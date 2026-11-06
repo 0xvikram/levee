@@ -33,7 +33,7 @@ The checker then reports `kind: "unhealthy", reason: "check failed: remote-acces
 
 ## 1. Normal path (default caps: 10,000 RUPC per transfer, 50,000 RUPC per day)
 
-Run at 03:53:26 UTC with the demo freshly up.
+Run at 03:53:26 UTC with the demo freshly up. Sections 1 to 5 ran before gate requests had to be signed (commit `e110c2a`); the signed-request run is section 6. Today a raw `POST /request` like the one below is refused `bad-signature`, and the never-enrolled `ghost-box` would be refused `unknown-machine`, not `no-pass`.
 
 | step | result | link |
 |---|---|---|
@@ -68,7 +68,7 @@ Normal-path cost: 0.004 HBAR (gate, receipt) + 0.016 HBAR (treasury, transfer).
 |---|---|---|---|---|---|
 | 100 | 6 (then 94 `execute-failed`) | 5 | **1 (no-receipt)** | 427 s | 2.27 |
 
-Transfer #5 ([tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793937268-268749224), 415.19 RUPC to payee0) was flagged `no-receipt` 2.0 s after consensus and contained in 6.2 s (treasury frozen, payee0 wiped + frozen). Its receipt existed: seq 7, consensus `1793937276.028`, **0.88 s before** the transfer (`1793937276.906`). The watcher reads movements first and receipts second, which is correct only if both reads see the same Mirror state. They don't. We first put this down to Mirror replicas disagreeing; the later probe (`scripts/demo/mirror-lag.ts`) found the real cause: the public Mirror Node sits behind a CDN that answers with `cache-control: public, max-age=1`, so an unchanged URL (the receipts query) can return an answer about 1 s old while the movements query is fresh. Fixed for good in commit `4f53393` (section 4). Every later request then failed with `ACCOUNT_FROZEN_FOR_TOKEN` (the receipts were written, the transfers were refused by the network).
+Transfer #5 ([tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793937268-268749224), 415.19 RUPC to payee0) was flagged `no-receipt` 2.0 s after consensus and contained in 6.2 s (treasury frozen, payee0 wiped + frozen). payee0 is the real partner Asha Pay: this false alarm wiped a partner's tokens. Since commit `3c9bb93` a known partner is only frozen, never wiped ("known partner: frozen, not wiped; admins decide"). Its receipt existed: seq 7, consensus `1793937276.028`, **0.88 s before** the transfer (`1793937276.906`). The watcher reads movements first and receipts second, which is correct only if both reads see the same Mirror state. They don't. We first put this down to Mirror replicas disagreeing; the later probe (`scripts/demo/mirror-lag.ts`) found the real cause: the public Mirror Node sits behind a CDN that answers with `cache-control: public, max-age=1`, so an unchanged URL (the receipts query) can return an answer about 1 s old while the movements query is fresh. Fixed for good in commit `4f53393` (section 4). Every later request then failed with `ACCOUNT_FROZEN_FOR_TOKEN` (the receipts were written, the transfers were refused by the network).
 
 Fix (commit `2627532`, tests in `tests/watcher/watcher.test.ts`): a movement whose only fault is "no receipt yet" waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000 ms, from first sight) for the receipt to be served, and is judged at once when the receipts read already contains any message with a later consensus time (then the read is provably complete for that moment). Nothing else changes: the receipt still has to have reached consensus *before* the movement, so a receipt written after a theft is still `receipt-after-movement`. The price is up to 3 s more detection time for a real theft when the receipts topic is quiet (see section 3). Treasury and payee0 were reopened 2-of-3 ([propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793937812-233962327), [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793937811-620431195); payee0 [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793937816-300565636), [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793937818-321896526)).
 
@@ -178,6 +178,22 @@ The planner did **not** freeze the treasury, and that is right: a mint is not a 
 | attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793975174-741999973) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793975176-022104293) |
 
 All transactions above were checked on the Mirror Node: mint, wipe + freeze, propose and approve (with its TOKENUNFREEZE child) `SUCCESS`; the second attempt `ACCOUNT_FROZEN_FOR_TOKEN`. Attacker after reopen: 103 RUPC, `UNFROZEN`. Fees (`charged_tx_fee`): mint 0.126, wipe + freeze 0.138, second attempt 0.016, propose 0.098, approve 0.135 HBAR; ≈ 0.54 HBAR for the whole run including the incident message and the restarted watcher's heartbeats.
+
+## 6. Signed requests: only an enrolled machine's key, with an allowed role, can ask the gate
+
+Commits `e110c2a` (gate) and `7560843` (demo). Every `POST /request` must carry `nonce`, `sentAt` and `signature`: an EIP-191 signature by the requesting machine's enrolled key over canonical JSON `{machine,to,amount,kind,nonce,sentAt}`. The gate asks the checker for the machine's enrolled key and role (`GET /machine/:name`), then checks signature, freshness (60 s), replay and role (`GATE_ALLOWED_ROLES`, default `finance,payouts`) before the pass, rules and watcher checks. `up.sh` locks `/enrol` with a random per-run `ENROL_TOKEN`. Demo roles: `payouts-server` = `payouts` (allowed), `laptop-vikram` = `employee`. Run by the main session on 6 Nov 2026 with the gate restarted on the new code (gate log: "signed requests only, roles finance/payouts"); the checker log shows "/enrol needs ENROL_TOKEN".
+
+| request | HTTP | reason | link |
+|---|---|---|---|
+| `npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500` (signed with the payouts-server key) | 200 | approved; watcher `matched` | [receipt](https://hashscan.io/testnet/transaction/0.0.11333489-1793975149-637916107) (topic 0.0.11333498) · [transfer](https://hashscan.io/testnet/transaction/0.0.11333495-1793975150-172921070) (500 RUPC treasury → Asha Pay) |
+| unsigned body `{machine, to, amount}` | 403 | `bad-signature` | |
+| signed with the `laptop-vikram` key but naming `payouts-server` | 403 | `bad-signature` | |
+| `laptop-vikram` signing as itself | 403 | `wrong-role` | |
+| the approved request sent again unchanged | 403 | `replayed-request` | |
+| a request with `sentAt` more than 60 s old | 403 | `stale-request` | |
+| `POST /enrol` on the checker without the token | 401 | `bad enrol token` | |
+
+Both linked transactions return `SUCCESS` on the Mirror Node (checked 6 Nov 2026). The unsigned refusal and the 401 on `/enrol` were re-checked against the running services the same evening. Refusals move no money and write no receipt. This signed payment is not included in the 393 false-alarm-free payments of runs B, C and D.
 
 ## Budget
 

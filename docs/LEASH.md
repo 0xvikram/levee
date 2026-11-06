@@ -1,11 +1,16 @@
-# Layer 1: Leash (machine health passes on Arkiv)
+# Leash (phase 2): machine health passes on Arkiv
 
-A company machine only gets to ask for money moves while it holds a live **pass**. The pass is one Arkiv entity per machine that expires 180 s after its last good heartbeat. The agent never judges transactions; it only says whether the machine is healthy.
+A company machine only gets to ask for money moves while it holds a live **pass**, and only by signing the request with its own enrolled key. The pass is one Arkiv entity per machine that expires 180 s after its last good heartbeat. The agent never judges transactions; it only says whether the machine is healthy.
+
+**Role is enforced.** Each machine is enrolled with a role (default `employee`). The gate accepts payment requests only from machines whose role is in `GATE_ALLOWED_ROLES` (default `finance,payouts`). Demo: `payouts-server` is enrolled as `payouts` (allowed); `laptop-vikram` as `employee`, so even with a live pass it would be refused `wrong-role`.
+
+**Requests are signed by the same key as heartbeats.** `npm run request -- --machine payouts-server --to 0.0.x --amount 500` (from the repo root) signs canonical JSON `{machine,to,amount,kind,nonce,sentAt}` with `state/machine-<name>.key` (EIP-191). The gate fetches the enrolled key and role from the checker (`GET /machine/:name`) and refuses `bad-signature`, `unknown-machine`, `stale-request` (more than 60 s), `replayed-request` or `wrong-role` before it looks at the pass. Naming a machine is not enough; you need its key. Details: [API.md](API.md#post-request).
 
 ```
 agent (each machine)  --signed heartbeat every 60 s-->  checker  --create/extend-->  Arkiv entity "levee.pass.v1"
                                                           ^                                   |
                                                     GET /pass/:machine  <------- gate --------+ (live only if entity exists, owned by checker, unexpired, Arkiv block < 10 s old)
+                                                    GET /machine/:name  <------- gate  (enrolled key + role, to verify the signed request)
 ```
 
 ## The 7 checks (macOS, read-only, no sudo)
@@ -53,7 +58,13 @@ Persistence, ports, dev-tool integrity and OS protections are what a server comp
 
 ## API (checker, port 8712)
 
-`POST /enrol {machine, publicKey, role}` · `GET /nonce?machine=` · `POST /heartbeat` · `GET /pass/:machine` → `{live, kind, expiresAt, reason, arkivEntityKey, arkivBlockAgeSeconds}` · `GET /passes` · `GET /events` (SSE). Set `ENROL_TOKEN` on the checker (and agent) to require a token on `/enrol`.
+`POST /enrol {machine, publicKey, role, profile}` (header `x-enrol-token`) · `GET /machine/:name` → `{machine, publicKey, role, profile}` · `GET /nonce?machine=` · `POST /heartbeat` · `GET /pass/:machine` → `{live, kind, expiresAt, reason, arkivEntityKey, arkivBlockAgeSeconds}` · `GET /passes` · `GET /events` (SSE). `/enrol` is locked by `ENROL_TOKEN` when it is set on the checker (and agent); `scripts/demo/up.sh` makes a random one per run and passes it only to the processes it starts. Without `ENROL_TOKEN`, `/enrol` is open (401 `bad enrol token` only when a token is set).
+
+## Limits
+
+- macOS checks only, self-reported by the machine's own agent. A root-level attacker on the machine can lie to them and also holds the key that signs its requests.
+- Enrolment records (public key, role) are kept in the checker's local state file, not on Arkiv.
+- In the demo both machines run on one Mac.
 
 ## Run
 

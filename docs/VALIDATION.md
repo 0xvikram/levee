@@ -23,7 +23,6 @@ Soft commitments (pilot, intro, letter of intent): list them here with the perso
 - Hedera / Stablecoin Studio team members at the venue (track sponsors).
 - Teams building payouts, remittance or treasury products on Hedera or any chain.
 - Security people: auditors, incident responders, people who handled a key-compromise incident.
-- DAO treasury signers.
 
 ## Questions to ask
 
