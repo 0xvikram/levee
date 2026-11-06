@@ -3,8 +3,10 @@
 //
 // Order matters on Hedera:
 //   1. freeze the treasury first (stops further outflows),
-//   2. wipe + freeze every receiving account (a frozen account cannot be wiped, so the
-//      controller wipes first, or uses wipeFrozen to unfreeze-wipe-freeze atomically),
+//   2. wipe + freeze every unknown receiving account (a frozen account cannot be wiped, so the
+//      controller wipes first, or uses wipeFrozen to unfreeze-wipe-freeze atomically);
+//      a KNOWN partner (rules allowlist / state payees) is only frozen, never wiped: a false
+//      alarm must not take a real partner's money (it wiped Asha Pay once), admins decide,
 //   3. burn unauthorised supply still sitting in the token treasury (proxy),
 //   4. pause the token last (a paused token rejects freeze/wipe/burn), only if configured.
 import { createHash } from "node:crypto";
@@ -25,7 +27,11 @@ export interface ContainmentStep {
   account?: string; // 0.0.x (freeze / wipe steps)
   amount?: string; // smallest unit (wipe / burn steps)
   why: string;
+  /** true when the account is a known partner: frozen only, never wiped */
+  partner?: boolean;
 }
+
+export const PARTNER_WHY = "known partner: frozen, not wiped; admins decide";
 
 export interface ContainmentState {
   treasury: string; // company treasury 0.0.x
@@ -35,6 +41,8 @@ export interface ContainmentState {
   balances?: Map<string, bigint>;
   pauseOnBreach: boolean;
   paused?: boolean;
+  /** Known recipients (rules allowlist / state payees). They are frozen, never wiped. */
+  knownRecipients?: Set<string>;
 }
 
 export function isTreasuryOutflow(b: WatcherBreach, treasury: string): boolean {
@@ -85,6 +93,13 @@ export function planContainment(breaches: WatcherBreach[], s: ContainmentState):
   const ordered = [...received.entries()].sort((a, b) => (a[1] === b[1] ? a[0].localeCompare(b[0]) : a[1] > b[1] ? -1 : 1));
   for (const [acct, want] of ordered) {
     if (acct === s.tokenTreasury) continue; // HTS cannot wipe the token treasury
+    if (s.knownRecipients?.has(acct)) {
+      if (!frozen.has(acct)) {
+        steps.push({ step: "freezeAccount", account: acct, why: PARTNER_WHY, partner: true });
+        frozen.add(acct);
+      }
+      continue;
+    }
     const amount = cap(acct, want);
     if (amount <= 0n) {
       if (!frozen.has(acct)) {
@@ -129,6 +144,7 @@ export interface StepResult {
   ok: boolean;
   atMs: number; // ms since the first breach movement's consensus time
   error?: string;
+  partner?: boolean;
 }
 
 /** Sends one controller call; returns the normalised tx id. Throws on failure. */
@@ -147,9 +163,9 @@ export async function executeContainment(
   for (const s of steps) {
     try {
       const { txId } = await call(s, incidentId);
-      out.push({ step: s.step, account: s.account, amount: s.amount, txId, ok: true, atMs: now() - t0 });
+      out.push({ step: s.step, account: s.account, amount: s.amount, txId, ok: true, atMs: now() - t0, ...(s.partner ? { partner: true } : {}) });
     } catch (e) {
-      out.push({ step: s.step, account: s.account, amount: s.amount, ok: false, atMs: now() - t0, error: (e as Error).message.slice(0, 200) });
+      out.push({ step: s.step, account: s.account, amount: s.amount, ok: false, atMs: now() - t0, error: (e as Error).message.slice(0, 200), ...(s.partner ? { partner: true } : {}) });
     }
   }
   return out;
@@ -181,6 +197,7 @@ export function buildIncident(o: {
       ...(r.txId ? { txId: r.txId } : {}),
       ok: r.ok,
       atMs: r.atMs,
+      ...(r.partner ? { note: PARTNER_WHY } : {}), // says why a receiver was frozen but not wiped
       ...(r.error ? { error: r.error } : {}), // kept so a failed step can be diagnosed
     })),
     detectedMs: o.detectedAtMs - t0,

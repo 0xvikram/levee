@@ -55,7 +55,7 @@ export interface Incident {
   incidentId: string;
   token: string;
   breaches: { txId: string; to: string; amount: string; reason: BreachReason }[];
-  actions: { step: string; account?: string; amount?: string; txId?: string; ok: boolean; atMs: number }[];
+  actions: { step: string; account?: string; amount?: string; txId?: string; ok: boolean; atMs: number; note?: string; error?: string }[];
   detectedMs: number; // ms from movement consensus to detection
   containedMs?: number; // ms from movement consensus to last containment step
 }

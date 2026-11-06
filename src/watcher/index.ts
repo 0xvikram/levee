@@ -135,7 +135,7 @@ async function main() {
     const t0 = Date.now();
     try {
       const r = await w.tick(true);
-      if (r.incident) console.log(`[watcher] incident ${r.incident.incidentId}: ${r.incident.actions.map((a) => `${a.step}${a.ok ? "" : "(FAILED)"}`).join(", ")} contained in ${r.incident.containedMs} ms`);
+      if (r.incident) console.log(`[watcher] incident ${r.incident.incidentId}: ${r.incident.actions.map((a) => `${a.step}${a.account ? ` ${a.account}` : ""}${a.note ? " (known partner: frozen, not wiped)" : ""}${a.ok ? "" : "(FAILED)"}`).join(", ")} contained in ${r.incident.containedMs} ms`);
     } catch {
       /* recorded in lastError; health check handles it */
     }

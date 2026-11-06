@@ -313,6 +313,7 @@ export class Watcher {
       balances,
       pauseOnBreach: this.cfg.pauseOnBreach,
       paused: info?.pause_status === "PAUSED",
+      knownRecipients: new Set(this.cfg.rules.knownDestinations),
     };
   }
 

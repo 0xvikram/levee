@@ -4,6 +4,7 @@ import {
   executeContainment,
   firstBreachAt,
   incidentIdFor,
+  PARTNER_WHY,
   planContainment,
   type ContainmentState,
   type WatcherBreach,
@@ -115,6 +116,45 @@ describe("planContainment", () => {
     expect(steps.map((s) => s.step)).toEqual(["freezeAccount"]);
   });
 
+  it("known partner (e.g. Asha Pay) on a false alarm: freeze the treasury and the partner, never wipe it", () => {
+    const steps = planContainment([br({ to: B, amount: "5000" })], st({ knownRecipients: new Set([B]) }));
+    expect(steps.map((s) => [s.step, s.account, s.amount, s.partner])).toEqual([
+      ["freezeAccount", T, undefined, undefined],
+      ["freezeAccount", B, undefined, true],
+    ]);
+    expect(steps[1].why).toBe(PARTNER_WHY);
+  });
+
+  it("known partner already frozen: nothing more to do for it", () => {
+    const steps = planContainment([br({ to: B })], st({ knownRecipients: new Set([B]), frozen: new Set([T, B]) }));
+    expect(steps).toEqual([]);
+  });
+
+  it("unknown receiver is still wiped and frozen when a partner list is set", () => {
+    const steps = planContainment([br({ to: A, amount: "700" })], st({ knownRecipients: new Set([B]) }));
+    expect(steps.map((s) => [s.step, s.account, s.amount])).toEqual([
+      ["freezeAccount", T, undefined],
+      ["wipeAndFreeze", A, "700"],
+    ]);
+    expect(steps[1].partner).toBeUndefined();
+  });
+
+  it("mixed breach: partner frozen only, attacker wiped + frozen, unauthorised mint to a partner is not wiped either", () => {
+    const steps = planContainment(
+      [
+        br({ txId: "m-1-000000001", to: B, amount: "9000" }),
+        br({ txId: "m-1-000000002", to: A, amount: "300" }),
+        br({ txId: "m-1-000000003", kind: "mint", from: null, to: B, amount: "50" }),
+      ],
+      st({ knownRecipients: new Set([B]) }),
+    );
+    expect(steps.map((s) => [s.step, s.account, s.amount])).toEqual([
+      ["freezeAccount", T, undefined],
+      ["freezeAccount", B, undefined],
+      ["wipeAndFreeze", A, "300"],
+    ]);
+  });
+
   it("does not mutate the input frozen set", () => {
     const frozen = new Set<string>();
     planContainment([br({})], st({ frozen }));
@@ -173,6 +213,18 @@ describe("incident ids and execution", () => {
     expect(inc.detectedMs).toBe(800); // allowance at ...005 is the earliest
     expect(inc.containedMs).toBe(2900);
     expect(inc.breaches[1]).toEqual({ txId: "0.0.6000-1-000000001", to: T, amount: "0", reason: "treasury-allowance" });
+    expect(validateIncident(inc).ok).toBe(true);
+  });
+
+  it("incident marks a partner freeze with a note, and only that action", async () => {
+    const b = [br({ to: B, amount: "10" })];
+    const steps = planContainment(b, st({ knownRecipients: new Set([B]) }));
+    const res = await executeContainment(steps, incidentIdFor(b), "1762400010.000000000", async () => ({ txId: "0.0.7-1-000000000" }), () => 1762400011_000);
+    const inc = buildIncident({ incidentId: incidentIdFor(b), token: "0.0.5001", breaches: b, results: res, detectedAtMs: 1762400010_500 });
+    expect(inc.actions.map((a) => [a.step, a.account, a.note])).toEqual([
+      ["freezeAccount", T, undefined],
+      ["freezeAccount", B, PARTNER_WHY],
+    ]);
     expect(validateIncident(inc).ok).toBe(true);
   });
 });
