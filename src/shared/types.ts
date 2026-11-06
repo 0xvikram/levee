@@ -12,6 +12,8 @@ export interface Receipt {
   kind: "transfer" | "mint";
   machine: string; // which machine asked
   approvedAt: string; // ISO time, informational only
+  /** transfers: the Hedera schedule (0.0.x) that holds this transfer; txId is its scheduled transaction id */
+  scheduleId?: string;
   /** consensus timestamp of the HCS message, filled in when read back from the Mirror Node */
   consensusAt?: string; // "seconds.nanos"
 }

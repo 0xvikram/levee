@@ -119,15 +119,21 @@ export interface GateEvent {
   amount: string;
   kind: "transfer" | "mint";
   ok: boolean;
-  reason?: RefusalReason | "execute-failed";
+  reason?: RefusalReason | ChainFailure;
   detail?: string;
   txId?: string;
   receiptTxId?: string; // HCS submit tx of the receipt (approved requests only)
   receiptSequence?: number; // receipt's sequence number on the receipts topic
+  scheduleId?: string; // transfers: the Hedera schedule holding the transfer
+  scheduledTxId?: string; // transfers: id the transfer executes under (= txId)
+  signTxId?: string; // transfers: the issuer signer's ScheduleSign
   timings?: Record<string, number>;
 }
 
-export function gateEvent(req: GateRequest, d: Decision | { ok: false; reason: "execute-failed"; detail: string }, nowMs: number, extra: Partial<GateEvent> = {}): GateEvent {
+/** Failures after approval: mint execution, ScheduleCreate, or the issuer signer refusing / not answering. */
+export type ChainFailure = "execute-failed" | "schedule-failed" | "signer-refused" | "signer-unavailable";
+
+export function gateEvent(req: GateRequest, d: Decision | { ok: false; reason: ChainFailure; detail: string }, nowMs: number, extra: Partial<GateEvent> = {}): GateEvent {
   return {
     at: new Date(nowMs).toISOString(),
     machine: req.machine,

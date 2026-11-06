@@ -19,6 +19,10 @@ describe("receipt validation", () => {
   ])("rejects bad %s = %j", (k, v) => {
     expect(validateReceipt({ ...good, [k]: v }).ok).toBe(false);
   });
+  it("keeps a schedule id (scheduled transfers) and rejects a bad one", () => {
+    expect(parseReceipt(JSON.stringify({ ...good, scheduleId: "0.0.8888" }))).toEqual({ ok: true, value: { ...good, scheduleId: "0.0.8888" } });
+    expect(validateReceipt({ ...good, scheduleId: "8888" }).ok).toBe(false);
+  });
   it("rejects non-JSON and non-objects", () => {
     expect(parseReceipt("{")).toEqual({ ok: false, error: "not JSON" });
     expect(parseReceipt("[1]").ok).toBe(false);

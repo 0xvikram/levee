@@ -13,6 +13,8 @@
     "setup:token": "tsx src/setup/token.ts",
     "setup:controller": "tsx src/setup/controller.ts",
     "gate": "tsx src/gate/server.ts",
+    "signer": "tsx src/signer/server.ts",
+    "setup:signer": "tsx src/signer/account.ts",
     "watcher": "tsx src/watcher/index.ts",
     "checker": "tsx src/checker/server.ts",
     "agent": "tsx src/agent/index.ts",

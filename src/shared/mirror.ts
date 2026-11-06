@@ -62,6 +62,21 @@ export interface TopicMessage {
   text: string;
 }
 
+/** /api/v1/schedules/{id} */
+export interface MirrorSchedule {
+  schedule_id: string;
+  consensus_timestamp: string; // when the ScheduleCreate reached consensus
+  creator_account_id: string;
+  payer_account_id: string;
+  deleted: boolean;
+  executed_timestamp: string | null;
+  expiration_time: string | null;
+  memo?: string;
+  transaction_body: string; // base64 SchedulableTransactionBody
+  wait_for_expiry?: boolean;
+  signatures?: { consensus_timestamp: string; public_key_prefix: string; type: string }[];
+}
+
 export interface MirrorTokenInfo {
   token_id: string;
   symbol: string;
@@ -314,6 +329,23 @@ export class MirrorClient {
   /** All records (parent + children) of one transaction id. */
   async transactionById(txId: string): Promise<MirrorTransaction[]> {
     const r = await this.get<{ transactions: MirrorTransaction[] }>(`/api/v1/transactions/${txId}`);
+    return r?.transactions ?? [];
+  }
+
+  /** One schedule entity (null until the Mirror has ingested its ScheduleCreate). */
+  schedule(scheduleId: string): Promise<MirrorSchedule | null> {
+    return this.get<MirrorSchedule>(`/api/v1/schedules/${scheduleId}`);
+  }
+
+  /** Newest schedules created by `account`, newest first. */
+  async schedulesCreatedBy(account: string, limit = 25): Promise<MirrorSchedule[]> {
+    const r = await this.get<{ schedules: MirrorSchedule[] }>(`/api/v1/schedules?account.id=${account}&order=desc&limit=${limit}`);
+    return r?.schedules ?? [];
+  }
+
+  /** The transaction(s) with exactly this consensus timestamp (e.g. the ScheduleCreate behind a schedule). */
+  async transactionsAt(ts: string): Promise<MirrorTransaction[]> {
+    const r = await this.get<{ transactions: MirrorTransaction[] }>(`/api/v1/transactions?timestamp=${ts}`);
     return r?.transactions ?? [];
   }
 

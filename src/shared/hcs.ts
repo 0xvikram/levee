@@ -70,6 +70,7 @@ export function validateReceipt(v: unknown): Parsed<Receipt> {
   if (!isStr(v.machine) || v.machine.length === 0 || v.machine.length > 64) return { ok: false, error: "bad machine" };
   if (!isStr(v.approvedAt) || Number.isNaN(Date.parse(v.approvedAt))) return { ok: false, error: "bad approvedAt" };
   if (v.consensusAt !== undefined && (!isStr(v.consensusAt) || !TS.test(v.consensusAt))) return { ok: false, error: "bad consensusAt" };
+  if (v.scheduleId !== undefined && (!isStr(v.scheduleId) || !ID.test(v.scheduleId))) return { ok: false, error: "bad scheduleId" };
   const r: Receipt = {
     v: 1,
     type: "receipt",
@@ -82,6 +83,7 @@ export function validateReceipt(v: unknown): Parsed<Receipt> {
     machine: v.machine,
     approvedAt: v.approvedAt,
   };
+  if (isStr(v.scheduleId)) r.scheduleId = v.scheduleId;
   if (isStr(v.consensusAt)) r.consensusAt = v.consensusAt;
   return { ok: true, value: r };
 }

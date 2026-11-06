@@ -28,7 +28,7 @@ const auth = new RequestAuthenticator(
     { machine: "laptop-1", publicKey: publicKeyOf(laptopKey), role: "employee" },
   ]),
 );
-const gate = createGate({ state, rules, mirror, pass: { isLive: (m) => pass.isLive(m) }, auth, client: {} as never, gateKey: {} as never, signerKey: {} as never });
+const gate = createGate({ state, rules, mirror, pass: { isLive: (m) => pass.isLive(m) }, auth, client: {} as never, gateKey: {} as never });
 let server: Server;
 let base = "";
 beforeAll(async () => {
