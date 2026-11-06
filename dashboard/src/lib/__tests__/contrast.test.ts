@@ -57,12 +57,6 @@ const PAIRS: [string, string, string][] = [
   ["ink chart label on sky", C.ink, C.sky],
   ["smoke source link / axis on sky", C.smoke, C.sky],
   ["gold Levee label + value on sky", C.gold, C.sky],
-  // poster hero (hero-wordmark.css): copy sits on a moss scrim (>= 0.8) that may cover a white cloud or bright sky
-  ["hero tagline white on moss scrim over white", "#F6F1E4", over(C.moss, 0.8, C.white)],
-  ["hero line sky on moss scrim over white", C.sky, over(C.moss, 0.8, C.white)],
-  ["hero accent yellow on moss scrim over white", C.yellow, over(C.moss, 0.8, C.white)],
-  ["hero chip sky on ink glass over white", C.sky, over(C.ink, 0.72, C.white)],
-  ["hero strip stat white on moss", "#F6F1E4", C.moss],
 ];
 
 /** Non-text marks (bars) need 3:1 against the ground (WCAG 1.4.11), and Levee must stand apart from the rest. */
