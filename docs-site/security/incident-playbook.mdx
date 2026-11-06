@@ -1,0 +1,54 @@
+---
+title: "Incident playbook"
+description: "What Levee does automatically when tokens move without a receipt, and what operators do next."
+---
+
+## What Levee does on its own
+
+Within seconds of the movement's consensus:
+
+1. The watcher detects the unreceipted movement.
+2. The contract freezes the treasury, if tokens left it.
+3. The contract wipes and freezes each unknown receiver. A known partner is only frozen.
+4. If configured, the token is paused last.
+5. The incident is published to the incidents topic.
+
+From then on, Hedera rejects any transfer out of the frozen treasury (`ACCOUNT_FROZEN_FOR_TOKEN`), whoever signs it. Only 2 of 3 admins can reopen.
+
+## What operators do
+
+<Steps>
+  <Step title="Read the incident">
+    Open the incidents topic ([0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) on testnet), or the watcher's `GET /state` and `/events`. The incident lists each breach (transaction id, receiver, amount, reason) and each containment step with its transaction id, whether it succeeded, and its time from the breach.
+  </Step>
+  <Step title="Check every step on HashScan">
+    Confirm that the freeze and the wipe succeeded. A failed step carries an `error`. If a step failed, an admin can run the same close action on the contract directly: admins may call `freezeAccount`, `wipeAndFreeze`, `wipeFrozen`, `burnSupply` and `pauseToken` too.
+  </Step>
+  <Step title="Decide: real theft or false alarm">
+    Was the movement signed outside the process? Check which keys signed it and whether a receipt was written late (`receipt-after-movement`) or did not match (`receipt-mismatch`). If a known partner was frozen, it was not wiped: talk to the partner before reopening it.
+  </Step>
+  <Step title="Close the hole first">
+    Before reopening, rotate whatever was stolen. For a stolen treasury key, re-key the treasury KeyList. For a stolen minting key, revoke its cash-in role, or pause the token, since Levee does not do this automatically yet. For a stolen watcher key, replace the watcher with a 2-of-3 `SetWatcher` proposal.
+  </Step>
+  <Step title="Reopen with 2 of 3 admins">
+    One admin proposes `Unfreeze` for each account to reopen, and a second approves. Unpause first if the token is paused, because unfreeze fails on a paused token. In the demo: `npx tsx scripts/reopen.ts treasury attacker`, or `scripts/demo/reset.ts` to unpause and reopen everything frozen.
+  </Step>
+  <Step title="Re-issue wiped supply if needed">
+    A wipe burns the tokens. They do not return to the treasury. If the issuer wants the treasury balance restored, it re-mints the wiped amount through its normal, receipted mint path.
+  </Step>
+</Steps>
+
+## If the watcher was down
+
+The gate refused all payouts while the watcher was down. But a theft that skipped the gate in that window is not contained automatically. On restart the watcher reports it as a historic breach. An admin must run the containment actions by hand.
+
+## If the thief moved funds on
+
+The wipe takes only what is still in the receiving account, and that account is frozen even if empty. Tokens already sent to another account are not followed. The admins can freeze that next account by hand through the controller.
+
+## Known testnet incidents
+
+| Incident message | What |
+|---|---|
+| Topic 0.0.11333500, message 5 | Stolen-key drain, 1,000 RUPC, contained in 6.86 s |
+| Topic 0.0.11333500, message 7 | Unauthorised mint, 5,000 RUPC, wiped and frozen in 7.53 s |

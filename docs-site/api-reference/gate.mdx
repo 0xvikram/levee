@@ -1,0 +1,153 @@
+---
+title: "Gate"
+description: "Port 8710. Ask for a payment or a mint, read health, and stream decisions."
+---
+
+Source: `src/gate/server.ts`, `src/gate/auth.ts`, `src/gate/decide.ts`.
+
+## POST /request
+
+Ask the gate to send a transfer or a mint. The body must be signed by the requesting machine's enrolled key.
+
+```json
+{
+  "machine": "payouts-server",
+  "to": "0.0.11333490",
+  "amount": "500000000",
+  "kind": "transfer",
+  "nonce": "<16-64 hex chars, never reused>",
+  "sentAt": 1793975149000,
+  "signature": "0x<65 bytes hex>"
+}
+```
+
+<ParamField body="machine" type="string" required>
+  The enrolled machine name. 1 to 64 characters from `[A-Za-z0-9._:-]`.
+</ParamField>
+<ParamField body="to" type="string" required>
+  Recipient account id, `0.0.x`. For transfers it must be a known recipient.
+</ParamField>
+<ParamField body="amount" type="string" required>
+  Positive integer in the token's smallest unit. A safe JS integer is also accepted. Must fit in int64.
+</ParamField>
+<ParamField body="kind" type="string" default="transfer">
+  `transfer` or `mint`. A mint is a Studio cash-in.
+</ParamField>
+<ParamField body="nonce" type="string" required>
+  16 to 64 hex characters. Never reuse one.
+</ParamField>
+<ParamField body="sentAt" type="number" required>
+  Unix time in milliseconds. Must be within 60 s of the gate clock.
+</ParamField>
+<ParamField body="signature" type="string" required>
+  EIP-191 (`personal_sign`) signature with the machine's key over the canonical JSON of exactly `{machine, to, amount, kind, nonce, sentAt}`, with `amount` as a decimal string. See `requestMessage` in `src/agent/request.ts`.
+</ParamField>
+
+Do not build the signature by hand. Use the CLI from the repo root, which signs and posts:
+
+```bash
+npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500
+# --amount is whole tokens; --units sends it as-is
+# [--kind transfer|mint] [--gate http://localhost:8710]
+```
+
+### Check order
+
+Parse (400), then: unsigned (`bad-signature`), `unknown-machine`, wrong key (`bad-signature`), `stale-request`, `replayed-request`, `wrong-role`, `no-pass`, caps and recipient, `no-watcher`.
+
+### Responses
+
+<ResponseField name="200 transfer" type="object">
+  `{ ok: true, receipt, txId, scheduleId, scheduledTxId, receiptTxId, receiptSequence, signTxId, executedStatus: "SUCCESS", timings }`. `receipt` includes its `sequence`.
+</ResponseField>
+<ResponseField name="200 mint" type="object">
+  `{ ok: true, receipt, receiptTxId, txId, timings }`.
+</ResponseField>
+<ResponseField name="400" type="object">
+  `{ ok: false, reason: "bad-request", detail }`.
+</ResponseField>
+<ResponseField name="403" type="object">
+  `{ ok: false, reason, detail }`. See the refusal reasons below.
+</ResponseField>
+<ResponseField name="502 schedule-failed" type="object">
+  `{ ok: false, reason: "schedule-failed", detail, txId, timings }`. The ScheduleCreate failed. No receipt was written.
+</ResponseField>
+<ResponseField name="502 signer-refused" type="object">
+  `{ ok: false, reason: "signer-refused", detail, txId, scheduleId, scheduledTxId, receiptTxId, receiptSequence, receipt, signer, timings }`. The receipt was written but the issuer signer refused. The schedule expires unexecuted.
+</ResponseField>
+<ResponseField name="504 signer-unavailable" type="object">
+  Same shape as `signer-refused`. The issuer signer did not answer. Its own poll may still judge, and sign, the schedule before it expires.
+</ResponseField>
+<ResponseField name="502 execute-failed" type="object">
+  Mint only. `{ ok: false, reason: "execute-failed", detail, txId, receipt, timings }`. The receipt was written and execution failed.
+</ResponseField>
+<ResponseField name="500" type="object">
+  `{ ok: false, reason: "internal", detail }`.
+</ResponseField>
+
+### Refusal reasons (403)
+
+| Reason | When |
+|---|---|
+| `bad-signature` | `signature`, `nonce` or `sentAt` missing or malformed, or the signature does not recover to the machine's enrolled key |
+| `unknown-machine` | The machine is not enrolled, or the checker could not be asked (fails closed) |
+| `stale-request` | `sentAt` more than 60 s from the gate clock |
+| `replayed-request` | This `(machine, nonce)` was already used. The cache is in memory and forgotten on restart |
+| `wrong-role` | The machine's role is not in `GATE_ALLOWED_ROLES` (default `finance,payouts`) |
+| `no-pass` | No live health pass on Arkiv |
+| `over-transfer-cap` | Amount above `CAP_PER_TRANSFER` |
+| `over-daily-cap` | Today's spend plus the amount above `CAP_PER_DAY` |
+| `unknown-destination` | `to` is not a known recipient |
+| `no-watcher` | No watcher heartbeat on HCS in the last 120 s |
+
+### Receipt and timings
+
+`Receipt` = `{ v: 1, type: "receipt", txId, token, from, to, amount, kind, machine, approvedAt, scheduleId? }`. `scheduleId` is set on transfers.
+
+`timings`, in ms since the request arrived unless noted: `authMs`, `passMs`, `heartbeatMs`, `scheduleMs` (duration of the ScheduleCreate), `receiptMs` (duration of the HCS submit), `signerMs` (duration of the call to the issuer signer), `signerVerifyMs` and `signerSignMs` (the signer's own Mirror check and ScheduleSign), `executeMs` (mint only), `totalMs`.
+
+### Example: approved transfer, abridged
+
+```json
+{
+  "ok": true,
+  "txId": "0.0.11333489-1793977084-654477314",
+  "scheduleId": "0.0.11340805",
+  "scheduledTxId": "0.0.11333489-1793977084-654477314",
+  "receiptTxId": "0.0.11333489-1793977081-963853491",
+  "receiptSequence": 499,
+  "signTxId": "0.0.11340800-1793977089-430366632",
+  "executedStatus": "SUCCESS"
+}
+```
+
+These ids are from the live run on 6 Nov 2026.
+
+### Example: refusal
+
+```json
+{ "ok": false, "reason": "over-transfer-cap", "detail": "amount 10001000000 > cap 10000000000" }
+```
+
+## GET /health
+
+```json
+{ "ok": true, "service": "gate", "served": 0, "treasury": "0.0.x", "token": "0.0.x", "sseClients": 0,
+  "capPerTransfer": "…", "capPerDay": "…", "spentToday": "…", "knownDestinations": ["0.0.x"],
+  "signing": "scheduled: gate key + issuer signer (separate process)" }
+```
+
+Caps and `spentToday` are smallest-unit strings. `spentToday` is the UTC day, reserved when a receipt is written.
+
+## GET /events (SSE)
+
+Replays the last 50 frames on connect. Each frame has `id:` and `event: decision`.
+
+```json
+{ "at": "ISO", "machine": "payouts-server", "to": "0.0.x", "amount": "500000000", "kind": "transfer",
+  "ok": true, "txId": "0.0.x-…", "scheduleId": "0.0.x", "scheduledTxId": "0.0.x-…",
+  "receiptTxId": "0.0.x-…", "receiptSequence": 12, "signTxId": "0.0.x-…",
+  "timings": { "passMs": 0, "heartbeatMs": 0, "scheduleMs": 0, "receiptMs": 0, "signerMs": 0, "totalMs": 0 } }
+```
+
+Mints carry `txId`, `receiptTxId`, `receiptSequence` and `timings.executeMs`, with no schedule fields. Refusals carry `ok: false, reason, detail, timings` and no `txId`. Failures after approval carry `ok: false`, the failure reason, `detail`, `txId`, `timings`, plus the schedule and receipt fields once they exist.

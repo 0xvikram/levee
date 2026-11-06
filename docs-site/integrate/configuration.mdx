@@ -1,0 +1,78 @@
+---
+title: "Configure caps and recipients"
+description: "Every setting Levee reads from the environment, and what is fixed."
+---
+
+Settings come from `.env`. Deployment IDs (token, accounts, topics, controller, recipients) come from `state/deploy.json`, written by the setup scripts.
+
+## Rules
+
+| Variable | Default | What |
+|---|---|---|
+| `CAP_PER_TRANSFER` | `10000` | Largest single payment, in **whole tokens** |
+| `CAP_PER_DAY` | `50000` | Most the gate approves per UTC day, in whole tokens |
+| `GATE_ALLOWED_ROLES` | `finance,payouts` | Machine roles allowed to request payments |
+
+Caps are written in whole tokens and scaled by the token's decimals. With RUPC (6 decimals), `CAP_PER_TRANSFER=10000` means 10,000 RUPC. The gate and the watcher both apply them.
+
+The **recipient list** is the payees in `state/deploy.json`, written at setup. In the demo: Asha Pay and Ravi Exchange.
+
+## Gate
+
+| Variable | Default | What |
+|---|---|---|
+| `GATE_PORT` | `8710` | HTTP port |
+| `CHECKER_URL` | `http://localhost:8712` | Where the gate asks for passes and enrolment records |
+| `SIGNER_URL` | `http://127.0.0.1:8715` | The issuer signer |
+| `SIGNER_WAIT_S` | `75` | How long the gate waits for the signer |
+| `SCHEDULE_TTL_S` | `300` | When an unsigned schedule expires |
+| `WATCHER_HEARTBEAT_MAX_AGE_S` | `120` | Oldest watcher heartbeat the gate accepts |
+
+## Watcher
+
+| Variable | Default | What |
+|---|---|---|
+| `WATCHER_PORT` | `8711` | HTTP port |
+| `WATCHER_RECEIPT_GRACE_MS` | `3000` | Backstop wait for a receipt not yet served |
+| `WATCHER_TICK_MS` | `1000` | Normal tick |
+| `WATCHER_HOLD_TICK_MS` | `400` | Tick while a movement waits for its receipt |
+| `WATCHER_HEARTBEAT_SECONDS` | `30` | Heartbeat interval |
+| `WATCHER_SINCE` | start of the UTC day | Where to start reading. `now` skips the day's history |
+| `PAUSE_ON_BREACH` | off | Pause the token as the last containment step |
+
+## Issuer signer
+
+| Variable | Default | What |
+|---|---|---|
+| `SIGNER_PORT` | `8715` | HTTP port, bound to 127.0.0.1 |
+| `SIGNER_RECEIPT_WAIT_S` | `60` | How long to look for a receipt before refusing |
+| `SIGNER_POLL_S` | `10` | Poll for gate schedules. `0` means notifications only |
+
+## Checker and agents
+
+| Variable | Default | What |
+|---|---|---|
+| `CHECKER_PORT` | `8712` | HTTP port |
+| `ENROL_TOKEN` | unset | Locks `POST /enrol`. Without it, enrolment is open. `up.sh` sets a random one per run |
+| `HEARTBEAT_SECONDS` | `60` | Agent heartbeat interval |
+| `PASS_SECONDS` | `180` | Pass lifetime on Arkiv |
+| `LEVEE_ALLOW_PORTS` | unset | Ports the `ports` check allows on this machine, for example `5432` on a database host |
+
+## Network
+
+| Variable | Default |
+|---|---|
+| `HEDERA_NETWORK` | `testnet` |
+| `MIRROR_URL` | `https://testnet.mirrornode.hedera.com` |
+| `ARKIV_RPC` | `https://rpc.rabdi.db-chain.testnet.arkiv.network` |
+| `OPERATOR_ID`, `OPERATOR_KEY`, `ARKIV_PRIVATE_KEY`, `ARKIV_ACCESS_KEY` | (none) |
+
+## Fixed, not settings
+
+- The receipt must reach consensus before the movement.
+- The contract can only close things. It has no transfer or mint function.
+- A known partner is frozen, never wiped (enforced by the watcher).
+- Reopen needs 2 different admins.
+- Admins are fixed when the contract is deployed.
+- The watcher can be changed only by a 2-of-3 `SetWatcher` proposal.
+- All gate checks are always on. There is no switch to turn one off. Raising caps loosens them.

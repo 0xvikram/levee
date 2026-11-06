@@ -1,0 +1,65 @@
+---
+title: "Protect an existing Stablecoin Studio token"
+description: "Attach Levee to a token you already issue. No new token. The paying treasury is re-keyed to a 2-of-3 KeyList that includes the gate."
+---
+
+Levee attaches to a Stablecoin Studio token through Studio's own role system. You keep `DEFAULT_ADMIN`. You do not issue a new token.
+
+<Note>
+This path is described in `docs/BUSINESS.md` and matches the setup scripts. It has run end to end on a token Levee created on testnet. It has not yet been run on a third party's existing token. A testnet pilot on an existing Studio token is the next step on the roadmap.
+</Note>
+
+## Requirements
+
+- A token created with Hedera Stablecoin Studio (v4), where you hold `DEFAULT_ADMIN`.
+- The token must have freeze and wipe keys held by the Studio proxy. Levee cannot protect a token you did not issue, such as USDC.
+- Three admin accounts for the 2-of-3 reopen.
+
+## Steps
+
+<Steps>
+  <Step title="Deploy the ContainmentController">
+    Deploy it with the token's proxy address, the watcher address and 3 admin addresses.
+
+    ```bash
+    npm run setup:controller
+    ```
+  </Step>
+  <Step title="Grant the controller four roles">
+    From the Studio admin, grant the controller `FREEZE_ROLE`, `WIPE_ROLE`, `BURN_ROLE` and `PAUSE_ROLE`. Never grant it `DEFAULT_ADMIN`. The setup script does this when the operator holds `DEFAULT_ADMIN`.
+  </Step>
+  <Step title="Create the three HCS topics">
+    Receipts (submit key: gate), incidents and heartbeats (submit key: watcher). No admin key.
+
+    ```bash
+    npm run setup:topics
+    ```
+  </Step>
+  <Step title="Re-key the paying treasury">
+    Change the paying treasury's key to a 2-of-3 KeyList that includes the gate key: `{treasurySigner, gate, cold}`. From now on a normal payout needs the gate's signature, which it gives only after writing a receipt.
+  </Step>
+  <Step title="Optional: gate mints too">
+    Grant the gate the cash-in (supplier) role so mints also need a receipt. Studio v4 does this with `grantUnlimitedSupplierRole(address)`, not the generic `grantRole`.
+  </Step>
+  <Step title="Set up the issuer signer">
+    Create the issuer signer's fee account. Its key is the treasury-signer key.
+
+    ```bash
+    npm run setup:signer
+    ```
+  </Step>
+  <Step title="Start the services">
+    Start the checker, the machine agents, the watcher, the issuer signer and the gate. See [Run in production](/integrate/production).
+  </Step>
+</Steps>
+
+## Removing Levee
+
+Do the reverse. Revoke the four roles from the controller (and the cash-in role from the gate, if granted). Change the treasury key back.
+
+## What changes for your team
+
+- Payout systems call the gate with a signed request instead of signing transfers themselves. See [Gate API](/api-reference/gate).
+- Recipients must be on the known list. Payments above the caps are refused.
+- Every approved payout leaves a public receipt on your receipts topic.
+- If the watcher is down, the gate refuses all payouts until it is back.

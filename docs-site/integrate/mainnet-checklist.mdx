@@ -1,0 +1,32 @@
+---
+title: "Mainnet checklist"
+description: "What must be true before Levee protects a mainnet token. Most of it is not done yet."
+---
+
+Levee is not on mainnet. This checklist is honest about where each item stands today.
+
+| Item | Status |
+|---|---|
+| Audit of `ContainmentController.sol` | Not done. See [Audit status](/security/audit-status) |
+| Gate, watcher, admin and treasury keys in KMS or HSM | Not built |
+| On-chain partner guard in the controller | Not built |
+| Dedicated Mirror Node for the watcher | Not built (the watcher reads `MIRROR_URL`, so it is a configuration change) |
+| A second, independent watcher | Not built |
+| Automatic revoke of the cash-in role, or pause, after an unauthorised mint | Not built (`PAUSE_ON_BREACH` exists, off by default) |
+| Burn of unauthorised supply in the token treasury, run live | Unit-tested only |
+| Persistent replay cache in the gate | Not built (in memory today) |
+| Windows and Linux machine agents | Not built (macOS only) |
+| Several tokens and treasuries per deployment | Not built (one of each today) |
+| Pilot on an existing Studio token | Not done |
+
+## Before you go live
+
+- [ ] Contract audited, and the verified source on HashScan matches the audited commit.
+- [ ] Three admins are named people with separate keys. They know the [incident playbook](/security/incident-playbook).
+- [ ] The treasury is a 2-of-3 KeyList that includes the gate key. The cold key is offline.
+- [ ] The issuer signer runs on infrastructure separate from the gate.
+- [ ] Caps (`CAP_PER_TRANSFER`, `CAP_PER_DAY`) are set to real business limits.
+- [ ] The recipient list contains every legitimate payee, each associated with the token.
+- [ ] `ENROL_TOKEN` is set on the checker.
+- [ ] Alerts are wired to the incidents and heartbeats topics and the watcher's `/health`.
+- [ ] You have run a drill on testnet: send, theft, reopen, and a false-alarm load test that ends with `breaches == 0`.

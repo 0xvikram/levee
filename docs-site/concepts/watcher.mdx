@@ -1,0 +1,51 @@
+---
+title: "Watcher"
+description: "The watcher matches every token movement to a receipt, reads the Mirror Node fresh, and proves when a receipt cannot exist."
+---
+
+The watcher does not care who signed a transaction. It reads every movement of the token from the Mirror Node and checks it against the receipts. Any outflow without a receipt is caught, whatever wallet or custodian produced the signature.
+
+## What it watches
+
+- The issuer treasury and the token treasury (the Studio proxy), so it sees transfers and mints.
+- The receipts topic.
+- New allowances granted by the treasury. An allowance is a breach (`treasury-allowance`).
+
+It ticks every 1 s. While a movement waits for its receipt it ticks every 0.4 s.
+
+## Matching
+
+Each movement is matched by transaction id to a receipt that reached consensus before it, with the same token, from, to, amount and kind. The receipt must not be reused and must still pass the caps and recipient list. Details on [Receipts](/concepts/receipts).
+
+## Fresh Mirror reads
+
+The public Mirror Node REST API sits behind a CDN that answers with `cache-control: public, max-age=1`. An unchanged URL can return an answer about 1 s old. In run A this caused a false alarm: the receipt had reached consensus 0.88 s before the transfer, but the receipts read was served from cache and did not include it yet.
+
+The watcher now makes every polling URL unique (cache-busted), so the CDN cannot serve it an old answer.
+
+## The coverage proof
+
+Every receipt is a message paid for by the gate. The watcher reads one ascending listing of every transaction touching the watched accounts or the gate. If one answer already holds the movement and no gate message before it, no receipt can still be unread. The watcher raises the breach at once.
+
+## The 3 s backstop
+
+If the proof read fails, a movement whose only fault is "no receipt yet" waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000 ms) for the receipt to be served. This cannot excuse a real theft. The receipt must still have reached consensus before the movement.
+
+## Health and fail closed
+
+- Healthy means Mirror lag at most 20 s and a successful tick within the last 20 s.
+- A healthy watcher posts a heartbeat to the heartbeats topic every 30 s.
+- An unhealthy watcher withholds heartbeats. The gate then refuses every payment with `no-watcher`.
+
+## On restart
+
+When the watcher starts, it re-reads the day's movements. Past breaches are reported as historic, not contained. A theft that skipped the gate while the watcher was down is not undone automatically. See [Known limits](/security/known-limits).
+
+## Measured
+
+| Metric | Value |
+|---|---|
+| Detection, latest stolen-key run | 2.87 s after consensus |
+| Match after the gate's reply, run D | p50 1.58 s, max 2.92 s |
+| Mirror ingest lag, fresh reads | p50 1.7 s, p99 2.8 s |
+| False alarms since the fixes | 0 in 393 payments |

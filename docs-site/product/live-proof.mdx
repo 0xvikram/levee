@@ -1,0 +1,87 @@
+---
+title: "Live proof"
+description: "Every live testnet number, with HashScan links. Hedera testnet, 6 Nov 2026."
+---
+
+Everything on this page ran on Hedera testnet on 6 Nov 2026 with the real Arkiv Rabdi pass store. Raw notes are in [`docs/LIVE_RUN.md`](https://github.com/0xvikram/levee/blob/build/docs/LIVE_RUN.md).
+
+"Watcher clock" is the time the watcher saw each step's receipt come back, as published in the incident. "Consensus" is the containment transaction's consensus time on the Mirror Node. Both are measured from the theft's consensus time.
+
+## Testnet IDs
+
+| What | ID |
+|---|---|
+| Token RUPC (Studio v4, 6 decimals) | [0.0.11333594](https://hashscan.io/testnet/token/0.0.11333594) |
+| ContainmentController (verified) | [0.0.11333603](https://hashscan.io/testnet/contract/0.0.11333603) |
+| Receipts topic | [0.0.11333498](https://hashscan.io/testnet/topic/0.0.11333498) |
+| Incidents topic | [0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) |
+| Heartbeats topic | [0.0.11333501](https://hashscan.io/testnet/topic/0.0.11333501) |
+| Issuer treasury (2-of-3 KeyList) | [0.0.11333495](https://hashscan.io/testnet/account/0.0.11333495) |
+| Asha Pay, Ravi Exchange | [0.0.11333490](https://hashscan.io/testnet/account/0.0.11333490), [0.0.11333492](https://hashscan.io/testnet/account/0.0.11333492) |
+| Demo attacker | [0.0.11333494](https://hashscan.io/testnet/account/0.0.11333494) |
+| Admins | [0.0.11333483](https://hashscan.io/testnet/account/0.0.11333483), [0.0.11333484](https://hashscan.io/testnet/account/0.0.11333484), [0.0.11333485](https://hashscan.io/testnet/account/0.0.11333485) |
+| Issuer signer fee account | [0.0.11340800](https://hashscan.io/testnet/account/0.0.11340800) |
+| Studio factory | [0.0.7353542](https://hashscan.io/testnet/contract/0.0.7353542) |
+
+## Stolen-key drains
+
+The attack signs a treasury transfer with two stolen keys (treasury signer and cold), skipping the gate.
+
+| Run | Amount | Detected | Treasury frozen (watcher / consensus) | Receiver wiped and frozen (watcher / consensus) | Transactions |
+|---|---|---|---|---|---|
+| **Latest** (fresh reads and coverage proof) | 1,000 RUPC | 2.87 s | 4.85 s / 4.17 s | 6.86 s / 5.62 s | [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793942673-449451952) · [freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793942676-864043046) · [wipe](https://hashscan.io/testnet/transaction/0.0.11333487-1793942678-498951813) |
+| Second (3 s grace only) | 1,000 RUPC | 6.89 s | 9.44 s / 8.28 s | 10.72 s / 10.17 s | [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793940607-721315934) · [freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793940615-613691402) · [wipe](https://hashscan.io/testnet/transaction/0.0.11333487-1793940618-278571902) |
+| First full run | 10,000 RUPC | 4.19 s | 6.44 s / 5.48 s | 8.31 s / 7.22 s | [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793935170-233904996) · [freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793935173-898405003) · [wipe](https://hashscan.io/testnet/transaction/0.0.11333487-1793935180-013412119) |
+| With scheduled signing live | 1,000 RUPC | 10.0 s | contained 14.3 s | | [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793977349-162435196) · [freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793977363-118897369) · [wipe](https://hashscan.io/testnet/transaction/0.0.11333487-1793977362-913017047) |
+
+The second run was slower because the watcher waited out most of the 3 s grace on a quiet receipts topic. The last row is from the scheduled-signing session (LIVE_RUN section 7d). It shows that theft is still contained with scheduled signing in place. It was slower than the latest run, and its cause was not analysed in the run log.
+
+Latest run, 2-of-3 reopen: treasury [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793942707-749023249) / [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793942710-022256943), attacker [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793942713-763876883) / [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793942712-224380819). The incident is message 5 on the incidents topic.
+
+## Stolen minting key
+
+The attack mints with the gate account's cash-in role, skipping the gate.
+
+| Amount | Detected | Receiver wiped and frozen (watcher / consensus) | Total supply after | Attacker's retry | Transactions |
+|---|---|---|---|---|---|
+| 5,000 RUPC | 4.65 s | 7.53 s / 6.09 s | Back to the pre-mint 967,484,808,697 units | `ACCOUNT_FROZEN_FOR_TOKEN` | [mint](https://hashscan.io/testnet/transaction/0.0.11333489-1793975099-404424918) · [wipe and freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793975101-804305541) · [retry](https://hashscan.io/testnet/transaction/0.0.11333489-1793975151-294777090) |
+
+The treasury was not frozen, correctly: a mint is not a treasury outflow. Reopened 2 of 3: [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793975174-741999973) / [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793975176-022104293). The incident is message 7 on the incidents topic.
+
+## Normal payouts and false alarms
+
+| Run | Payouts | Matched | Breaches | Notes |
+|---|---|---|---|---|
+| A (before the fixes) | 100 planned | 5 | 1 false alarm | A cached Mirror answer missed a receipt that existed. Containment froze the treasury and wiped the real partner Asha Pay. Partners are no longer wiped |
+| B | 100 | 100 | 0 | 42,595 RUPC in 376 s |
+| C | 193 of 300 | 193 | 0 | The Mac slept after 193. The other 107 were refused `no-pass`, as designed |
+| D (fresh reads and coverage proof) | 100 | 100 | 0 | 0 late matches |
+| Scheduled signing | 5 | 5 | 0 | Gate reply p50 8.4 s |
+
+**393 of 393 payments matched with no false alarm** across runs B, C and D. One more signed payment also matched ([receipt](https://hashscan.io/testnet/transaction/0.0.11333489-1793975149-637916107) · [transfer](https://hashscan.io/testnet/transaction/0.0.11333495-1793975150-172921070)) and is not counted in the 393.
+
+## Scheduled sends
+
+| Step | Link |
+|---|---|
+| ScheduleCreate by the gate, schedule 0.0.11340805 | [schedule](https://hashscan.io/testnet/schedule/0.0.11340805) |
+| Receipt, sequence 499 | [receipt](https://hashscan.io/testnet/transaction/0.0.11333489-1793977081-963853491) |
+| ScheduleSign by the issuer signer | [sign](https://hashscan.io/testnet/transaction/0.0.11340800-1793977089-430366632) |
+| Transfer executed, 500 RUPC to Asha Pay | [transfer](https://hashscan.io/testnet/transaction/0.0.11333489-1793977084-654477314) |
+
+A schedule created with the gate key and no receipt ([0.0.11340812](https://hashscan.io/testnet/schedule/0.0.11340812)) was refused by the issuer signer and expired unexecuted.
+
+## Other measurements
+
+| Metric | Value |
+|---|---|
+| Gate latency, direct signing | p50 3.66 s (run B), 3.47 s (run C) |
+| Gate latency, scheduled signing | p50 8.4 s (5 transfers) |
+| Watcher match after the gate's reply | p50 1.58 s, max 2.92 s (run D) |
+| Fee per payout | About 0.020 HBAR before scheduled signing, about 0.18 HBAR with it |
+| Fee per containment | About 0.23 HBAR (freeze 0.096 + wipe and freeze 0.138) |
+| Mirror ingest lag, fresh reads | p50 1.7 s, p99 2.8 s |
+
+## Gate refusals seen live
+
+`no-pass` (machine failing the remote-access check, 347 ms), `over-transfer-cap` (669 ms), `unknown-destination` (969 ms). After signed requests: unsigned gives `bad-signature`, the laptop's key claiming `payouts-server` gives `bad-signature`, the laptop as itself gives `wrong-role`, a replay gives `replayed-request`, a stale request gives `stale-request`, and `/enrol` without the token gives 401.

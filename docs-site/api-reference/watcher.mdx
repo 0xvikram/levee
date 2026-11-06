@@ -1,0 +1,78 @@
+---
+title: "Watcher"
+description: "Port 8711. Health, current state, and a live stream of matches, breaches and incidents."
+---
+
+Source: `src/watcher/index.ts`, `src/watcher/watcher.ts`, `src/watcher/match.ts`, `src/watcher/contain.ts`. Start with `npm run watcher`.
+
+## GET /health
+
+Returns 200 when healthy and 503 otherwise.
+
+```json
+{ "ok": true, "service": "watcher", "lagMs": 1700, "lastBeat": "ISO" }
+```
+
+Healthy means Mirror lag at most 20 s and a successful tick within 20 s. An unhealthy watcher withholds heartbeats, so the gate refuses everything with `no-watcher`.
+
+## GET /state
+
+Sends CORS `*`.
+
+<ResponseField name="healthy" type="boolean">Same rule as `/health`.</ResponseField>
+<ResponseField name="lagMs" type="number | null">Mirror read lag.</ResponseField>
+<ResponseField name="matched" type="number">Movements matched since start.</ResponseField>
+<ResponseField name="receipts" type="number">Receipts read.</ResponseField>
+<ResponseField name="invalidReceipts" type="number">Messages on the receipts topic that are not valid receipts.</ResponseField>
+<ResponseField name="receiptSeq" type="number">Last receipt sequence read.</ResponseField>
+<ResponseField name="pendingReceipts" type="number">Movements waiting for a late-served receipt.</ResponseField>
+<ResponseField name="lateReceiptMatches" type="number">Matches that needed the receipt grace.</ResponseField>
+<ResponseField name="cursors" type="object">`{ [account]: consensusTs }`.</ResponseField>
+<ResponseField name="breaches" type="BreachView[]">The last 50.</ResponseField>
+<ResponseField name="incidents" type="IncidentOut[]">The last 20.</ResponseField>
+<ResponseField name="lastTickOkAt" type="string | null">ISO time.</ResponseField>
+<ResponseField name="lastError" type="string | null">Last tick error.</ResponseField>
+<ResponseField name="lastBeat" type="string | null">ISO time of the last heartbeat.</ResponseField>
+<ResponseField name="pauseOnBreach" type="boolean">Whether `PAUSE_ON_BREACH` is on.</ResponseField>
+<ResponseField name="treasury, token, tokenTreasury" type="string">The watched ids.</ResponseField>
+
+### BreachView
+
+`{ txId, reason, to?, amount?, kind?, consensusAt, historic? }`. `historic: true` means it was seen while priming on start: reported, not contained.
+
+| Reason | Meaning |
+|---|---|
+| `no-receipt` | No receipt for this transaction id |
+| `receipt-after-movement` | The receipt reached consensus after the movement |
+| `receipt-mismatch` | Token, from, to, amount or kind differ |
+| `receipt-reused` | The receipt was already used |
+| `over-transfer-cap`, `over-daily-cap` | The movement breaks a cap |
+| `unknown-destination` | The receiver is not a known recipient |
+| `treasury-allowance` | The treasury granted an allowance |
+
+### IncidentOut
+
+```json
+{ "v": 1, "type": "incident", "incidentId": "0x…32 bytes", "token": "0.0.x",
+  "breaches": [{ "txId": "…", "to": "0.0.x", "amount": "…", "reason": "no-receipt" }],
+  "actions": [{ "step": "freezeAccount", "account": "0.0.x", "txId": "…", "ok": true, "atMs": 4845 }],
+  "detectedMs": 2865, "containedMs": 6861 }
+```
+
+`detectedMs`, `containedMs` and `atMs` are measured from the breach's consensus time. An action on a known partner carries `note: "known partner: frozen, not wiped; admins decide"`. A failed action carries `error`.
+
+## GET /events (SSE)
+
+Replays the last 100 frames.
+
+| Event | Data |
+|---|---|
+| `matched` | Movement `{ txId, consensusAt, token, from (null for a mint), to, amount, kind }` |
+| `breach` | BreachView |
+| `detected` | `{ incidentId, breaches, detectedMs }` |
+| `plan` | `{ incidentId, steps: [{ step, account?, amount?, why }] }` |
+| `step` | `{ incidentId, step, account?, amount?, txId, atMs }` |
+| `incident` | IncidentOut |
+| `health` | `{ healthy: true, lagMs, heartbeatAt }` or `{ healthy: false, lagMs, lastError }`, every 30 s |
+
+Plan steps are `freezeAccount`, `wipeAndFreeze`, `wipeFrozen`, `burnSupply` and `pauseToken`.

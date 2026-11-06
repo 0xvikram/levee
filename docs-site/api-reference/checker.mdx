@@ -1,0 +1,75 @@
+---
+title: "Checker"
+description: "Port 8712. Enrol machines, take signed heartbeats, and answer whether a machine holds a live pass on Arkiv."
+---
+
+Source: `src/checker/server.ts`, `src/checker/core.ts`, `src/shared/arkiv.ts`. Start with `npm run checker` (real Arkiv) or `npm run checker -- --memory` (offline).
+
+## POST /enrol
+
+<ParamField header="x-enrol-token" type="string">
+  Required when `ENROL_TOKEN` is set on the checker. Compared in constant time. Without `ENROL_TOKEN` the endpoint is open.
+</ParamField>
+<ParamField body="machine" type="string" required>
+  Machine name.
+</ParamField>
+<ParamField body="publicKey" type="string" required>
+  Uncompressed secp256k1 public key, `0x04…`.
+</ParamField>
+<ParamField body="role" type="string" default="employee">
+  For example `employee`, `finance`, `payouts`. The gate allows `GATE_ALLOWED_ROLES`.
+</ParamField>
+<ParamField body="profile" type="string" default="laptop">
+  `laptop`, `server` or `ci`. Fixed at enrolment.
+</ParamField>
+
+<ResponseField name="200" type="object">`{ ok: true, machine, role, profile }`</ResponseField>
+<ResponseField name="400" type="object">`{ ok: false, error }`: bad input.</ResponseField>
+<ResponseField name="401" type="object">`{ ok: false, error: "bad enrol token" }`</ResponseField>
+<ResponseField name="409" type="object">`{ ok: false, error }`: a different key or a different profile for an enrolled machine.</ResponseField>
+
+## GET /machine/:name
+
+The enrolment record the gate uses to verify a signed request: `{ machine, publicKey, role, profile }`. Returns 404 `{ ok: false, error: "unknown machine" }` if not enrolled. Read from the checker's local state, not from Arkiv.
+
+## GET /nonce?machine=
+
+`{ nonce, ttlSeconds: 60 }`. Returns 404 for an unknown machine.
+
+## POST /heartbeat
+
+<ParamField body="payload" type="object" required>
+  `{ machine, seq, nonce, checks: { [checkId]: "ok" | "fail" | "skip" }, evidenceHash, sentAt, profile? }`
+</ParamField>
+<ParamField body="signature" type="string" required>
+  EIP-191 signature with the machine key over the canonical JSON of `{machine, seq, nonce, checks, evidenceHash, sentAt}`.
+</ParamField>
+
+Replies `{ ok: true, renewed: true, expiresAt, arkivEntityKey }` or `{ ok: false, renewed: false, reason }`. Errors 400, 401, 404, 409 and 503 as `{ ok: false, error }`.
+
+The checker rejects an unknown, expired (60 s) or replayed nonce, a bad signature, a sequence that does not increase, and clock skew over 120 s. Any failing check means no renewal, and the pass entity is deleted on Arkiv.
+
+Check ids: `persistence`, `remote-access`, `ports`, `devtools`, `protections`, `disk`, `extensions`.
+
+## GET /pass/:machine and GET /passes
+
+`/passes` returns an array of the same shape.
+
+```json
+{ "machine": "payouts-server", "live": true, "kind": "ok",
+  "expiresAt": "ISO", "reason": null, "arkivEntityKey": "0x…", "arkivBlockAgeSeconds": 0.7,
+  "checks": { "persistence": "ok", "disk": "skip" }, "profile": "server", "lastHeartbeatAt": "ISO" }
+```
+
+`kind` is `ok`, `offline`, `unhealthy`, `unverifiable` or `unknown`. A pass is live only if Arkiv's latest block is under 10 s old, the entity exists, its owner is the checker wallet, and its expiry is in the future.
+
+## GET /events (SSE)
+
+Unnamed frames (`data:` only): `{ type, at (ms), data }`.
+
+| Type | Data |
+|---|---|
+| `enrol` | `{ machine, role, profile }` |
+| `heartbeat` (good) | `{ machine, ok: true, expiresAtMs, entityKey }` |
+| `heartbeat` (failing check) | `{ machine, ok: false, failing: checkId[], revoked }` |
+| `heartbeat` (Arkiv write failed) | `{ machine, ok: true, renewed: false, error }` |

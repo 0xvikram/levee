@@ -1,0 +1,21 @@
+---
+title: "Audit status"
+description: "Levee has not been audited."
+---
+
+**Levee is not audited yet.** Neither the `ContainmentController` contract nor the services have had a third-party security review.
+
+## What exists today
+
+- The contract source is verified on HashScan as a full match, so anyone can read exactly what is deployed. See [Contract](/security/contract).
+- Unit tests: 351 in the root project (including in-process EVM tests of the contract) and 157 in the dashboard, all passing on 6 Nov 2026 (`npx vitest run`). They need no network and no keys and run in CI on pushes to `main` and `build` and on pull requests.
+- Live testnet runs with HashScan links for every step. See [Live proof](/product/live-proof).
+- A written list of known limits. See [Known limits](/security/known-limits).
+
+## Before mainnet
+
+An audit of the contract is on the roadmap, before any mainnet use. Do not use Levee to protect real funds before then.
+
+## Report a problem
+
+Open an issue on [GitHub](https://github.com/0xvikram/levee/issues). For anything sensitive, open an issue asking for a private channel without posting the details.

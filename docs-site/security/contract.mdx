@@ -1,0 +1,66 @@
+---
+title: "ContainmentController contract"
+description: "A close-only contract that holds the Studio token's freeze, wipe, burn and pause roles. Opening needs 2 of 3 admins."
+---
+
+Source: [`contracts/ContainmentController.sol`](https://github.com/0xvikram/levee/blob/build/contracts/ContainmentController.sol). Testnet: [0.0.11333603](https://hashscan.io/testnet/contract/0.0.11333603).
+
+## Verified source
+
+The source is verified on HashScan through Sourcify (chain 296) as a full match: creation and runtime bytecode, metadata included. The verified source is `contracts/ContainmentController.sol` as of commit `60f2afa`, compiled with solc 0.8.24, optimizer 200 runs, evmVersion cancun. The later commit `4073626` only added NatSpec comments: same ABI and same bytecode apart from the metadata hash.
+
+## State
+
+| Name | What |
+|---|---|
+| `token` | The Studio token manager (diamond proxy). Immutable |
+| `watcher` | The address allowed to run close actions. Changed only by a `SetWatcher` proposal |
+| `admins` | Three admin addresses. Fixed at deploy |
+| `THRESHOLD` | `2` |
+| `proposalCount` | Number of proposals so far, also the latest id. Ids start at 1 |
+
+## Close actions (watcher or admin)
+
+| Function | What |
+|---|---|
+| `freezeAccount(address account, bytes32 incidentId)` | Studio `freeze(account)` |
+| `wipeAndFreeze(address account, int64 amount, bytes32 incidentId)` | Studio `wipe` then `freeze`, one transaction |
+| `wipeFrozen(address account, int64 amount, bytes32 incidentId)` | Studio `unfreeze`, `wipe`, `freeze`, one transaction. The account always ends frozen |
+| `burnSupply(int64 amount, bytes32 incidentId)` | Studio `burn(amount)` on the token treasury |
+| `pauseToken(bytes32 incidentId)` | Studio `pause()`. Always the last step |
+
+Each emits `Contained(step, account, amount, incidentId)`.
+
+## Open actions (2 of 3 admins)
+
+| Function | What |
+|---|---|
+| `propose(Action action, address target)` | Admin only. Creates a proposal and counts the proposer's approval |
+| `approve(uint256 id)` | Admin only. At 2 approvals the action executes |
+| `getProposal(uint256 id)` | Read action, target, approvals, executed |
+
+`Action` is `Unfreeze` (0), `Unpause` (1) or `SetWatcher` (2).
+
+Events: `ProposalCreated`, `ProposalApproved`, `ProposalExecuted`.
+
+## Errors
+
+| Error | When |
+|---|---|
+| `NotWatcherOrAdmin()` | A close action from anyone else |
+| `NotAdmin()` | An open action from a non-admin |
+| `AlreadyApproved()` | The same admin approves twice |
+| `AlreadyExecuted()` | Approving an executed proposal |
+| `StudioCallFailed(string step)` | A Studio call returned false |
+
+## Roles on the Studio token
+
+The controller holds `FREEZE_ROLE`, `WIPE_ROLE`, `BURN_ROLE` and `PAUSE_ROLE`. It never holds `DEFAULT_ADMIN`.
+
+## What it cannot do
+
+It has no transfer function and no mint function. The watcher can never unfreeze, unpause or replace itself.
+
+## Tests
+
+The contract has in-process EVM unit tests that run with the root test suite (`npx vitest run`). No network or keys needed.

@@ -12,6 +12,7 @@ Built for ETHGlobal Mumbai 2026. Main track: Hedera "Tokenize with Hedera Studio
 
 - Demo video: (link added at submission)
 - Hosted dashboard: https://levee-theta.vercel.app (live view: https://levee-theta.vercel.app/live, reads the chain directly)
+- Docs: docs-site/ (Mintlify; hosted URL added once connected)
 - What it does and does not do, phase by phase: [docs/SCOPE.md](docs/SCOPE.md)
 - Live testnet run log: [docs/LIVE_RUN.md](docs/LIVE_RUN.md)
 - The 60-second pitch and demo script: [docs/PITCH.md](docs/PITCH.md)
