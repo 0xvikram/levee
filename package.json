@@ -15,7 +15,8 @@
     "gate": "tsx src/gate/server.ts",
     "watcher": "tsx src/watcher/index.ts",
     "checker": "tsx src/checker/server.ts",
-    "agent": "tsx src/agent/index.ts"
+    "agent": "tsx src/agent/index.ts",
+    "arkiv:smoke": "tsx src/checker/arkiv-smoke.ts"
   },
   "engines": {
     "node": ">=20"

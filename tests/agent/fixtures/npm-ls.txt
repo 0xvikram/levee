@@ -1,0 +1,6 @@
+/Users/user/.local/share/fnm/node-versions/v24.21.0/installation/lib
+├── @shopify/cli@4.9.4
+├── corepack@0.36.0
+├── npm@11.19.0
+└── vercel@63.1.2
+

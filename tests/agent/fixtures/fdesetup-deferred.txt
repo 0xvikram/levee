@@ -1,0 +1,2 @@
+FileVault is On.
+Deferred enablement appears to be active for user "user".
