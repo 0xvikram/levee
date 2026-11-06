@@ -29,6 +29,8 @@ const proxy = {
   "/api/gate": { target: "http://127.0.0.1:8710", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/gate/, "") },
   "/api/watcher": { target: "http://127.0.0.1:8711", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/watcher/, "") },
   "/api/checker": { target: "http://127.0.0.1:8712", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/checker/, "") },
+  // demo runner (scripts/demo/runner.ts, DEMO_MODE=1 only, bound to 127.0.0.1)
+  "/api/runner": { target: "http://127.0.0.1:8713", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/runner/, "") },
 };
 
 export default defineConfig({

@@ -21,7 +21,8 @@
     "t3": "tsx scripts/tests/t3-pause.ts",
     "t4": "tsx scripts/tests/t4-timing.ts",
     "setup": "npm run setup:accounts && npm run setup:topics && npm run setup:token && npm run setup:controller",
-    "setup:status": "tsx src/setup/status.ts"
+    "setup:status": "tsx src/setup/status.ts",
+    "demo:runner": "tsx scripts/demo/runner.ts"
   },
   "engines": {
     "node": ">=20"
