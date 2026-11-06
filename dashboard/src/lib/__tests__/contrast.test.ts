@@ -53,11 +53,27 @@ const PAIRS: [string, string, string][] = [
   ["yellow ticker figure on ink under cursor light", C.yellow, LIT_INK],
   ["olive-lit live tag on ink under cursor light", C.oliveLit, LIT_INK],
   ["sky ticker link on ink under cursor light", C.sky, LIT_INK],
+  // by the numbers (light ground): chart labels, Levee highlight, source links
+  ["ink chart label on sky", C.ink, C.sky],
+  ["smoke source link / axis on sky", C.smoke, C.sky],
+  ["gold Levee label + value on sky", C.gold, C.sky],
+];
+
+/** Non-text marks (bars) need 3:1 against the ground (WCAG 1.4.11), and Levee must stand apart from the rest. */
+const MARKS: [string, string, string][] = [
+  ["smoke industry bar on sky", C.smoke, C.sky],
+  ["gold Levee bar on sky", C.gold, C.sky],
 ];
 
 describe("brand contrast pairs", () => {
   it.each(PAIRS)("%s ≥ 4.5:1", (_name, fg, bg) => {
     expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+  it.each(MARKS)("%s ≥ 3:1", (_name, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(3);
+  });
+  it("the Levee bar is not the same colour as the others", () => {
+    expect(C.gold.toLowerCase()).not.toBe(C.smoke.toLowerCase());
   });
   it("the old yellow-on-cream accent really was unreadable", () => {
     expect(ratio(C.yellow, C.sky)).toBeLessThan(1.2);

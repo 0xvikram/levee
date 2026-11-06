@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { FooterScene, useFooterFeed } from "../components/FooterScene";
 import { HeroMedia } from "../components/HeroMedia";
 import { Link, navigate } from "../components/router";
-import { ARKIV_EXPLORER, GITHUB, deploy, hashscan, payeeName, serviceUrl } from "../lib/config";
+import { ARKIV_EXPLORER, GITHUB, MIRROR, deploy, hashscan, payeeName, serviceUrl } from "../lib/config";
+import { FACTS, INDUSTRY, MARKET, MINT, SCHEDULED_ON_BUILD, TICKS, logPos } from "../lib/numbers";
 import { useShowcase, type Showcase } from "../lib/incident";
 import { useCountUp, usePoll, usePrefersReducedMotion, useRiseIn, useSeenOnce } from "../lib/hooks";
 import type { WatcherSnapshot } from "../lib/types";
@@ -81,8 +82,8 @@ export function Landing() {
         <ContainSection m={showcase} />
         <ReopenSection />
         <ScopeSection />
-        <AddOnsSection />
         <NumbersSection m={showcase} />
+        <AddOnsSection />
         <IncidentsSection />
       </main>
 
@@ -201,26 +202,201 @@ function Figure({ value, decimals, unit, label, start }: { value: number; decima
   );
 }
 
-function NumbersSection({ m }: { m: Showcase }) {
+function Src({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a className="bn-src" href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  );
+}
+
+export function NumbersSection({ m }: { m: Showcase }) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useSeenOnce(ref, 0.3);
   return (
-    <section className="section" id="numbers">
+    <section className="section bn-section" id="numbers">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">{m.live ? "Latest run" : "Measured"} on Hedera testnet, {m.date}</span>
+          <span className="eyebrow">By the numbers</span>
           <h2>
-            Frozen and clawed back in <span className="accent">{m.wipedS.toFixed(2)} seconds</span>
+            Contained in <span className="accent">seconds</span>, not hours
           </h2>
         </div>
-        <div ref={ref} className="figures">
-          <Figure value={m.detectionS} decimals={2} unit="s" label="Theft detected" start={seen} />
-          <Figure value={m.treasuryFrozenS} decimals={2} unit="s" label="Treasury frozen" start={seen} />
-          <Figure value={m.wipedS} decimals={2} unit="s" label="Tokens clawed back, thief frozen" start={seen} />
-          <Figure value={m.wipedValue} decimals={m.wipedValue % 1 ? 2 : 0} unit={deploy.token.symbol} label="Clawed back from the thief" start={seen} />
+
+        <div ref={ref} className="bn-runs">
+          <article className="bn-run" data-rise>
+            <span className="eyebrow">
+              Theft · {m.live ? "latest real incident" : "measured run"} · {m.date}
+            </span>
+            <div className="figures bn-figs">
+              <Figure value={m.detectionS} decimals={2} unit="s" label="Theft detected" start={seen} />
+              <Figure value={m.treasuryFrozenS} decimals={2} unit="s" label="Treasury frozen" start={seen} />
+              <Figure value={m.wipedS} decimals={2} unit="s" label={`Thief wiped + frozen (${m.wipedAmount} ${deploy.token.symbol})`} start={seen} />
+            </div>
+            <p className="bn-srcs">
+              <Src href={hashscan.tx(m.attackTx)}>theft</Src>
+              <Src href={hashscan.tx(m.freezeTx)}>freeze</Src>
+              <Src href={hashscan.tx(m.wipeTx)}>wipe</Src>
+              <span>on HashScan{m.live ? ", read live from the incidents topic" : ""}</span>
+            </p>
+          </article>
+          <article className="bn-run" data-rise>
+            <span className="eyebrow">
+              Unauthorised mint · {MINT.amount} {deploy.token.symbol} · {MINT.date}
+            </span>
+            <div className="figures bn-figs">
+              <Figure value={MINT.detectedS} decimals={2} unit="s" label="Mint detected" start={seen} />
+              <Figure value={MINT.containedS} decimals={2} unit="s" label="Minted tokens wiped, thief frozen" start={seen} />
+              <Figure value={MINT.netSupplyChange} decimals={0} unit={deploy.token.symbol} label="Net supply change: back to the pre-mint value" start={seen} />
+            </div>
+            <p className="bn-srcs">
+              <Src href={hashscan.tx(MINT.mintTx)}>mint</Src>
+              <Src href={hashscan.tx(MINT.wipeTx)}>wipe</Src>
+              <span>on HashScan ·</span>
+              <Src href={`${MINT.source}#5-stolen-minting-key-unauthorised-mint-wiped--frozen-2-of-3-reopen`}>supply check</Src>
+            </p>
+          </article>
         </div>
+
+        <ul className="bn-facts" data-rise>
+          <li>
+            <b className="num">{FACTS.matchedSends}</b>
+            <span>legitimate sends matched, {FACTS.falseAlarms} false alarms after the fix</span>
+            <Src href={FACTS.liveRun}>LIVE_RUN.md</Src>
+          </li>
+          <li>
+            <b className="num">~{FACTS.hbarPerSend} HBAR</b>
+            <span>network fees per send, receipt included</span>
+            <Src href={FACTS.liveRun}>LIVE_RUN.md</Src>
+          </li>
+          <li>
+            <b className="num">
+              {FACTS.rootTests} + {FACTS.dashboardTests}
+            </b>
+            <span>automated tests + dashboard tests, run in CI on GitHub</span>
+            <Src href={FACTS.ci}>CI</Src>
+          </li>
+        </ul>
+
+        <CompareChart leveeS={m.wipedS} leveeTx={m.wipeTx} />
+
+        <HederaStrip />
       </div>
     </section>
+  );
+}
+
+function fmtSeconds(s: number): string {
+  return `${s.toFixed(2)} s`;
+}
+
+export function CompareChart({ leveeS, leveeTx }: { leveeS: number; leveeTx: string }) {
+  const rows = [
+    ...INDUSTRY.map((c) => ({ key: c.name, name: c.name, when: c.when, shown: c.shown, what: c.what, pos: logPos(c.seconds), href: c.source, srcName: c.sourceName, levee: false })),
+    { key: "levee", name: "Levee", when: "Nov 2026", shown: `~${fmtSeconds(leveeS)}`, what: "theft to thief wiped + frozen, Hedera testnet", pos: logPos(leveeS), href: hashscan.tx(leveeTx), srcName: "HashScan", levee: true },
+  ];
+  return (
+    <figure className="bn-chart" data-rise>
+      <figcaption>
+        <span className="eyebrow">Time to contain, log scale</span>
+        <span className="muted small">Each bar is the time the team or the press reported, measured as noted. Each step right is ten times longer.</span>
+      </figcaption>
+      <ul className="bn-bars">
+        {rows.map((r) => (
+          <li key={r.key} className={r.levee ? "levee" : undefined}>
+            <span className="bn-name">
+              <b>{r.name}</b> · {r.when}
+            </span>
+            <span className="bn-val mono num">{r.shown}</span>
+            <svg className="bn-track" viewBox="0 0 1000 14" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+              {TICKS.map((t) => (
+                <line key={t.s} x1={logPos(t.s) * 1000} x2={logPos(t.s) * 1000} y1="0" y2="14" className="bn-grid" vectorEffect="non-scaling-stroke" />
+              ))}
+              <rect x="0" y="2" width={Math.max(4, r.pos * 1000)} height="10" rx="0" className="bn-bar" data-pos={r.pos.toFixed(4)} />
+            </svg>
+            <span className="bn-what small">
+              {r.what} · <Src href={r.href}>{r.srcName}</Src>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <div className="bn-axis mono" aria-hidden="true">
+        {TICKS.map((t) => (
+          <span key={t.s} style={{ left: `${(logPos(t.s) * 100).toFixed(2)}%` }}>
+            {t.label}
+          </span>
+        ))}
+      </div>
+    </figure>
+  );
+}
+
+export function HederaStrip() {
+  const chips: { name: string; detail: ReactNode }[] = [
+    {
+      name: "Hedera Token Service",
+      detail: (
+        <>
+          via Stablecoin Studio: freeze, wipe, pause, cash-in roles · <Src href={hashscan.token(deploy.token.tokenId)}>token {deploy.token.tokenId}</Src>
+        </>
+      ),
+    },
+    {
+      name: "Hedera Consensus Service",
+      detail: (
+        <>
+          3 topics: <Src href={hashscan.topic(deploy.topics.receipts)}>receipts {deploy.topics.receipts}</Src>, <Src href={hashscan.topic(deploy.topics.incidents)}>incidents {deploy.topics.incidents}</Src>,{" "}
+          <Src href={hashscan.topic(deploy.topics.heartbeats)}>heartbeats {deploy.topics.heartbeats}</Src>
+        </>
+      ),
+    },
+    ...(SCHEDULED_ON_BUILD ? [{ name: "Scheduled Transactions", detail: <>two-party signing</> }] : []),
+    {
+      name: "Threshold keys",
+      detail: (
+        <>
+          2-of-3 treasury · <Src href={hashscan.account(deploy.treasury)}>treasury {deploy.treasury}</Src>
+        </>
+      ),
+    },
+    {
+      name: "Smart contract",
+      detail: (
+        <>
+          <Src href={hashscan.contract(deploy.controller)}>ContainmentController {deploy.controller}</Src>
+        </>
+      ),
+    },
+    {
+      name: "Mirror Node",
+      detail: (
+        <>
+          <Src href={`${MIRROR}/api/v1/topics/${deploy.topics.incidents}/messages?order=desc&limit=5`}>reads every movement and receipt</Src>
+        </>
+      ),
+    },
+  ];
+  return (
+    <div className="bn-stack" data-rise>
+      <span className="eyebrow">Built on Hedera</span>
+      <ul className="bn-chips">
+        {chips.map((c) => (
+          <li key={c.name}>
+            <b>{c.name}</b>
+            <span className="small muted">{c.detail}</span>
+          </li>
+        ))}
+        <li className="arkiv">
+          <b>Arkiv</b>
+          <span className="small muted">
+            machine health passes · <Src href={ARKIV_EXPLORER}>explorer</Src>
+          </span>
+        </li>
+      </ul>
+      <p className="small muted bn-market">
+        {MARKET.text} · <Src href={MARKET.source}>{MARKET.sourceName}</Src>
+      </p>
+    </div>
   );
 }
 

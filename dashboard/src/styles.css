@@ -12,6 +12,7 @@
      amber #D9B25C on ink                                    "refused at gate" on dark (neutral, not red)
      breach-lit #F08C74 on ink                               live-breach text on dark (#C8432B is fills only)
      white on breach #C8432B                                 live-breach tag / banner text
+     by the numbers: ink / smoke / gold on sky only; bars smoke + gold (3:1 marks, tested)
 */
 :root {
   --sky: #efe6d2;
@@ -161,7 +162,7 @@ code { font-family: var(--f-mono); font-size: 0.88em; }
 .hero-copy p { color: var(--ink); text-align: center; }
 
 /* ---------- landing: sections ---------- */
-.section { padding: clamp(72px, 11vw, 136px) max(16px, 4vw); }
+.section { padding: clamp(72px, 11vw, 136px) max(16px, 4vw); overflow-x: clip; }
 .section-inner { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 36px; }
 .section-inner.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: clamp(32px, 6vw, 72px); align-items: center; }
 .section-head { display: flex; flex-direction: column; gap: 16px; }
@@ -225,6 +226,43 @@ code { font-family: var(--f-mono); font-size: 0.88em; }
 .fig-val { font-size: clamp(2.6rem, 6vw, 4.6rem); line-height: 1; letter-spacing: -0.04em; white-space: nowrap; }
 .fig-val small { font-size: 0.32em; margin-left: 6px; color: var(--smoke); letter-spacing: 0; }
 .fig-label { color: var(--smoke); font-size: 0.95rem; }
+
+/* ---------- by the numbers (light ground: ink / smoke text, gold for Levee; see contrast pairs) */
+.bn-runs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 40px; }
+.bn-run { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.bn-figs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.bn-figs .fig-val { font-size: clamp(1.9rem, 3.6vw, 2.8rem); }
+.bn-figs .fig-label { font-size: 0.86rem; }
+.bn-srcs { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.78rem; color: var(--smoke); }
+.bn-src { color: var(--smoke); overflow-wrap: anywhere; }
+.bn-src:hover { color: var(--ink); }
+.bn-facts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 40px; }
+.bn-facts li { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bn-facts b { font-family: var(--f-head); font-weight: 500; font-size: 1.6rem; letter-spacing: -0.02em; }
+.bn-facts .bn-src { font-size: 0.78rem; }
+.bn-chart { margin: 0; border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.bn-chart figcaption { display: flex; flex-direction: column; gap: 4px; }
+.bn-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.bn-bars li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; min-width: 0; }
+.bn-name { color: var(--ink); font-size: 0.95rem; }
+.bn-name b { font-weight: 600; }
+.bn-val { color: var(--ink); font-size: 0.9rem; white-space: nowrap; }
+.bn-track { grid-column: 1 / -1; display: block; width: 100%; height: 14px; }
+.bn-grid { stroke: var(--line); stroke-width: 1; }
+.bn-bar { fill: var(--smoke); }
+.bn-what { grid-column: 1 / -1; color: var(--smoke); font-size: 0.78rem; }
+.bn-bars li.levee .bn-name, .bn-bars li.levee .bn-val { color: var(--gold); }
+.bn-bars li.levee .bn-val { font-weight: 600; }
+.bn-bars li.levee .bn-bar { fill: var(--gold); }
+.bn-axis { position: relative; height: 1.2em; font-size: 0.7rem; color: var(--smoke); }
+.bn-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.bn-axis span:first-child { transform: none; }
+.bn-stack { border-top: 1px solid var(--line); padding-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.bn-chips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.bn-chips li { border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bn-chips b { font-weight: 600; font-size: 0.92rem; color: var(--ink); }
+.bn-chips li.arkiv { border-style: dashed; }
+.bn-market { font-size: 0.78rem; }
 
 /* f) add-on rules: one compact strip, clearly optional */
 .section.addons-section { padding-top: 0; }
@@ -476,6 +514,8 @@ a.tb-item:hover { text-decoration: underline; }
   .room-grid { grid-template-columns: 1fr 1fr; }
   .room-grid .contain { grid-column: 1 / -1; order: -1; }
   .figures, .incidents, .contain-steps { grid-template-columns: repeat(2, 1fr); }
+  .bn-runs { grid-template-columns: 1fr; }
+  .bn-figs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .contain-steps .cs-dot::before { display: none; }
 }
 @media (max-width: 720px) {
@@ -494,6 +534,11 @@ a.tb-item:hover { text-decoration: underline; }
   .search .btn { padding: 10px 14px; }
   .figures { grid-template-columns: 1fr 1fr; gap: 16px; }
   .fig-val { font-size: clamp(2.1rem, 10vw, 2.8rem); }
+  .bn-runs, .bn-facts { grid-template-columns: 1fr; }
+  .bn-figs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .bn-figs .fig-val { font-size: clamp(1.5rem, 7vw, 2rem); }
+  .bn-figs .fig-val small { margin-left: 3px; }
+  .bn-figs .fig-label { font-size: 0.78rem; }
   .incidents, .contain-steps { grid-template-columns: 1fr; }
   .addons { grid-template-columns: 1fr; }
   .addon-list { grid-template-columns: 1fr; }
