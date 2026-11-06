@@ -155,6 +155,30 @@ Watcher `matched` after the gate's reply: p50 1.58 s, max 2.92 s. False-alarm-fr
 - Ingest lag (consensus to first fresh REST sight): p50 1.7 s, p99 2.8 s.
 - gRPC `TopicMessageQuery` delivers about 0.3 s earlier than fresh REST polling, but a stream cannot prove coverage on a quiet topic (no message means either nothing happened or nothing arrived yet), so it was not adopted (`scripts/demo/mirror-stream-lag.ts`).
 
+## 5. Stolen minting key: unauthorised mint, wiped + frozen, 2-of-3 reopen
+
+The headline stablecoin incidents (Resolv, StablR, Gala) were unauthorised mints, so this run proves the mint path live. The gate account holds the Studio CASHIN (supplier) role, so `scripts/attack-mint.ts 5000` plays a thief with the gate's key: it calls the Studio proxy's cash-in `mint(address,int64)` directly, 5,000 RUPC to the attacker `0.0.11333494`, skipping the gate, so no receipt exists. On the Mirror Node a cash-in is a parent CONTRACTCALL, a child TOKENMINT to the token treasury (the proxy `0.0.11333593`), then a child CRYPTOTRANSFER proxy → attacker; the watcher reads the proxy's transactions and reports one `mint` to the attacker under the parent tx id. Run 6 Nov 2026 with the watcher restarted on commit `3c9bb93` (known partners are frozen, never wiped), `CAP_PER_TRANSFER=10000`, `CAP_PER_DAY=300000`, `WATCHER_SINCE=now`.
+
+| step | watcher clock (from mint consensus) | consensus (from mint consensus) | link |
+|---|---|---|---|
+| theft: cash-in of 5,000 RUPC to attacker `0.0.11333494` (TOKENMINT to the proxy, then transfer) | 0 | consensus `1793975103.259` | [tx](https://hashscan.io/testnet/transaction/0.0.11333489-1793975099-404424918) |
+| detected (`no-receipt`, kind `mint`) | 4.650 s | | |
+| attacker wiped + frozen (`wipeAndFreeze`, 5,000 RUPC: TOKENWIPE + TOKENFREEZE) | 7.527 s | 6.09 s | [tx](https://hashscan.io/testnet/transaction/0.0.11333487-1793975101-804305541) |
+| incident published | | seq 7, consensus `1793975111.059` | [topic 0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) |
+| attacker's second attempt: 0.000001 RUPC attacker → treasury | | `ACCOUNT_FROZEN_FOR_TOKEN` | [tx](https://hashscan.io/testnet/transaction/0.0.11333489-1793975151-294777090) |
+
+Total supply (Mirror `total_supply`, smallest units): **967,484,808,697 before**, 972,484,808,697 right after the mint (computed: the TOKENMINT child adds 5,000,000,000; the Mirror does not serve historical supply), **967,484,808,697 after the wipe** (a wipe burns the tokens). The supply is back to the pre-mint value; the attacker's 103 RUPC from before the run were left alone, because the wipe takes only what the incident minted.
+
+The planner did **not** freeze the treasury, and that is right: a mint is not a treasury outflow, the treasury did not move, and freezing it would have stopped legitimate payouts without containing anything. The plan was one step, `wipeAndFreeze` on the receiver. The step that would actually stop a second mint with the same stolen key is taking the CASHIN role away from the gate account (or pausing the token, `PAUSE_ON_BREACH`); the controller does not do that yet (follow-up).
+
+2-of-3 reopen afterwards (`scripts/reopen.ts treasury attacker`; the treasury was not frozen, so it was skipped):
+
+| account | propose (admin0) | approve (admin1, executes the unfreeze) |
+|---|---|---|
+| attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793975174-741999973) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793975176-022104293) |
+
+All transactions above were checked on the Mirror Node: mint, wipe + freeze, propose and approve (with its TOKENUNFREEZE child) `SUCCESS`; the second attempt `ACCOUNT_FROZEN_FOR_TOKEN`. Attacker after reopen: 103 RUPC, `UNFROZEN`. Fees (`charged_tx_fee`): mint 0.126, wipe + freeze 0.138, second attempt 0.016, propose 0.098, approve 0.135 HBAR; ≈ 0.54 HBAR for the whole run including the incident message and the restarted watcher's heartbeats.
+
 ## Budget
 
 | | operator | gate | treasury | watcher |
