@@ -26,7 +26,8 @@ import {
 export type WatcherMirror = Pick<
   MirrorClient,
   "transactionsSince" | "topicMessagesSince" | "tokenRelationship" | "tokenInfo" | "latestBlockTimestamp"
->;
+> &
+  Partial<Pick<MirrorClient, "transactionsForAccountsFrom">>;
 
 export interface WatcherConfig {
   token: string;
@@ -39,13 +40,20 @@ export interface WatcherConfig {
   /**
    * How long a movement with no receipt yet may wait for its receipt to become readable before it
    * is a "no-receipt" breach. Needed because the Mirror Node's REST endpoints are served by several
-   * replicas: a fresh one can return the transfer while the next request (topic messages) lands on
-   * one a second behind, which raised a false alarm live (docs/LIVE_RUN.md). It cannot excuse a real
+   * replicas behind a CDN that caches answers for up to a second: the transfer can be readable while
+   * the next request (topic messages) gets an older answer, which raised a false alarm live
+   * (docs/LIVE_RUN.md). While a movement waits, the service re-ticks every WATCHER_HOLD_TICK_MS. It cannot excuse a real
    * breach: the receipt must still have reached consensus BEFORE the movement, and the wait ends
-   * early once any receipt with a later consensus time has been read (the read is then complete).
+   * early once the receipts read is known complete for the movement's time (a later receipt was read,
+   * or proveReceipts() showed it).
    * Default 0 (judge at once); the service sets WATCHER_RECEIPT_GRACE_MS (default 3000).
    */
   receiptGraceMs?: number;
+  /**
+   * The account that pays for every receipt (the gate). When set, a held movement is judged before the
+   * grace ends if one Mirror answer proves no unread receipt can exist before it: see proveReceipts().
+   */
+  receiptPayer?: string;
 }
 
 export interface WatcherDeps {
@@ -100,6 +108,14 @@ export class Watcher {
   readonly pending = new Map<string, { movement: Movement; firstSeenMs: number }>();
   /** highest consensus time of any receipts-topic message read so far (all earlier ones are read too) */
   receiptsReadTo = "0.0";
+  /**
+   * Every receipt that reached consensus strictly before this time has been read (exclusive bound).
+   * Raised by reading receipts (to receiptsReadTo) and by proveReceipts(). A held movement whose
+   * consensus time is <= this is judged at once: its receipt, if any, would already be in `receipts`.
+   */
+  receiptsCompleteBefore = "0.0";
+  /** movements judged before the grace ended because a Mirror answer proved the receipts read complete */
+  provenEarly = 0;
   /** movements that matched only after waiting for their receipt (each one would have been a false alarm) */
   lateReceiptMatches = 0;
   lagMs = Number.POSITIVE_INFINITY; // fail closed until measured
@@ -158,6 +174,7 @@ export class Watcher {
       for (const m of msgs) {
         seq = Math.max(seq, m.sequence);
         if (compareConsensus(m.consensusAt, this.receiptsReadTo) > 0) this.receiptsReadTo = m.consensusAt;
+        if (compareConsensus(m.consensusAt, this.receiptsCompleteBefore) > 0) this.receiptsCompleteBefore = m.consensusAt;
         const p = receiptFromMessage(m);
         if (!p.ok) {
           this.invalidReceipts++;
@@ -173,6 +190,7 @@ export class Watcher {
       const fresh = extractMovements(txs, opts);
       const movements = [...[...this.pending.values()].map((p) => p.movement), ...fresh];
       const res = matchMovements(movements, this.receipts, this.cfg.rules, this.match);
+      if (contain && res.breaches.some((b) => b.reason === "no-receipt" && !this.covered(b.movement))) await this.proveReceipts();
       res.breaches = this.holdForLateReceipts(res, fresh, contain);
       const allowances = extractAllowances(txs, this.cfg.treasury);
       const breaches: WatcherBreach[] = [...res.breaches, ...allowances.map((a) => ({ reason: "treasury-allowance" as const, allowance: a }))];
@@ -197,6 +215,48 @@ export class Watcher {
     }
   }
 
+  private covered(m: Movement): boolean {
+    return compareConsensus(this.receiptsCompleteBefore, m.consensusAt) >= 0;
+  }
+
+  /**
+   * Try to prove, from ONE ascending Mirror listing, that every receipt before some time Z has been read.
+   *
+   * The listing holds every transaction touching the watched accounts or the receipt payer, from
+   * receiptsCompleteBefore onwards. Mirror ingests record files in consensus order, one database
+   * transaction per file, so an answer (or ascending page) that contains a record at time Z was served
+   * by a replica that had ingested EVERYTHING up to Z, and is complete up to Z. Every receipt is a
+   * CONSENSUSSUBMITMESSAGE to the receipts topic paid by the receipt payer, so it shows up in that
+   * listing. If none appears after receiptsReadTo, every receipt up to Z has been read; otherwise
+   * everything before the first unread one has. A held movement's own record (it touches a watched
+   * account) gives Z >= its consensus time as soon as the replica has it. Nothing here can excuse a
+   * receipt that is missing: a receipt we have not read only ever LOWERS the bound.
+   */
+  private async proveReceipts(): Promise<void> {
+    const payer = this.cfg.receiptPayer;
+    const list = this.deps.mirror.transactionsForAccountsFrom;
+    if (!payer || !list) return;
+    const from = compareConsensus(this.receiptsCompleteBefore, this.receiptsReadTo) >= 0 ? this.receiptsCompleteBefore : this.receiptsReadTo;
+    let rows: MirrorTransaction[];
+    try {
+      rows = await list.call(this.deps.mirror, [...this.watched(), payer], from);
+    } catch (e) {
+      this.deps.log?.(`receipt proof read failed: ${(e as Error).message}`);
+      return; // no proof: the grace still applies
+    }
+    if (rows.length === 0) return;
+    rows = [...rows].sort((a, b) => compareConsensus(a.consensus_timestamp, b.consensus_timestamp));
+    const unread = rows.find(
+      (t) =>
+        t.name === "CONSENSUSSUBMITMESSAGE" &&
+        t.entity_id === this.cfg.receiptsTopic &&
+        t.result === "SUCCESS" &&
+        compareConsensus(t.consensus_timestamp, this.receiptsReadTo) > 0,
+    );
+    const bound = unread ? unread.consensus_timestamp : rows[rows.length - 1].consensus_timestamp;
+    if (compareConsensus(bound, this.receiptsCompleteBefore) > 0) this.receiptsCompleteBefore = bound;
+  }
+
   /**
    * Movements whose only problem is "no receipt yet" wait up to receiptGraceMs (from first sight)
    * unless the receipts read already covers their consensus time. Returns the breaches to act on now.
@@ -215,11 +275,12 @@ export class Watcher {
     for (const b of res.breaches) {
       const k = key(b.movement);
       const p = this.pending.get(k);
-      const covered = compareConsensus(this.receiptsReadTo, b.movement.consensusAt) > 0;
+      const covered = this.covered(b.movement);
       if (b.reason === "no-receipt" && p && !covered && now - p.firstSeenMs < grace) {
         waiting.add(k);
         continue;
       }
+      if (b.reason === "no-receipt" && grace > 0 && covered && p && now - p.firstSeenMs < grace) this.provenEarly++;
       keep.push(b);
     }
     for (const k of [...this.pending.keys()]) if (!waiting.has(k)) this.pending.delete(k);
@@ -290,6 +351,8 @@ export class Watcher {
       receiptSeq: this.receiptSeq,
       pendingReceipts: this.pending.size,
       lateReceiptMatches: this.lateReceiptMatches,
+      receiptsCompleteBefore: this.receiptsCompleteBefore,
+      provenEarly: this.provenEarly,
       cursors: this.cursors,
       breaches: this.breaches.slice(-50),
       incidents: this.incidents.slice(-20),

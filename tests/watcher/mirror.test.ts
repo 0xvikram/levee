@@ -250,6 +250,28 @@ describe("MirrorClient", () => {
     expect(calls[0]).toContain("/api/v1/topics/0.0.10/messages?sequencenumber=gte:5&order=asc");
   });
 
+  it("cacheBust makes every polling URL unique without excluding any real record", async () => {
+    const page = { status: 200, body: { messages: [], transactions: [], blocks: [], links: { next: null } } };
+    const { f, calls } = fakeFetch([page, page, page, page]);
+    const m = new MirrorClient({ baseUrl: "https://mirror.test", fetch: f, sleep, cacheBust: true, now: () => 1_793_940_000_123 });
+    await m.topicMessagesSince("0.0.10", 4);
+    await m.topicMessagesSince("0.0.10", 4);
+    await m.transactionsSince("0.0.6000", "1.0");
+    await m.latestBlockTimestamp();
+    expect(calls[0]).toBe("https://mirror.test/api/v1/topics/0.0.10/messages?sequencenumber=gte:5&timestamp=lte:1793943600.000000001&order=asc&limit=100");
+    expect(calls[1]).toContain("timestamp=lte:1793943600.000000002");
+    expect(calls[2]).toBe("https://mirror.test/api/v1/transactions?account.id=0.0.6000&timestamp=gt:1.0&timestamp=lte:1793943600.000000003&order=asc&limit=100");
+    expect(new Set(calls).size).toBe(4);
+  });
+
+  it("lists transactions of several accounts at once (repeated account.id), ascending, from a timestamp inclusive", async () => {
+    const { f, calls } = fakeFetch([{ status: 200, body: { transactions: [{ consensus_timestamp: "5.1" }], links: { next: null } } }]);
+    const m = new MirrorClient({ baseUrl: "https://mirror.test", fetch: f, sleep });
+    const out = await m.transactionsForAccountsFrom(["0.0.6000", "0.0.5000", "0.0.6000", "0.0.7000"], "5.000000001");
+    expect(out).toHaveLength(1);
+    expect(calls[0]).toBe("https://mirror.test/api/v1/transactions?account.id=0.0.6000&account.id=0.0.5000&account.id=0.0.7000&timestamp=gte:5.000000001&order=asc&limit=100");
+  });
+
   it("reads freeze status and balance of an account", async () => {
     const { f } = fakeFetch([{ status: 200, body: { tokens: [{ token_id: "0.0.5001", balance: 42, freeze_status: "FROZEN" }] } }]);
     const m = new MirrorClient({ baseUrl: "https://mirror.test", fetch: f, sleep });

@@ -1,5 +1,5 @@
 // Fire Exit watcher service.
-//   every 1 s: tick (movements -> receipts -> match -> contain)
+//   every 1 s (0.4 s while a movement waits for its receipt): tick (movements -> receipts -> match -> contain)
 //   every 5 s: measure Mirror read lag (fail closed above 20 s: stop heartbeats)
 //   every 30 s: heartbeat on the heartbeats topic (the gate refuses to sign without one)
 //   GET /state, GET /events (SSE), GET /health
@@ -20,6 +20,9 @@ const ROLE_WATCHER = process.env.WATCHER_ROLE ?? "watcher";
 const PAUSE_ON_BREACH = /^(1|true|yes)$/i.test(process.env.PAUSE_ON_BREACH ?? "false");
 const HEARTBEAT_EVERY_MS = Number(process.env.WATCHER_HEARTBEAT_SECONDS ?? "30") * 1000;
 const TICK_MS = Number(process.env.WATCHER_TICK_MS ?? "1000");
+// While a movement waits for its receipt, tick sooner: each tick re-reads receipts with a fresh
+// (cache-busted) request and retries the one-answer completeness proof (Watcher.proveReceipts).
+const HOLD_TICK_MS = Number(process.env.WATCHER_HOLD_TICK_MS ?? "400");
 const GAS: Record<ContainmentStep["step"], number> = {
   freezeAccount: Number(process.env.GAS_FREEZE ?? "400000"),
   wipeAndFreeze: Number(process.env.GAS_WIPE_FREEZE ?? "700000"),
@@ -91,7 +94,7 @@ async function main() {
   for (const k of ["treasury", "watcher", "token", "topics", "controller", "payees"] as const) {
     if (!state[k]) throw new Error(`state/deploy.json has no ${k}: finish setup first`);
   }
-  const mirror = new MirrorClient();
+  const mirror = new MirrorClient({ cacheBust: true });
   const client = roleClient(ROLE_WATCHER, state.watcher.id);
   const key: PrivateKey = roleKey(ROLE_WATCHER);
   const hub = new SseHub(100);
@@ -108,6 +111,7 @@ async function main() {
       rules: rulesFromState(state, env),
       pauseOnBreach: PAUSE_ON_BREACH,
       receiptGraceMs: Number(process.env.WATCHER_RECEIPT_GRACE_MS ?? "3000"),
+      receiptPayer: state.gate?.id,
     },
     {
       mirror,
@@ -126,19 +130,19 @@ async function main() {
   const primed = await w.tick(false);
   console.log(`[watcher] primed from ${since}: ${primed.matched.length} matched, ${primed.breaches.length} historic breaches, ${w.receipts.size} receipts`);
 
-  let running = false;
-  setInterval(async () => {
-    if (running) return; // containment can take longer than a tick
-    running = true;
+  // One tick at a time (containment can take longer than a tick); the next one is scheduled when it ends.
+  const loop = async () => {
+    const t0 = Date.now();
     try {
       const r = await w.tick(true);
       if (r.incident) console.log(`[watcher] incident ${r.incident.incidentId}: ${r.incident.actions.map((a) => `${a.step}${a.ok ? "" : "(FAILED)"}`).join(", ")} contained in ${r.incident.containedMs} ms`);
     } catch {
       /* recorded in lastError; health check handles it */
-    } finally {
-      running = false;
     }
-  }, TICK_MS);
+    const every = w.pending.size > 0 ? HOLD_TICK_MS : TICK_MS;
+    setTimeout(loop, Math.max(0, every - (Date.now() - t0)));
+  };
+  setTimeout(loop, TICK_MS);
 
   setInterval(() => w.measureLag().catch(() => (w.lagMs = Number.POSITIVE_INFINITY)), 5000);
 

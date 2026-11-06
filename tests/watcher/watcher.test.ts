@@ -55,16 +55,34 @@ class FakeMirror implements WatcherMirror {
   async latestBlockTimestamp() {
     return this.blockTs;
   }
+  /** what the one-answer proof listing returns (the Mirror replica's view of watched accounts + gate) */
+  listing: MirrorTransaction[] = [];
+  listingFails = false;
+  async transactionsForAccountsFrom(accounts: string[], from: string) {
+    this.calls.push(`list:${accounts.join(",")}:${from}`);
+    if (this.listingFails) throw new Error("mirror 503");
+    return this.listing.filter((t) => Number(t.consensus_timestamp) >= Number(from));
+  }
 }
 
-function setup(pauseOnBreach = false, receiptGraceMs?: number) {
+const GATE = "0.0.7000";
+const submitRow = (ts: string, result = "SUCCESS"): MirrorTransaction => ({
+  consensus_timestamp: ts,
+  transaction_id: `${GATE}-${ts.split(".")[0]}-000000001`,
+  name: "CONSENSUSSUBMITMESSAGE",
+  result,
+  entity_id: "0.0.9001",
+  nonce: 0,
+});
+
+function setup(pauseOnBreach = false, receiptGraceMs?: number, receiptPayer?: string) {
   const mirror = new FakeMirror();
   const steps: ContainmentStep[] = [];
   const published: IncidentOut[] = [];
   const events: string[] = [];
   let now = 1762400101_000;
   const w = new Watcher(
-    { token: TOKEN, treasury: T, tokenTreasury: P, receiptsTopic: "0.0.9001", rules, pauseOnBreach, receiptGraceMs },
+    { token: TOKEN, treasury: T, tokenTreasury: P, receiptsTopic: "0.0.9001", rules, pauseOnBreach, receiptGraceMs, receiptPayer },
     {
       mirror,
       call: async (s) => {
@@ -129,6 +147,102 @@ describe("Watcher late receipts (Mirror replica lag false alarm, found live)", (
     const { mirror, w } = setup(false, 3000);
     mirror.txs[T].push(xfer(TX, "1762400010.000000000", ATT, 500));
     expect((await w.tick(false)).breaches[0]).toMatchObject({ reason: "no-receipt" });
+  });
+});
+
+describe("Watcher receipt hold: one-answer completeness proof", () => {
+  const TX = "0.0.6000-1762400004-000000001";
+  const proofCalls = (m: FakeMirror) => m.calls.filter((c) => c.startsWith("list:"));
+
+  it("(a) late receipt: the proof sees its unread submit, keeps holding, and the receipt is matched on a re-query", async () => {
+    const { mirror, w, steps, setNow } = setup(false, 3000, GATE);
+    const tr = xfer(TX, "1762400010.900000000", PAYEE, 500);
+    mirror.txs[T].push(tr);
+    // the replica serving the listing has the receipt submit (0.9 s before) and the transfer...
+    mirror.listing = [submitRow("1762400010.000000000"), tr];
+    // ...but the topic-messages answers are still behind for two reads
+    expect((await w.tick()).breaches).toHaveLength(0);
+    expect(w.receiptsCompleteBefore).toBe("1762400010.000000000"); // bounded by the unread receipt
+    setNow(1762400101_400);
+    expect((await w.tick()).breaches).toHaveLength(0); // 1st re-query: still not readable
+    mirror.msgs.push(receiptMsg(1, "1762400010.000000000", { txId: TX, to: PAYEE, amount: "500" }));
+    setNow(1762400101_800);
+    const r = await w.tick(); // 2nd re-query: readable
+    expect(r.matched).toHaveLength(1);
+    expect(r.breaches).toHaveLength(0);
+    expect(steps).toHaveLength(0);
+    expect(w.snapshot()).toMatchObject({ matched: 1, pendingReceipts: 0, lateReceiptMatches: 1, provenEarly: 0 });
+  });
+
+  it("(b) missing receipt: breach on the first tick (well inside the grace) once the answer that holds the theft has no unread receipt", async () => {
+    const { mirror, w, steps } = setup(false, 3000, GATE);
+    mirror.msgs.push(receiptMsg(1, "1762400005.000000000", { txId: "0.0.6000-1762400004-000000009", to: PAYEE, amount: "1" }));
+    const theft = xfer(TX, "1762400010.000000000", ATT, 500);
+    mirror.txs[T].push(theft);
+    // earlier receipt (already read) + the theft itself: complete up to the theft
+    mirror.listing = [submitRow("1762400005.000000000"), theft];
+    const r = await w.tick();
+    expect(r.breaches[0]).toMatchObject({ reason: "no-receipt" });
+    expect(steps.length).toBeGreaterThan(0);
+    expect(proofCalls(mirror)).toEqual([`list:${T},${P},${GATE}:1762400005.000000000`]);
+    expect(w.snapshot()).toMatchObject({ provenEarly: 1, pendingReceipts: 0 });
+  });
+
+  it("(b) missing receipt: at the grace when the proof answer is behind (does not hold the theft yet)", async () => {
+    const { mirror, w, steps, setNow } = setup(false, 3000, GATE);
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", ATT, 500));
+    mirror.listing = [xfer("0.0.6000-1762400001-000000001", "1762400008.000000000", PAYEE, 1)]; // lagging replica: newest record is older than the theft
+    expect((await w.tick()).breaches).toHaveLength(0);
+    setNow(1762400103_000);
+    expect((await w.tick()).breaches).toHaveLength(0);
+    setNow(1762400104_000);
+    expect((await w.tick()).breaches[0]).toMatchObject({ reason: "no-receipt" });
+    expect(steps.length).toBeGreaterThan(0);
+    expect(w.snapshot().provenEarly).toBe(0);
+  });
+
+  it("(b) missing receipt: at the grace when the proof read fails or there is no receipt payer", async () => {
+    for (const payer of [GATE, undefined]) {
+      const { mirror, w, setNow } = setup(false, 3000, payer);
+      const theft = xfer(TX, "1762400010.000000000", ATT, 500);
+      mirror.txs[T].push(theft);
+      mirror.listing = [theft];
+      mirror.listingFails = payer !== undefined;
+      expect((await w.tick()).breaches).toHaveLength(0);
+      setNow(1762400104_000);
+      expect((await w.tick()).breaches[0]).toMatchObject({ reason: "no-receipt" });
+    }
+  });
+
+  it("an unread receipt submit before the theft keeps it waiting even if the answer reaches past it; a failed submit does not", async () => {
+    const { mirror, w } = setup(false, 3000, GATE);
+    const theft = xfer(TX, "1762400010.000000000", ATT, 500);
+    mirror.txs[T].push(theft);
+    mirror.listing = [submitRow("1762400009.000000000", "INVALID_SIGNATURE"), submitRow("1762400009.500000000"), theft, xfer("0.0.6000-1762400011-000000001", "1762400012.000000000", PAYEE, 1)];
+    expect((await w.tick()).breaches).toHaveLength(0);
+    expect(w.receiptsCompleteBefore).toBe("1762400009.500000000");
+  });
+
+  it("the unread receipt turns out to be for something else: the theft is judged as soon as it is read", async () => {
+    const { mirror, w, setNow } = setup(false, 3000, GATE);
+    const theft = xfer(TX, "1762400010.000000000", ATT, 500);
+    mirror.txs[T].push(theft);
+    mirror.listing = [submitRow("1762400009.500000000"), theft];
+    expect((await w.tick()).breaches).toHaveLength(0);
+    mirror.msgs.push(receiptMsg(1, "1762400009.500000000", { txId: "0.0.6000-1762400008-000000001", to: PAYEE, amount: "1" }));
+    setNow(1762400101_400);
+    const r = await w.tick();
+    expect(r.breaches[0]).toMatchObject({ reason: "no-receipt" });
+    expect(proofCalls(mirror).at(-1)).toBe(`list:${T},${P},${GATE}:1762400009.500000000`); // re-proved from the bound, inclusive
+  });
+
+  it("no proof read when nothing is waiting, and never in prime mode", async () => {
+    const { mirror, w } = setup(false, 3000, GATE);
+    mirror.msgs.push(receiptMsg(1, "1762400005.000000000", { txId: TX, to: PAYEE, amount: "500" }));
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", PAYEE, 500));
+    await w.tick(false);
+    await w.tick();
+    expect(proofCalls(mirror)).toHaveLength(0);
   });
 });
 

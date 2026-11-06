@@ -214,6 +214,14 @@ export interface MirrorClientOptions {
   maxRetries?: number;
   sleep?: (ms: number) => Promise<void>;
   maxPages?: number;
+  /**
+   * Make every polling URL unique (an extra `timestamp=lte:<an hour ahead>.<counter>` filter, which
+   * matches everything up to now). The public Mirror Node sits behind a CDN that caches answers for
+   * `max-age=1`, so a poll with an unchanged URL (no new receipts -> same `sequencenumber=gte:N`) can be
+   * served an answer up to a second old (scripts/demo/mirror-lag.ts). The watcher turns this on.
+   */
+  cacheBust?: boolean;
+  now?: () => number;
 }
 
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -224,6 +232,9 @@ export class MirrorClient {
   private maxRetries: number;
   private sleep: (ms: number) => Promise<void>;
   private maxPages: number;
+  private cacheBust: boolean;
+  private nowMs: () => number;
+  private bustSeq = 0;
 
   constructor(o: MirrorClientOptions = {}) {
     this.baseUrl = (o.baseUrl ?? env.mirrorUrl).replace(/\/$/, "");
@@ -231,6 +242,15 @@ export class MirrorClient {
     this.maxRetries = o.maxRetries ?? 5;
     this.sleep = o.sleep ?? realSleep;
     this.maxPages = o.maxPages ?? 20;
+    this.cacheBust = o.cacheBust ?? false;
+    this.nowMs = o.now ?? Date.now;
+  }
+
+  /** `&timestamp=lte:<now + 1 h>.<unique>` when cache-busting, else "". Never excludes a real record. */
+  private bust(): string {
+    if (!this.cacheBust) return "";
+    this.bustSeq = (this.bustSeq + 1) % 1_000_000_000;
+    return `&timestamp=lte:${Math.floor(this.nowMs() / 1000) + 3600}.${String(this.bustSeq).padStart(9, "0")}`;
   }
 
   /** GET a Mirror path (or an absolute `links.next`). Retries 429 and 5xx with backoff. 404 -> null. */
@@ -275,7 +295,19 @@ export class MirrorClient {
 
   /** Transactions touching `account` with consensus strictly after `sinceTs` ("seconds.nanos"), oldest first. */
   transactionsSince(account: string, sinceTs: string, limit = 100): Promise<MirrorTransaction[]> {
-    const q = `/api/v1/transactions?account.id=${account}&timestamp=gt:${sinceTs}&order=asc&limit=${limit}`;
+    const q = `/api/v1/transactions?account.id=${account}&timestamp=gt:${sinceTs}${this.bust()}&order=asc&limit=${limit}`;
+    return this.paged<MirrorTransaction>(q, "transactions");
+  }
+
+  /**
+   * Transactions touching ANY of `accounts` (repeated account.id is an OR on the Mirror Node) with
+   * consensus at or after `fromTs`, oldest first. Ascending pages make the answer gap-free: a page
+   * that holds a record at time Z came from a replica that had ingested every record up to Z, and
+   * the next page starts strictly after the previous page's last record.
+   */
+  transactionsForAccountsFrom(accounts: string[], fromTs: string, limit = 100): Promise<MirrorTransaction[]> {
+    const ids = [...new Set(accounts)].map((a) => `account.id=${a}`).join("&");
+    const q = `/api/v1/transactions?${ids}&timestamp=gte:${fromTs}${this.bust()}&order=asc&limit=${limit}`;
     return this.paged<MirrorTransaction>(q, "transactions");
   }
 
@@ -306,7 +338,7 @@ export class MirrorClient {
   /** Topic messages with sequence number > `afterSeq`, oldest first, decoded. */
   async topicMessagesSince(topicId: string, afterSeq: number, limit = 100): Promise<TopicMessage[]> {
     // The Mirror Node rejects sequencenumber=gt:0 (HTTP 400); gte:N+1 is the same filter and is accepted.
-    const q = `/api/v1/topics/${topicId}/messages?sequencenumber=gte:${afterSeq + 1}&order=asc&limit=${limit}`;
+    const q = `/api/v1/topics/${topicId}/messages?sequencenumber=gte:${afterSeq + 1}${this.bust()}&order=asc&limit=${limit}`;
     return decodeTopicMessages(await this.paged<MirrorTopicMessage>(q, "messages"));
   }
 
@@ -319,7 +351,7 @@ export class MirrorClient {
 
   /** Consensus end timestamp of the newest block the Mirror Node has ingested. */
   async latestBlockTimestamp(): Promise<string | null> {
-    const r = await this.get<{ blocks: { timestamp: { from: string; to: string } }[] }>(`/api/v1/blocks?order=desc&limit=1`);
+    const r = await this.get<{ blocks: { timestamp: { from: string; to: string } }[] }>(`/api/v1/blocks?order=desc&limit=1${this.bust()}`);
     return r?.blocks?.[0]?.timestamp?.to ?? null;
   }
 }
