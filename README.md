@@ -20,7 +20,7 @@ A stablecoin issuer's treasury key, or the server that holds it, is the single p
 | StablR (EURR, USDR) | 24 May 2026 | Minting multisig compromised; unbacked tokens issued; ~$2.8M extracted on-chain | [Cointelegraph](https://cointelegraph.com/news/euro-and-usd-stablecoins-depeg-amid-ongoing-28m-stablr-exploit) |
 | Gala Games | 20 May 2024 | Compromised admin address minted 5B GALA (~$200M); the attacker sold ~$21M before the wallet was frozen | [The Block](https://www.theblock.co/post/295723/gala-games-exploiter-returns-21-million-taken-from-the-200-million-exploit) |
 
-In each case the issuer had the power to freeze, but a human had to notice first. Levee makes the "notice and freeze" part automatic, and makes every legitimate move leave a public receipt first, so "unreceipted" is a precise, machine-checkable definition of theft.
+All three were key or admin compromises, and in each the response (pause, freeze, burn) came after people noticed. Levee makes the "notice and contain" part automatic for both treasury transfers and mints, and makes every legitimate move leave a public receipt first, so "unreceipted" is a precise, machine-checkable definition of theft.
 
 ## How it works
 
