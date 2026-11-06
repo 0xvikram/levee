@@ -7,7 +7,7 @@ Levee stops a stolen-key theft from a Hedera Stablecoin Studio treasury in about
 Built for ETHGlobal Mumbai 2026. Main track: Hedera "Tokenize with Hedera Studios" (Stablecoin Studio). Also submitted to Arkiv "Build from scratch".
 
 - Demo video: (link added at submission)
-- Hosted dashboard: (URL added at deploy)
+- Hosted dashboard: https://levee-theta.vercel.app (live view: https://levee-theta.vercel.app/live, reads the chain directly)
 - Live testnet run log: [docs/LIVE_RUN.md](docs/LIVE_RUN.md)
 
 ## Problem
