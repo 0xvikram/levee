@@ -30,7 +30,7 @@ Levee is a circuit breaker for stablecoin issuers on Hedera. Every token that le
 - Payments that have a valid receipt are trusted. A wrong but approved payment is not caught.
 - A stolen minting (CASHIN) key can mint again after its first mint is wiped. Revoking the role or pausing the token is not automatic yet; `PAUSE_ON_BREACH` exists but is off by default. Burning unauthorised supply left in the token treasury (`burnSupply`) is unit-tested only, never run live.
 - The watcher key, through the controller, can freeze any account and wipe receivers' balances. The partner rule is enforced in the watcher's code, not on chain (no on-chain allowlist yet), so a stolen watcher key calling the controller directly could also wipe a partner. It can never unfreeze, unpause, pay, mint or replace itself. Production needs it in a KMS/HSM and an on-chain partner guard (phase 3).
-- Everything in the demo runs on one Mac. The gate process also loads the issuer's treasury-signer key, so it signs with key 1 (treasury signer) and key 2 (gate) of the 2-of-3 from one process (`src/gate/server.ts`). In a real setup the issuer's service holds its own key and Levee holds only the gate key.
+- Everything in the demo runs on one Mac and every key file sits there. Signing is split: the gate schedules each transfer with its own key only (`src/gate/server.ts`), and a separate issuer-signer process (`src/signer/`) adds the treasury-signer key's signature after it finds the matching receipt on Hedera. In a real setup those run on separate machines, with keys in KMS/HSM.
 
 ## Phase 2: stricter rules (built, always on in today's code)
 
