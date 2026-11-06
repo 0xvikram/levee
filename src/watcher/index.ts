@@ -107,6 +107,7 @@ async function main() {
       receiptsTopic: state.topics.receipts,
       rules: rulesFromState(state, env),
       pauseOnBreach: PAUSE_ON_BREACH,
+      receiptGraceMs: Number(process.env.WATCHER_RECEIPT_GRACE_MS ?? "3000"),
     },
     {
       mirror,

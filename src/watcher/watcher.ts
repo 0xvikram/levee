@@ -2,7 +2,7 @@
 // Every tick: read new treasury / token-treasury transactions FIRST, then new receipts
 // (so any receipt that reached consensus before a movement we saw is already readable),
 // match, and contain breaches.
-import type { Movement, Receipt, Rules } from "../shared/types.js";
+import type { Breach, Movement, Receipt, Rules } from "../shared/types.js";
 import {
   extractAllowances,
   extractMovements,
@@ -36,6 +36,16 @@ export interface WatcherConfig {
   rules: Rules;
   pauseOnBreach: boolean;
   maxLagMs?: number; // default 20 s
+  /**
+   * How long a movement with no receipt yet may wait for its receipt to become readable before it
+   * is a "no-receipt" breach. Needed because the Mirror Node's REST endpoints are served by several
+   * replicas: a fresh one can return the transfer while the next request (topic messages) lands on
+   * one a second behind, which raised a false alarm live (docs/LIVE_RUN.md). It cannot excuse a real
+   * breach: the receipt must still have reached consensus BEFORE the movement, and the wait ends
+   * early once any receipt with a later consensus time has been read (the read is then complete).
+   * Default 0 (judge at once); the service sets WATCHER_RECEIPT_GRACE_MS (default 3000).
+   */
+  receiptGraceMs?: number;
 }
 
 export interface WatcherDeps {
@@ -86,6 +96,10 @@ export class Watcher {
   breaches: BreachView[] = [];
   incidents: IncidentOut[] = [];
   invalidReceipts = 0;
+  /** movements still waiting (within receiptGraceMs) for their receipt to be readable */
+  readonly pending = new Map<string, { movement: Movement; firstSeenMs: number }>();
+  /** highest consensus time of any receipts-topic message read so far (all earlier ones are read too) */
+  receiptsReadTo = "0.0";
   lagMs = Number.POSITIVE_INFINITY; // fail closed until measured
   lastTickOkAt = 0;
   lastError: string | null = null;
@@ -141,6 +155,7 @@ export class Watcher {
       let seq = this.receiptSeq;
       for (const m of msgs) {
         seq = Math.max(seq, m.sequence);
+        if (compareConsensus(m.consensusAt, this.receiptsReadTo) > 0) this.receiptsReadTo = m.consensusAt;
         const p = receiptFromMessage(m);
         if (!p.ok) {
           this.invalidReceipts++;
@@ -153,8 +168,10 @@ export class Watcher {
 
       // 3. match
       const opts = { token: this.cfg.token, treasury: this.cfg.treasury, tokenTreasury: this.cfg.tokenTreasury };
-      const movements = extractMovements(txs, opts);
+      const fresh = extractMovements(txs, opts);
+      const movements = [...[...this.pending.values()].map((p) => p.movement), ...fresh];
       const res = matchMovements(movements, this.receipts, this.cfg.rules, this.match);
+      res.breaches = this.holdForLateReceipts(res, fresh, contain);
       const allowances = extractAllowances(txs, this.cfg.treasury);
       const breaches: WatcherBreach[] = [...res.breaches, ...allowances.map((a) => ({ reason: "treasury-allowance" as const, allowance: a }))];
       this.matchedCount += res.matched.length;
@@ -176,6 +193,31 @@ export class Watcher {
       this.deps.log?.(`tick failed: ${this.lastError}`);
       throw e;
     }
+  }
+
+  /**
+   * Movements whose only problem is "no receipt yet" wait up to receiptGraceMs (from first sight)
+   * unless the receipts read already covers their consensus time. Returns the breaches to act on now.
+   */
+  private holdForLateReceipts(res: { matched: Movement[]; breaches: Breach[] }, fresh: Movement[], contain: boolean): Breach[] {
+    const key = (m: Movement) => `${m.txId}|${m.to}|${m.amount}|${m.kind}`;
+    const grace = contain ? (this.cfg.receiptGraceMs ?? 0) : 0;
+    const now = this.now();
+    for (const m of fresh) if (!this.pending.has(key(m))) this.pending.set(key(m), { movement: m, firstSeenMs: now });
+    const keep: Breach[] = [];
+    const waiting = new Set<string>();
+    for (const b of res.breaches) {
+      const k = key(b.movement);
+      const p = this.pending.get(k);
+      const covered = compareConsensus(this.receiptsReadTo, b.movement.consensusAt) > 0;
+      if (b.reason === "no-receipt" && p && !covered && now - p.firstSeenMs < grace) {
+        waiting.add(k);
+        continue;
+      }
+      keep.push(b);
+    }
+    for (const k of [...this.pending.keys()]) if (!waiting.has(k)) this.pending.delete(k);
+    return keep;
   }
 
   async containmentState(breaches: WatcherBreach[]): Promise<ContainmentState> {
@@ -240,6 +282,7 @@ export class Watcher {
       receipts: this.receipts.size,
       invalidReceipts: this.invalidReceipts,
       receiptSeq: this.receiptSeq,
+      pendingReceipts: this.pending.size,
       cursors: this.cursors,
       breaches: this.breaches.slice(-50),
       incidents: this.incidents.slice(-20),

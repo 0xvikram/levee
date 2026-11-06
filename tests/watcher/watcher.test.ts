@@ -57,14 +57,14 @@ class FakeMirror implements WatcherMirror {
   }
 }
 
-function setup(pauseOnBreach = false) {
+function setup(pauseOnBreach = false, receiptGraceMs?: number) {
   const mirror = new FakeMirror();
   const steps: ContainmentStep[] = [];
   const published: IncidentOut[] = [];
   const events: string[] = [];
   let now = 1762400101_000;
   const w = new Watcher(
-    { token: TOKEN, treasury: T, tokenTreasury: P, receiptsTopic: "0.0.9001", rules, pauseOnBreach },
+    { token: TOKEN, treasury: T, tokenTreasury: P, receiptsTopic: "0.0.9001", rules, pauseOnBreach, receiptGraceMs },
     {
       mirror,
       call: async (s) => {
@@ -80,6 +80,57 @@ function setup(pauseOnBreach = false) {
   );
   return { mirror, w, steps, published, events, setNow: (n: number) => (now = n) };
 }
+
+describe("Watcher late receipts (Mirror replica lag false alarm, found live)", () => {
+  const TX = "0.0.6000-1762400004-000000001";
+  it("a receipt that is readable one tick after its transfer is matched, not a breach", async () => {
+    const { mirror, w, steps, setNow } = setup(false, 3000);
+    // live case: receipt consensus 0.9 s BEFORE the transfer, but the replica serving topic messages lags
+    mirror.txs[T].push(xfer(TX, "1762400010.900000000", PAYEE, 500));
+    const r1 = await w.tick();
+    expect(r1.breaches).toHaveLength(0);
+    expect(w.snapshot().pendingReceipts).toBe(1);
+    mirror.msgs.push(receiptMsg(1, "1762400010.000000000", { txId: TX, to: PAYEE, amount: "500" }));
+    setNow(1762400102_000);
+    const r2 = await w.tick();
+    expect(r2.matched).toHaveLength(1);
+    expect(r2.breaches).toHaveLength(0);
+    expect(steps).toHaveLength(0);
+    expect(w.snapshot()).toMatchObject({ matched: 1, pendingReceipts: 0 });
+  });
+  it("no receipt ever: breach once the grace has passed", async () => {
+    const { mirror, w, steps, setNow } = setup(false, 3000);
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", ATT, 500));
+    expect((await w.tick()).breaches).toHaveLength(0);
+    setNow(1762400102_500);
+    expect((await w.tick()).breaches).toHaveLength(0);
+    setNow(1762400104_000);
+    const r = await w.tick();
+    expect(r.breaches[0]).toMatchObject({ reason: "no-receipt" });
+    expect(steps.length).toBeGreaterThan(0);
+    expect(w.snapshot().pendingReceipts).toBe(0);
+    expect((await w.tick()).breaches).toHaveLength(0); // not re-reported
+  });
+  it("no waiting when the receipts read already covers the movement's time (a later receipt was read)", async () => {
+    const { mirror, w } = setup(false, 3000);
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", ATT, 500));
+    mirror.msgs.push(receiptMsg(1, "1762400011.000000000", { txId: "0.0.6000-1762400009-000000009", to: PAYEE, amount: "1" }));
+    expect((await w.tick()).breaches[0]).toMatchObject({ reason: "no-receipt" });
+  });
+  it("a late receipt with a LATER consensus time is still a breach (no backdating through the grace)", async () => {
+    const { mirror, w, setNow } = setup(false, 3000);
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", PAYEE, 500));
+    await w.tick();
+    mirror.msgs.push(receiptMsg(1, "1762400011.000000000", { txId: TX, to: PAYEE, amount: "500" }));
+    setNow(1762400102_000);
+    expect((await w.tick()).breaches[0]).toMatchObject({ reason: "receipt-after-movement" });
+  });
+  it("prime mode never waits", async () => {
+    const { mirror, w } = setup(false, 3000);
+    mirror.txs[T].push(xfer(TX, "1762400010.000000000", ATT, 500));
+    expect((await w.tick(false)).breaches[0]).toMatchObject({ reason: "no-receipt" });
+  });
+});
 
 describe("Watcher.tick", () => {
   it("matches a receipted payout and contains nothing", async () => {
