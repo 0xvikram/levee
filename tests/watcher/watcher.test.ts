@@ -96,7 +96,7 @@ describe("Watcher late receipts (Mirror replica lag false alarm, found live)", (
     expect(r2.matched).toHaveLength(1);
     expect(r2.breaches).toHaveLength(0);
     expect(steps).toHaveLength(0);
-    expect(w.snapshot()).toMatchObject({ matched: 1, pendingReceipts: 0 });
+    expect(w.snapshot()).toMatchObject({ matched: 1, pendingReceipts: 0, lateReceiptMatches: 1 });
   });
   it("no receipt ever: breach once the grace has passed", async () => {
     const { mirror, w, steps, setNow } = setup(false, 3000);
@@ -141,7 +141,7 @@ describe("Watcher.tick", () => {
     expect(r.matched).toHaveLength(1);
     expect(r.breaches).toHaveLength(0);
     expect(steps).toHaveLength(0);
-    expect(w.snapshot()).toMatchObject({ matched: 1, receipts: 1, receiptSeq: 1, healthy: false });
+    expect(w.snapshot()).toMatchObject({ matched: 1, receipts: 1, receiptSeq: 1, healthy: false, lateReceiptMatches: 0 });
   });
 
   it("reads movements BEFORE receipts (so a receipt that preceded a seen movement is never missed)", async () => {

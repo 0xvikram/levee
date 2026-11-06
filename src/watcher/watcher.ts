@@ -100,6 +100,8 @@ export class Watcher {
   readonly pending = new Map<string, { movement: Movement; firstSeenMs: number }>();
   /** highest consensus time of any receipts-topic message read so far (all earlier ones are read too) */
   receiptsReadTo = "0.0";
+  /** movements that matched only after waiting for their receipt (each one would have been a false alarm) */
+  lateReceiptMatches = 0;
   lagMs = Number.POSITIVE_INFINITY; // fail closed until measured
   lastTickOkAt = 0;
   lastError: string | null = null;
@@ -203,6 +205,10 @@ export class Watcher {
     const key = (m: Movement) => `${m.txId}|${m.to}|${m.amount}|${m.kind}`;
     const grace = contain ? (this.cfg.receiptGraceMs ?? 0) : 0;
     const now = this.now();
+    for (const m of res.matched) {
+      const p = this.pending.get(key(m));
+      if (p && p.firstSeenMs < now) this.lateReceiptMatches++;
+    }
     for (const m of fresh) if (!this.pending.has(key(m))) this.pending.set(key(m), { movement: m, firstSeenMs: now });
     const keep: Breach[] = [];
     const waiting = new Set<string>();
@@ -283,6 +289,7 @@ export class Watcher {
       invalidReceipts: this.invalidReceipts,
       receiptSeq: this.receiptSeq,
       pendingReceipts: this.pending.size,
+      lateReceiptMatches: this.lateReceiptMatches,
       cursors: this.cursors,
       breaches: this.breaches.slice(-50),
       incidents: this.incidents.slice(-20),

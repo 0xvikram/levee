@@ -83,6 +83,8 @@ const result = {
   breaches: runBreaches.length,
   watcherBreachDelta: after.breaches.length - before.breaches.length,
   incidentsDelta: after.incidents.length - before.incidents.length,
+  lateReceiptMatches: (after.lateReceiptMatches ?? 0) - (before.lateReceiptMatches ?? 0), // matched only thanks to the receipt grace
+
   totalRupc: (totalOf(plan) / scale).toString(),
   durationS: +((Date.now() - t0) / 1000).toFixed(1),
   sendPhaseS: +(sendDoneMs / 1000).toFixed(1),

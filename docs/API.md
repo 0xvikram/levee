@@ -15,6 +15,7 @@ All three `/events` endpoints are Server-Sent Events with `Access-Control-Allow-
 - gate `POST /request` 200 reply: new `receiptTxId`.
 - gate `decision` SSE event: new `receiptTxId`, `receiptSequence` on approved requests.
 - gate `GET /health`: new `capPerTransfer`, `capPerDay`, `spentToday`, `knownDestinations`.
+- watcher `GET /state`: new `pendingReceipts`, `lateReceiptMatches` (see WATCHER_RECEIPT_GRACE_MS).
 - checker `GET /pass/:machine` and `/passes`: new `profile`; `checks` values may now be `"skip"`.
 - checker `POST /enrol`: new optional `profile` in body and reply.
 - checker `enrol` event data: new `profile`.
@@ -65,10 +66,13 @@ Refusals: `ok: false, reason, detail, timings` (no txId). Execute failures: `ok:
 
 200 when healthy, 503 otherwise: `{ ok, service: "watcher", lagMs, lastBeat }`. Healthy = Mirror lag ≤ 20 s and a tick succeeded within 20 s. An unhealthy watcher withholds heartbeats, so the gate refuses everything (`no-watcher`).
 
+A movement with no receipt yet waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000) for the receipt to be served before a `no-receipt` breach is raised (Mirror replicas can lag each other by ~1 s; see docs/LIVE_RUN.md). The receipt must still have reached consensus before the movement.
+
 ### `GET /state`
 
 ```
 { healthy, lagMs | null, matched (count since start), receipts (count), invalidReceipts, receiptSeq,
+  pendingReceipts (movements waiting for a late-served receipt), lateReceiptMatches (count matched after waiting),
   cursors: { [account]: consensusTs }, breaches: BreachView[] (last 50), incidents: IncidentOut[] (last 20),
   lastTickOkAt: ISO | null, lastError: string | null, lastBeat: ISO | null,
   pauseOnBreach, treasury, token, tokenTreasury }
