@@ -39,7 +39,10 @@ export async function mirror<T = any>(pathAndQuery: string, tries = 1): Promise<
   return null;
 }
 
+/** HBAR balance: Mirror Node first (free, never BUSY, a few seconds behind), consensus query as fallback. */
 export async function hbarBalance(client: Client, accountId: string): Promise<number> {
+  const j = await mirror<{ balance: { balance: number } }>(`/api/v1/accounts/${accountId}`).catch(() => null);
+  if (j?.balance) return j.balance.balance / 1e8;
   const b = await new AccountBalanceQuery().setAccountId(accountId).execute(client);
   return b.hbars.toTinybars().toNumber() / 1e8;
 }

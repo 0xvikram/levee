@@ -5,10 +5,17 @@ import { decodeFunctionResult, encodeFunctionData, keccak256, toHex } from "viem
 import { readState, type DeployState } from "../../src/shared/config.js";
 import { roleClient } from "../../src/shared/hedera.js";
 import { ethCall, execContract, freezeStatus, mirror, sleep, type ExecResult } from "../../src/setup/net.js";
-import { replaceSection } from "../../src/setup/plan.js";
+import { missingSteps, replaceSection } from "../../src/setup/plan.js";
 import { controllerArtifact, revertAbis } from "../../src/setup/studio.js";
 
 export const state: DeployState = readState();
+{
+  const todo = missingSteps(state as any);
+  if (todo.length) {
+    console.error(`setup incomplete (to do: ${todo.join(", ")}). Run npm run setup first.`);
+    process.exit(2);
+  }
+}
 export const ctrlAbi = controllerArtifact().abi;
 const abis = revertAbis();
 

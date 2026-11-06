@@ -55,7 +55,7 @@ export const FEE_HBAR = {
   topicCreate: 0.45,
   tokenAssociate: 0.75,
   /** HTS token create fee forwarded by the Studio factory as msg.value; excess is not taken */
-  tokenCreateValue: 25,
+  tokenCreateValue: 30,
   tokenCreateFee: 16,
   gasTinybarPerUnit: 130,
   hbarTransfer: 0.001,
