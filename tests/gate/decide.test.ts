@@ -126,4 +126,13 @@ describe("receipt + events", () => {
     const r = rulesFromState({ token: { tokenId: "0.0.5001" }, treasury: { id: "0.0.6000" }, payees: [{ id: "0.0.6001" }, { id: "0.0.6002" }] }, { capPerTransfer: 1n, capPerDay: 2n });
     expect(r).toEqual({ token: "0.0.5001", treasury: "0.0.6000", capPerTransfer: 1n, capPerDay: 2n, knownDestinations: ["0.0.6001", "0.0.6002"] });
   });
+  it("rulesFromState scales whole-token caps to the smallest unit (bug: 500 RUPC was over a 10,000 cap)", () => {
+    const r = rulesFromState({ token: { tokenId: "0.0.5001", decimals: 6 }, treasury: { id: "0.0.6000" }, payees: [{ id: "0.0.6001" }] }, { capPerTransfer: 10_000n, capPerDay: 50_000n });
+    expect(r.capPerTransfer).toBe(10_000_000_000n);
+    expect(r.capPerDay).toBe(50_000_000_000n);
+    const pass = { live: true };
+    const req = { machine: "m", to: "0.0.6001", amount: "500000000", kind: "transfer" as const };
+    expect(decide({ req, pass, rules: r, spentToday: 0n, heartbeat: { consensusAt: "1700000000.000000000" }, nowMs: 1_700_000_001_000 })).toEqual({ ok: true });
+    expect(decide({ req: { ...req, amount: "10000000001" }, pass, rules: r, spentToday: 0n, heartbeat: { consensusAt: "1700000000.000000000" }, nowMs: 1_700_000_001_000 })).toMatchObject({ reason: "over-transfer-cap" });
+  });
 });

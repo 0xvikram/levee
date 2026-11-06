@@ -6,6 +6,7 @@ import path from "node:path";
 import type { Hex } from "viem";
 import type { PassStore } from "../shared/arkiv.js";
 import { failingChecks, verifySigned, type SignedHeartbeat } from "../agent/protocol.js";
+import { isProfile, type Profile } from "../agent/checks.js";
 
 export const NONCE_TTL_MS = 60_000;
 export const MAX_BLOCK_AGE_S = 10;
@@ -14,6 +15,8 @@ export const MAX_CLOCK_SKEW_MS = 120_000;
 export interface MachineState {
   machine: string;
   role: string;
+  /** fixed at enrolment; older state files have none = laptop */
+  profile?: Profile;
   publicKey: Hex;
   lastSeq: number;
   lastHeartbeatAt: number | null;
@@ -36,6 +39,7 @@ export interface PassView {
   arkivBlockAgeSeconds: number | null;
   checks?: Record<string, string>;
   lastHeartbeatAt?: string | null;
+  profile?: Profile;
 }
 
 export class HttpError extends Error {
@@ -75,21 +79,25 @@ export class CheckerCore {
     this.events.emit("event", { type, at: this.now(), data });
   }
 
-  enrol(body: { machine?: string; publicKey?: string; role?: string }, token?: string) {
+  enrol(body: { machine?: string; publicKey?: string; role?: string; profile?: string }, token?: string) {
     if (this.o.enrolToken && token !== this.o.enrolToken) throw new HttpError(401, "bad enrol token");
     const { machine, publicKey } = body;
     const role = body.role ?? "employee";
     if (!machine || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(machine)) throw new HttpError(400, "bad machine name");
     if (!publicKey || !/^0x04[0-9a-fA-F]{128}$/.test(publicKey)) throw new HttpError(400, "publicKey must be an uncompressed secp256k1 key (0x04...)");
     if (!/^[\w .-]{1,32}$/.test(role)) throw new HttpError(400, "bad role");
+    const profile = body.profile ?? "laptop";
+    if (!isProfile(profile)) throw new HttpError(400, "profile must be laptop, server or ci");
     const cur = this.machines.get(machine);
     if (cur && cur.publicKey.toLowerCase() !== publicKey.toLowerCase()) throw new HttpError(409, "machine already enrolled with another key");
+    // The profile decides which checks may be skipped, so it can never change after enrolment.
+    if (cur && (cur.profile ?? "laptop") !== profile) throw new HttpError(409, `machine already enrolled with profile ${cur.profile ?? "laptop"}`);
     if (!cur) {
-      this.machines.set(machine, { machine, role, publicKey: publicKey as Hex, lastSeq: 0, lastHeartbeatAt: null, lastGoodAt: null, denied: false, reason: null, checks: {} });
+      this.machines.set(machine, { machine, role, profile, publicKey: publicKey as Hex, lastSeq: 0, lastHeartbeatAt: null, lastGoodAt: null, denied: false, reason: null, checks: {} });
       this.persist();
-      this.emit("enrol", { machine, role });
+      this.emit("enrol", { machine, role, profile });
     }
-    return { ok: true, machine, role };
+    return { ok: true, machine, role: cur?.role ?? role, profile };
   }
 
   nonce(machine: string | undefined) {
@@ -113,10 +121,12 @@ export class CheckerCore {
     if (!(await verifySigned(m.publicKey, hb))) throw new HttpError(401, "bad signature");
     if (!Number.isInteger(p.seq) || p.seq <= m.lastSeq) throw new HttpError(409, `seq must increase (last ${m.lastSeq})`);
     if (Math.abs(this.now() - p.sentAt) > MAX_CLOCK_SKEW_MS) throw new HttpError(400, "sentAt too far from checker clock");
+    const profile = m.profile ?? "laptop";
+    if (p.profile !== undefined && p.profile !== profile) throw new HttpError(400, `heartbeat profile ${String(p.profile)} does not match enrolled profile ${profile}`);
     m.lastSeq = p.seq;
     m.lastHeartbeatAt = this.now();
     m.checks = p.checks;
-    const failing = failingChecks(p.checks);
+    const failing = failingChecks(p.checks ?? {}, profile);
     if (failing.length) {
       m.denied = true;
       m.reason = `check failed: ${failing.join(", ")}`;
@@ -152,7 +162,7 @@ export class CheckerCore {
     const base = { machine, arkivEntityKey: null, arkivBlockAgeSeconds: null as number | null, expiresAt: null };
     const m = this.machines.get(machine);
     if (!m) return { ...base, live: false, kind: "unknown", reason: "unknown machine" };
-    const extra = { checks: m.checks, lastHeartbeatAt: m.lastHeartbeatAt ? new Date(m.lastHeartbeatAt).toISOString() : null };
+    const extra = { checks: m.checks, profile: m.profile ?? "laptop", lastHeartbeatAt: m.lastHeartbeatAt ? new Date(m.lastHeartbeatAt).toISOString() : null };
     let age: number | null = null;
     try {
       age = await this.o.store.latestBlockAge();

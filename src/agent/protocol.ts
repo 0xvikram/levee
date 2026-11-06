@@ -2,13 +2,15 @@
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { verifyMessage, type Hex } from "viem";
 import { publicKeyToAddress } from "viem/utils";
-import { sha256, CHECK_IDS, type CheckId, type CheckResult } from "./checks.js";
+import { sha256, CHECK_IDS, checksFor, type CheckId, type CheckResult, type Profile } from "./checks.js";
 
 export interface HeartbeatPayload {
   machine: string;
   seq: number;
   nonce: string;
-  checks: Record<string, "ok" | "fail">;
+  checks: Record<string, "ok" | "fail" | "skip">;
+  /** the agent's profile (informational: the checker enforces the profile stored at enrolment) */
+  profile?: Profile;
   evidenceHash: string;
   sentAt: number; // unix ms
 }
@@ -30,11 +32,12 @@ export function canonicalJson(v: unknown): string {
     .join(",")}}`;
 }
 
-export function buildPayload(machine: string, seq: number, nonce: string, results: CheckResult[], sentAt = Date.now()): HeartbeatPayload {
-  const checks: Record<string, "ok" | "fail"> = {};
+export function buildPayload(machine: string, seq: number, nonce: string, results: CheckResult[], sentAt = Date.now(), profile?: Profile): HeartbeatPayload {
+  const checks: Record<string, "ok" | "fail" | "skip"> = {};
+  if (profile) for (const id of CHECK_IDS) if (!checksFor(profile).includes(id)) checks[id] = "skip";
   for (const r of results) checks[r.id] = r.ok ? "ok" : "fail";
   const evidenceHash = sha256(canonicalJson(results.map((r) => [r.id, r.evidenceHash])));
-  return { machine, seq, nonce, checks, evidenceHash, sentAt };
+  return { machine, seq, nonce, checks, evidenceHash, sentAt, ...(profile ? { profile } : {}) };
 }
 
 export const newMachineKey = (): Hex => generatePrivateKey();
@@ -53,7 +56,10 @@ export async function verifySigned(publicKey: Hex, hb: SignedHeartbeat): Promise
   }
 }
 
-/** Every one of the 7 checks must be present and "ok". Returns failing ids (missing counts as failing). */
-export function failingChecks(checks: Record<string, string>): CheckId[] {
-  return CHECK_IDS.filter((id) => checks[id] !== "ok");
+/**
+ * Every check the profile requires must be present and "ok" (missing or "skip" counts as failing).
+ * Default profile is laptop = all 7. Checks outside the profile are ignored whatever they say.
+ */
+export function failingChecks(checks: Record<string, string>, profile: Profile = "laptop"): CheckId[] {
+  return checksFor(profile).filter((id) => checks[id] !== "ok");
 }

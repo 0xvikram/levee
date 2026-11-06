@@ -147,16 +147,22 @@ export function buildReceipt(req: GateRequest, o: { txId: string; token: string;
   };
 }
 
-/** Rules for this deployment: caps from .env, known destinations = the setup payees. */
+/**
+ * Rules for this deployment: caps from .env, known destinations = the setup payees.
+ * CAP_PER_TRANSFER / CAP_PER_DAY are written in WHOLE tokens (10000 = 10,000 RUPC), while gate
+ * requests, receipts and Mirror movements are in the smallest unit, so the caps are scaled by
+ * 10^decimals here. (Before this fix a 6-decimal token had a cap of 0.01 RUPC.)
+ */
 export function rulesFromState(
-  s: { token: { tokenId: string }; treasury: { id: string }; payees: { id: string }[] },
+  s: { token: { tokenId: string; decimals?: number }; treasury: { id: string }; payees: { id: string }[] },
   caps: { capPerTransfer: bigint; capPerDay: bigint },
 ): Rules {
+  const scale = 10n ** BigInt(s.token.decimals ?? 0);
   return {
     token: s.token.tokenId,
     treasury: s.treasury.id,
-    capPerTransfer: caps.capPerTransfer,
-    capPerDay: caps.capPerDay,
+    capPerTransfer: caps.capPerTransfer * scale,
+    capPerDay: caps.capPerDay * scale,
     knownDestinations: s.payees.map((p) => p.id),
   };
 }

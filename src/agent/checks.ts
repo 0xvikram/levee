@@ -23,6 +23,23 @@ export interface Baseline {
   tools: Record<string, string>; // tool name or shim path -> sha256 of the resolved binary
 }
 
+/**
+ * Machine profiles. A laptop runs all 7 checks. A server or CI runner has no person at a keyboard,
+ * so the laptop-only checks are skipped: disk encryption (servers are protected by the data
+ * centre / cloud volume encryption, and FileVault is a per-user laptop control), editor
+ * extensions (nobody installs VS Code extensions on a payouts server), and remote-access apps
+ * (servers are reached over the ops path, not AnyDesk/Parsec). Persistence, ports, dev-tool
+ * integrity and OS protections apply everywhere. The profile is fixed at enrolment: the checker
+ * stores it and ignores what later heartbeats claim, so a laptop cannot downgrade itself.
+ */
+export type Profile = "laptop" | "server" | "ci";
+export const PROFILES: Profile[] = ["laptop", "server", "ci"];
+export const LAPTOP_ONLY: CheckId[] = ["disk", "extensions", "remote-access"];
+export function checksFor(profile: Profile): CheckId[] {
+  return profile === "laptop" ? [...CHECK_IDS] : CHECK_IDS.filter((c) => !LAPTOP_ONLY.includes(c));
+}
+export const isProfile = (v: unknown): v is Profile => typeof v === "string" && (PROFILES as string[]).includes(v);
+
 export const REMOTE_TOOLS = ["AnyDesk", "TeamViewer", "RustDesk", "ScreenConnect", "Splashtop", "Parsec"];
 export const SENSITIVE_PORTS = [22, 3389, 5900, 2375, 6379, 8888, 9222, 9229, 5432, 6443, 10250];
 export const EXTENSION_WINDOW_MS = 24 * 3600 * 1000;
@@ -99,18 +116,33 @@ export function parseListeners(netstat: string): Listener[] {
   return out;
 }
 
-export function exposedSensitive(listeners: Listener[]): Listener[] {
-  return listeners.filter((l) => !isLoopback(l.address) && SENSITIVE_PORTS.includes(l.port));
+export function exposedSensitive(listeners: Listener[], allow: number[] = []): Listener[] {
+  return listeners.filter((l) => !isLoopback(l.address) && SENSITIVE_PORTS.includes(l.port) && !allow.includes(l.port));
 }
 
-export function evaluatePorts(netstat: string): CheckResult {
-  const bad = exposedSensitive(parseListeners(netstat));
+/**
+ * LEVEE_ALLOW_PORTS="5432,6379": sensitive ports a machine is EXPECTED to expose (a DB host).
+ * Off by default; documented in docs/LEASH.md. Allowed ports are named in the check detail so
+ * the exception is always visible in the evidence.
+ */
+export function parseAllowPorts(v: string | undefined): number[] {
+  return (v ?? "")
+    .split(",")
+    .map((x) => Number(x.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0 && n < 65536);
+}
+const allowedPortsFromEnv = () => parseAllowPorts(process.env.LEVEE_ALLOW_PORTS);
+
+export function evaluatePorts(netstat: string, allow: number[] = []): CheckResult {
+  const bad = exposedSensitive(parseListeners(netstat), allow);
   const uniq = [...new Set(bad.map((b) => `${b.port}/${b.process}`))];
   return {
     id: "ports",
     ok: bad.length === 0,
-    detail: bad.length ? `sensitive ports exposed beyond loopback: ${uniq.join(", ")}` : "no sensitive port exposed",
-    evidenceHash: sha256(JSON.stringify(uniq.sort())),
+    detail:
+      (bad.length ? `sensitive ports exposed beyond loopback: ${uniq.join(", ")}` : "no sensitive port exposed") +
+      (allow.length ? ` (allowlisted: ${allow.join(", ")})` : ""),
+    evidenceHash: allow.length ? sha256(JSON.stringify({ exposed: uniq.sort(), allow })) : sha256(JSON.stringify(uniq.sort())),
   };
 }
 
@@ -262,22 +294,25 @@ export function captureBaseline(): Baseline {
   return { createdAt: new Date().toISOString(), persistence: collectPersistence(), tools: collectToolHashes() };
 }
 
-export async function runAllChecks(baseline: Baseline | null): Promise<CheckResult[]> {
+export async function runAllChecks(baseline: Baseline | null, profile: Profile = "laptop"): Promise<CheckResult[]> {
+  const want = new Set(checksFor(profile));
+  const skip = Promise.resolve(null);
   const [netstat, spctl, csrutil, fde, remote, ext] = await Promise.all([
     run("netstat", ["-anv", "-p", "tcp"]),
     run("spctl", ["--status"]),
     run("csrutil", ["status"]),
-    run("fdesetup", ["status"]),
-    collectRemoteAccess(),
-    collectExtensions(),
+    want.has("disk") ? run("fdesetup", ["status"]) : skip,
+    want.has("remote-access") ? collectRemoteAccess() : skip,
+    want.has("extensions") ? collectExtensions() : skip,
   ]);
-  return [
+  const all: (CheckResult | null)[] = [
     evaluatePersistence(collectPersistence(), baseline),
     remote,
-    evaluatePorts(netstat),
+    evaluatePorts(netstat, allowedPortsFromEnv()),
     evaluateDevtools(collectToolHashes(), baseline),
     evaluateProtections(spctl, csrutil),
-    evaluateDisk(fde),
+    fde === null ? null : evaluateDisk(fde),
     ext,
   ];
+  return all.filter((r): r is CheckResult => r !== null && want.has(r.id));
 }
