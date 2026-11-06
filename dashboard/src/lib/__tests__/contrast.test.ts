@@ -19,6 +19,13 @@ function over(fg: string, alpha: number, bg: string): string {
 
 const C = { sky: "#EFE6D2", haze: "#E6D8B4", white: "#FFFFFF", ink: "#1B1A17", moss: "#2E3722", smoke: "#6B665C", gold: "#7A5A00", yellow: "#F2E34C", oliveLit: "#B6C383", amber: "#D9B25C", breachLit: "#F08C74", breach: "#C8432B" };
 
+/** screen blend of the footer cursor light's brightest stop (sun #F6ECC6 at 0.2) over ink */
+const LIT_INK = (() => {
+  const a = [0xf6, 0xec, 0xc6].map((v) => (v / 255) * 0.2);
+  const b = C.ink.replace("#", "").match(/../g)!.map((h) => parseInt(h, 16) / 255);
+  return "#" + b.map((v, i) => Math.round((1 - (1 - v) * (1 - a[i])) * 255).toString(16).padStart(2, "0")).join("");
+})();
+
 const PAIRS: [string, string, string][] = [
   ["ink on sky", C.ink, C.sky],
   ["ink on haze", C.ink, C.haze],
@@ -40,6 +47,11 @@ const PAIRS: [string, string, string][] = [
   ["breach-lit on ink", C.breachLit, C.ink],
   ["breach-lit on moss", C.breachLit, C.moss],
   ["white on breach", C.white, C.breach],
+  // footer: the cursor light (sun at <= 20% alpha, screen blend) brightens the dark ground under the ticker
+  ["sky-dim ticker on ink under cursor light", over(C.sky, 0.7, LIT_INK), LIT_INK],
+  ["yellow ticker figure on ink under cursor light", C.yellow, LIT_INK],
+  ["olive-lit live tag on ink under cursor light", C.oliveLit, LIT_INK],
+  ["sky ticker link on ink under cursor light", C.sky, LIT_INK],
 ];
 
 describe("brand contrast pairs", () => {

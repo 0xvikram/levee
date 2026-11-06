@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { initialPoll, nextPoll, type PollResult, type PollState } from "./health";
 
-/** Subscribe to an SSE stream. `handlers` keys are event names ("message" for unnamed events). */
+/** Subscribe to an SSE stream. `handlers` keys are event names ("message" for unnamed events). An empty url opens nothing. */
 export function useEventSource(url: string, handlers: Record<string, (data: unknown) => void>): "connecting" | "open" | "closed" {
   const ref = useRef(handlers);
   ref.current = handlers;
   const [status, setStatus] = useState<"connecting" | "open" | "closed">("connecting");
   const names = Object.keys(handlers).sort().join(",");
   useEffect(() => {
-    if (typeof EventSource === "undefined") return;
+    if (!url || typeof EventSource === "undefined") return;
     const es = new EventSource(url);
     es.onopen = () => setStatus("open");
     es.onerror = () => setStatus(es.readyState === EventSource.CLOSED ? "closed" : "connecting");
@@ -34,10 +34,12 @@ export function useEventSource(url: string, handlers: Record<string, (data: unkn
 /**
  * Poll a JSON endpoint. Resolves non-2xx JSON bodies too (watcher /health answers 503 with JSON).
  * Keeps the last good data and only reports "unreachable" after two misses in a row (lib/health.ts).
+ * An empty url does not poll.
  */
 export function usePoll<T>(url: string, everyMs: number, timeoutMs = 8000): PollState<T> {
   const [st, setSt] = useState<PollState<T>>(initialPoll);
   useEffect(() => {
+    if (!url) return;
     let alive = true;
     let inFlight = false;
     const run = async () => {

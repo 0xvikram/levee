@@ -1,9 +1,11 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { FooterScene, useFooterFeed } from "../components/FooterScene";
 import { HeroMedia } from "../components/HeroMedia";
 import { Link, navigate } from "../components/router";
-import { GITHUB, deploy, hashscan } from "../lib/config";
+import { GITHUB, deploy, hashscan, services } from "../lib/config";
 import { useShowcase, type Showcase } from "../lib/incident";
-import { useCountUp, useRiseIn, useSeenOnce } from "../lib/hooks";
+import { useCountUp, usePoll, usePrefersReducedMotion, useRiseIn, useSeenOnce } from "../lib/hooks";
+import type { WatcherSnapshot } from "../lib/types";
 
 const INCIDENTS = [
   { name: "Resolv USR", when: "Mar 2026", big: "~$25M", note: "extracted before anyone could stop it" },
@@ -77,7 +79,7 @@ export function Landing() {
         <ReopenSection />
       </main>
 
-      <Footer />
+      <Footer showcase={showcase} />
     </>
   );
 }
@@ -286,14 +288,147 @@ function ReopenSection() {
 
 // ---------------------------------------------------------------- footer
 
-function Footer() {
+const WORD = "Levee";
+
+function Footer({ showcase }: { showcase: Showcase }) {
+  const reduced = usePrefersReducedMotion();
+  const root = useRef<HTMLElement>(null);
+  const light = useRef<HTMLDivElement>(null);
+  const letters = useRef<(HTMLSpanElement | null)[]>([]);
+  const vid = useRef<HTMLVideoElement>(null);
   const [imgOk, setImgOk] = useState(true);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [started, setStarted] = useState(false); // footer has neared the viewport once
+  const [onScreen, setOnScreen] = useState(false);
+  const [fine, setFine] = useState(false);
+
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setStarted(true);
+      setOnScreen(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([e]) => {
+        setOnScreen(e.isIntersecting);
+        if (e.isIntersecting) setStarted(true);
+      },
+      { rootMargin: "300px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const m = window.matchMedia?.("(pointer: fine)");
+    if (!m) return;
+    const on = () => setFine(m.matches);
+    on();
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+
+  const showVideo = started && !reduced && !videoFailed;
+  useEffect(() => {
+    const v = vid.current;
+    if (!v) return;
+    v.muted = true; // React does not always write the attribute, which some browsers need before autoplay
+    if (onScreen) v.play?.()?.catch(() => undefined);
+    else v.pause?.();
+  }, [onScreen, showVideo]);
+
+  // cursor light + wordmark lean (pointer: fine only, transforms only)
+  const interactive = fine && !reduced;
+  useEffect(() => {
+    const el = root.current;
+    if (!el || !interactive) return;
+    let raf = 0;
+    let px = 0;
+    let py = 0;
+    const paint = () => {
+      raf = 0;
+      const box = el.getBoundingClientRect();
+      if (light.current) light.current.style.transform = `translate3d(${(px - box.left).toFixed(0)}px, ${(py - box.top).toFixed(0)}px, 0) translate(-50%, -50%)`;
+      for (const l of letters.current) {
+        if (!l) continue;
+        const r = l.getBoundingClientRect();
+        const dx = px - (r.left + r.width / 2);
+        const dy = py - (r.top + r.height / 2);
+        const pull = Math.exp(-Math.hypot(dx, dy) / 420);
+        const lift = -12 * pull;
+        const tilt = Math.max(-1, Math.min(1, dx / 300)) * 7 * pull;
+        l.style.transform = `translate3d(0, ${lift.toFixed(2)}px, 0) rotate(${tilt.toFixed(2)}deg)`;
+      }
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse" && e.pointerType !== "pen") return;
+      px = e.clientX;
+      py = e.clientY;
+      el.classList.add("lit");
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const leave = () => {
+      el.classList.remove("lit");
+      for (const l of letters.current) if (l) l.style.transform = "";
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerleave", leave);
+    return () => {
+      cancelAnimationFrame(raf);
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerleave", leave);
+      leave();
+    };
+  }, [interactive]);
+
+  const feed = useFooterFeed(started, onScreen);
+  const watcher = usePoll<WatcherSnapshot>(started ? `${services.watcher}/state` : "", 15_000);
+  const matched = watcher.reachable && typeof watcher.data?.matched === "number" ? watcher.data.matched : null;
+
   return (
-    <footer className="footer">
-      {imgOk && <img className="footer-img" src="/media/footer.jpg" alt="" aria-hidden="true" onError={() => setImgOk(false)} decoding="async" loading="lazy" />}
+    <footer ref={root} className={`footer${interactive ? " footer-live" : ""}`}>
+      {imgOk && (
+        <img
+          className={`footer-img${videoFailed && !reduced ? " drift" : ""}`}
+          src="/media/footer.jpg"
+          alt=""
+          aria-hidden="true"
+          onError={() => setImgOk(false)}
+          decoding="async"
+          loading="lazy"
+        />
+      )}
+      {showVideo && (
+        <video
+          ref={vid}
+          className="footer-img"
+          muted
+          autoPlay
+          loop
+          playsInline
+          preload="metadata"
+          poster={imgOk ? "/media/footer.jpg" : undefined}
+          aria-hidden="true"
+          onError={() => setVideoFailed(true)}
+        >
+          <source src="/media/footer.webm" type="video/webm" />
+          {/* a missing source fires error on the <source>, not the <video> */}
+          <source src="/media/footer.mp4" type="video/mp4" onError={() => setVideoFailed(true)} />
+        </video>
+      )}
+      {!reduced && <FooterScene active={onScreen} feed={feed} />}
+      {interactive && <div ref={light} className="footer-light" aria-hidden="true" />}
       <div className="footer-inner">
         <div className="footer-brand">
-          <span className="footer-word">Levee</span>
+          <span className="footer-word" role="img" aria-label={WORD}>
+            {WORD.split("").map((ch, i) => (
+              <span key={i} ref={(n) => void (letters.current[i] = n)} aria-hidden="true">
+                {ch}
+              </span>
+            ))}
+          </span>
           <p>
             No receipt, no movement. Anything that moves without one is frozen and <span className="accent">undone</span>.
           </p>
@@ -329,6 +464,22 @@ function Footer() {
             </a>
           </div>
         </div>
+        <p className="footer-ticker" aria-live="off">
+          {matched !== null && (
+            <span>
+              <b>{matched.toLocaleString("en-US")}</b> {matched === 1 ? "payment" : "payments"} matched today
+            </span>
+          )}
+          {showcase.live && (
+            <a href={hashscan.tx(showcase.wipeTx)} target="_blank" rel="noreferrer">
+              last incident contained in <b>{showcase.wipedS.toFixed(2)} s</b>
+            </a>
+          )}
+          <a href={hashscan.topic(deploy.topics.receipts)} target="_blank" rel="noreferrer">
+            receipts topic <span className="mono">{deploy.topics.receipts}</span>
+          </a>
+          {feed.sse === "open" && <span className="footer-dot">live</span>}
+        </p>
         <div className="footer-base">
           <span>Built at ETHGlobal Mumbai 2026 · Hedera {deploy.network}</span>
           <span className="fine">Independent project, not affiliated with Hedera.</span>
