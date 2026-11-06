@@ -26,6 +26,7 @@ import { withSpike, type ChartEvent, type ChartEventKind } from "../lib/series";
 import { containReducer, elapsedMs, initialContain, stepLabel, type ContainState } from "../lib/stopwatch";
 import { CAPTIONS, dedupeLinks, runError, initialStory, milestones, proofFromContain, proofFromRun, STORY, stepTone, storyCaption, storyReducer, type ProofLink, type StoryState } from "../lib/story";
 import type { BreachView, CheckerEvent, GateDecision, Incident, Movement, PassView, WatcherSnapshot } from "../lib/types";
+import "./live-theme.css";
 
 const fmt = (raw: string) => formatAmount(raw, deploy.token.decimals);
 const sym = deploy.token.symbol;
@@ -241,7 +242,7 @@ export function Live() {
   const leveeS = shownContain.phase === "contained" && shownContain.containedMs ? shownContain.containedMs / 1000 : null;
 
   return (
-    <div className={`room cc mode-${mode.kind}`}>
+    <div className={`room cc lv mode-${mode.kind}`}>
       <div className="room-frame" aria-hidden="true" />
       <TopBar treasury={treasuryRel} health={health} arkiv={arkiv} mirrorOk={mirrorOk} chain={chainMode} />
       <KpiStrip kpis={kpis} />

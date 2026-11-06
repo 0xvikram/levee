@@ -1,0 +1,153 @@
+/* /live on the landing's Parley v3 theme: cobalt grounds, cobalt-glass panels, cream text,
+   yellow #F2E34C as the only accent (active step, primary fill, stopwatch digits, focus rings).
+   Everything is scoped under .lv (the /live root) so it overrides the older dark control-room
+   rules in styles.css without touching them. No images or video here.
+
+   Status colours are light tints chosen to read on cobalt and on the glass panels
+   (checked in src/lib/__tests__/contrast.test.ts, "/live cobalt theme"):
+     ok / contained   #B8E0A0   on glass #2B4697 5.86:1, on cobalt 7.02:1
+     refused / warn   #F5C46B   on glass 5.36:1, on cobalt 6.42:1
+     breach           #FFAC9C   on glass 4.80:1, on cobalt 5.75:1 (ink #1B1A17 on it 9.64:1)
+     cream            #F3EBD6   on glass 7.28:1; cream-dim (74%) on glass 4.77:1
+     yellow           #F2E34C   on glass 6.54:1; ink #1B1A17 on yellow 13.15:1
+   Nested surfaces inside a panel go DARKER (cobalt-ink at 35%), never lighter, so every pair
+   above only improves there. */
+
+.lv {
+  --lv-cobalt: #1a3892;
+  --lv-deep: #142c82;
+  --lv-ink: #0e1f5e;
+  --lv-cream: #f3ebd6;
+  --lv-ok: #b8e0a0;
+  --lv-warn: #f5c46b;
+  --lv-breach: #ffac9c;
+  --lv-ink-text: #1b1a17;
+  --lv-glass: rgba(243, 235, 214, 0.08);
+  --lv-glass-line: rgba(243, 235, 214, 0.18);
+  --lv-sunk: rgba(14, 31, 94, 0.35);
+
+  /* re-point the tokens the older /live rules read, so anything not restyled below follows */
+  --sky: var(--lv-cream);
+  --sky-dim: rgba(243, 235, 214, 0.74);
+  --line-dark: rgba(243, 235, 214, 0.14);
+  --olive-lit: var(--lv-ok);
+  --amber: var(--lv-warn);
+  --breach-lit: var(--lv-breach);
+  --breach: var(--lv-breach);
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+
+/* ground */
+.room.lv {
+  background:
+    radial-gradient(120% 80% at 15% 0%, rgba(26, 56, 146, 0) 0%, rgba(20, 44, 130, 0.55) 70%, rgba(14, 31, 94, 0.7) 100%),
+    var(--lv-cobalt);
+  color: var(--lv-cream);
+  font-family: var(--f-body);
+}
+.lv :focus-visible,
+.lv .step-btn:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+
+/* type: Inter Tight 500 headings, Inter body, IBM Plex Mono labels and numbers */
+.lv h2 { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.03em; }
+.lv .accent { font-family: inherit; font-style: normal; font-weight: inherit; letter-spacing: inherit; color: var(--yellow); }
+.lv .mono, .lv code, .lv .eyebrow, .lv .kpi-label, .lv .ms-l, .lv .tag, .lv .state-badge, .lv .state-line { font-family: var(--f-mono); }
+.lv .eyebrow { color: var(--sky-dim); letter-spacing: 0.1em; }
+.lv code { background: var(--lv-sunk); }
+
+/* breach frame: a red tint flash over the whole screen, settling to a thin light-red line; contained = green line that fades */
+.room.lv .room-frame { box-shadow: inset 0 0 0 2px var(--lv-breach); background: transparent; }
+.room.lv.mode-live .room-frame { opacity: 1; animation: lv-flash 1.4s var(--ease) both; }
+.room.lv.mode-contained .room-frame { opacity: 1; box-shadow: inset 0 0 0 2px var(--lv-ok); }
+@keyframes lv-flash {
+  0% { background: rgba(255, 172, 156, 0.14); }
+  100% { background: rgba(255, 172, 156, 0); }
+}
+
+/* glass panels */
+.lv .card-dark,
+.lv .kpi,
+.lv .pipeline {
+  background: var(--lv-glass);
+  box-shadow: inset 0 0 0 1px var(--lv-glass-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* top bar */
+.lv .topbar { background: rgba(14, 31, 94, 0.55); border-bottom: 1px solid var(--lv-glass-line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.lv .wordmark { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.03em; }
+.lv .state-badge { box-shadow: inset 0 0 0 1px var(--lv-glass-line); }
+.lv .state-badge.open { color: var(--lv-ok); box-shadow: inset 0 0 0 1px rgba(184, 224, 160, 0.5); }
+.lv .state-badge.frozen { color: var(--lv-ink-text); background: var(--lv-cream); }
+.lv.mode-live .state-badge.frozen { color: var(--lv-ink-text); background: var(--lv-breach); }
+.lv .arkiv-chip { box-shadow: inset 0 0 0 1px var(--lv-glass-line); }
+.lv .arkiv-chip.a-live { box-shadow: inset 0 0 0 1px rgba(184, 224, 160, 0.5); }
+.lv .dot.checking { background: rgba(243, 235, 214, 0.35); }
+
+/* KPI strip */
+.lv .kpi-value { font-family: var(--f-mono); font-weight: 500; letter-spacing: -0.02em; }
+
+/* story stepper: ① Send ② Hack ③ Unlock ④ Fake mint, then ↺ Reset */
+.lv .step-btn { background: var(--lv-sunk); box-shadow: inset 0 0 0 1px var(--lv-glass-line); color: var(--lv-cream); }
+.lv .step-btn:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--yellow); }
+.lv .step-n { background: rgba(243, 235, 214, 0.08); font-family: var(--f-mono); }
+.lv .step-text b { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.02em; }
+.lv .step.t-active .step-btn { background: var(--yellow); color: var(--lv-ink-text); box-shadow: none; }
+.lv .step.t-active .step-text small { color: var(--lv-ink-text); }
+.lv .step.t-active .step-n { background: rgba(27, 26, 23, 0.12); color: var(--lv-ink-text); }
+.lv .step.t-done .step-n { background: rgba(184, 224, 160, 0.16); color: var(--lv-ok); }
+.lv .btn { font-family: var(--f-head); font-weight: 500; }
+.lv .btn:not(.ghost) { background: var(--yellow); color: var(--lv-ink-text); }
+.lv .btn.ghost { color: var(--lv-cream); background: rgba(243, 235, 214, 0.06); box-shadow: inset 0 0 0 1px var(--lv-glass-line); }
+.lv .cc-caption { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.03em; border-top-color: var(--lv-glass-line); }
+
+/* pipeline nodes */
+.lv .pipe-dot { background: var(--lv-ink); } /* ring and core colours come from the tone rules (tokens above) */
+.lv .pipe-label { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.02em; }
+.lv .pipe-label small { font-family: var(--f-mono); letter-spacing: 0.02em; }
+.lv .pipe-link { background: rgba(243, 235, 214, 0.16); }
+
+/* stopwatch: yellow digits at rest, light red while a breach runs, green once contained */
+.lv .watch .digits { font-family: var(--f-mono); font-weight: 500; letter-spacing: -0.04em; color: var(--yellow); }
+.lv .watch.running .digits { color: var(--lv-breach); }
+.lv .watch.contained .digits { color: var(--lv-ok); }
+.lv .ms-t { font-family: var(--f-mono); font-weight: 500; }
+
+/* chart: treasury balance in cream, total supply in yellow (dashed) */
+.lv .lg-t i { background: var(--lv-cream); }
+.lv .lg-t b { color: var(--lv-cream); }
+.lv .lg-s i { background: var(--yellow); }
+.lv .lg-s b { color: var(--yellow); }
+.lv .ch-axis.t { fill: var(--lv-cream); }
+.lv .ch-axis.s { fill: var(--yellow); }
+.lv .ch-line.t { stroke: var(--lv-cream); }
+.lv .ch-line.s { stroke: var(--yellow); }
+.lv .ch-grid { stroke: rgba(243, 235, 214, 0.12); }
+.lv .ch-tick, .lv .ch-axis, .lv .ch-ev text { font-family: var(--f-mono); }
+
+/* proof: QR codes stay ink on cream with an extra cream margin around the 2-module quiet zone */
+.lv .qr { background: var(--lv-cream); padding: 4px; border-radius: 8px; }
+.lv .qr rect { fill: var(--lv-cream); }
+.lv .qr path { fill: var(--lv-ink-text); }
+
+/* before / after: industry bars cream-dim, Levee bar yellow */
+.lv .ba-track { background: var(--lv-sunk); }
+.lv .ba-track i { background: rgba(243, 235, 214, 0.74); }
+.lv .ba-bars li.levee .ba-track i { background: var(--yellow); }
+
+/* feed */
+.lv .tl-mark { background: rgba(243, 235, 214, 0.08); font-family: var(--f-mono); }
+.lv .s-ok .tl-mark, .lv .s-done .tl-mark { background: rgba(184, 224, 160, 0.14); color: var(--lv-ok); }
+.lv .s-refused .tl-mark { background: rgba(245, 196, 107, 0.14); color: var(--lv-warn); }
+.lv .s-breach .tl-mark { background: var(--lv-breach); color: var(--lv-ink-text); }
+.lv .tag.breach { background: var(--lv-breach); color: var(--lv-ink-text); box-shadow: none; }
+.lv .tl-row.live { background: var(--lv-sunk); box-shadow: inset 3px 0 0 var(--lv-breach); }
+.lv .tl-row { border-top-color: rgba(243, 235, 214, 0.12); }
+
+/* other sunk surfaces the older rules painted ink */
+.lv .frozen-list li, .lv .reopen-box, .lv .run-log, .lv .cmd { background: var(--lv-sunk); }
+
+@media (prefers-reduced-motion: reduce) {
+  .room.lv.mode-live .room-frame { animation: none; }
+}

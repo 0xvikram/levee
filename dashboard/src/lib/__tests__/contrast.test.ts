@@ -158,3 +158,61 @@ describe("landing palette is cobalt + cream + yellow only", () => {
     for (const c of found) expect(allowed, `unexpected colour rgb(${c})`).toContain(c);
   });
 });
+
+/** /live on the cobalt theme (pages/live-theme.css): glass panels are cream at 8% over the cobalt ground
+ *  (the ground only gets darker towards the edges, so this is the lightest a panel gets); nested
+ *  surfaces are cobalt-ink at 35% over the glass. Status colours are light tints that read on both. */
+const LV = { cobalt: "#1A3892", deep: "#142C82", ink: "#0E1F5E", cream: "#F3EBD6", yellow: "#F2E34C", inkText: "#1B1A17", ok: "#B8E0A0", warn: "#F5C46B", breach: "#FFAC9C" };
+const LV_GLASS = over(LV.cream, 0.08, LV.cobalt);
+const LV_SUNK = over(LV.ink, 0.35, LV_GLASS);
+const LV_TOPBAR = over(LV.ink, 0.55, LV.cobalt);
+const LV_FLASH = over(LV.breach, 0.14, LV.cobalt); // peak of the breach tint flash
+const LV_DIM = (bg: string) => over(LV.cream, 0.74, bg);
+const LV_GROUNDS: [string, string][] = [["cobalt", LV.cobalt], ["glass panel", LV_GLASS], ["sunk surface", LV_SUNK], ["top bar", LV_TOPBAR]];
+const LV_TEXT: [string, string][] = [["cream", LV.cream], ["yellow", LV.yellow], ["ok green", LV.ok], ["refused amber", LV.warn], ["breach red", LV.breach]];
+
+const LV_PAIRS: [string, string, string][] = [
+  ...LV_GROUNDS.flatMap(([gn, g]) => LV_TEXT.map(([tn, t]): [string, string, string] => [`${tn} on ${gn}`, t, g])),
+  ...LV_GROUNDS.map(([gn, g]): [string, string, string] => [`cream-dim on ${gn}`, LV_DIM(g), g]),
+  ["ink on yellow (active step, primary button)", LV.inkText, LV.yellow],
+  ["ink on breach red (breach tag, FROZEN badge in a breach)", LV.inkText, LV.breach],
+  ["ink on cream (FROZEN badge)", LV.inkText, LV.cream],
+  ["cream on the breach flash at its peak", LV.cream, LV_FLASH],
+];
+const LV_MARKS: [string, string, string][] = [
+  ["cream treasury line on glass", LV.cream, LV_GLASS],
+  ["yellow supply line / Levee bar on glass", LV.yellow, LV_GLASS],
+  ["cream-dim industry bar on its sunk track", LV_DIM(LV_SUNK), LV_SUNK],
+  ["yellow Levee bar on its sunk track", LV.yellow, LV_SUNK],
+  ["breach frame line on cobalt", LV.breach, LV.cobalt],
+  ["contained frame line on cobalt", LV.ok, LV.cobalt],
+];
+
+describe("/live cobalt theme contrast", () => {
+  it.each(LV_PAIRS)("%s ≥ 4.5:1", (_name, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+  it.each(LV_MARKS)("%s ≥ 3:1", (_name, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(3);
+  });
+  it("QR codes keep scanning contrast (ink modules on cream)", () => {
+    expect(ratio(LV.inkText, LV.cream)).toBeGreaterThanOrEqual(10);
+  });
+  it("supply (yellow) and treasury (cream) lines are told apart", () => {
+    expect(ratio(LV.yellow, LV.cream)).toBeGreaterThan(1);
+    expect(LV.yellow).not.toBe(LV.cream);
+  });
+  it("live-theme.css uses no gold and only the theme's colours", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const css = fs.readFileSync(path.resolve(__dirname, "../../pages/live-theme.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").toLowerCase();
+    expect(css).not.toContain("#7a5a00");
+    expect(css).not.toContain("var(--gold)");
+    const allowed = new Set(["26,56,146", "20,44,130", "14,31,94", "243,235,214", "242,227,76", "27,26,23", "184,224,160", "245,196,107", "255,172,156"]);
+    const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)).join(",");
+    const found = [...css.matchAll(/#[0-9a-f]{6}\b/g)].map((m) => rgb(m[0]));
+    found.push(...[...css.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)].map((m) => `${m[1]},${m[2]},${m[3]}`));
+    expect(found.length).toBeGreaterThan(10);
+    for (const c of found) expect(allowed, `unexpected colour rgb(${c})`).toContain(c);
+  });
+});
