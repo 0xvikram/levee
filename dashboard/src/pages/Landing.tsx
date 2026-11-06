@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { FooterScene, useFooterFeed } from "../components/FooterScene";
-import { HeroMedia } from "../components/HeroMedia";
-import { Link, navigate } from "../components/router";
+import { HeroWordmark } from "../components/HeroWordmark";
+import { Link } from "../components/router";
 import { ARKIV_EXPLORER, GITHUB, MIRROR, deploy, hashscan, payeeName, serviceUrl } from "../lib/config";
 import { FACTS, INDUSTRY, MARKET, MINT, SCHEDULED_ON_BUILD, TICKS, logPos } from "../lib/numbers";
 import { useShowcase, type Showcase } from "../lib/incident";
@@ -32,50 +32,10 @@ const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
 export function Landing() {
   useRiseIn();
   const showcase = useShowcase();
-  const [token, setToken] = useState("");
-  const watch = (e: FormEvent) => {
-    e.preventDefault();
-    const t = token.trim();
-    navigate(t ? `/live?token=${encodeURIComponent(t)}` : "/live");
-  };
 
   return (
     <>
-      <header className="hero">
-        <HeroMedia parallax />
-        <div className="nav">
-          <Link to="/" className="logo">
-            ▲ Levee
-          </Link>
-          <nav aria-label="Main">
-            <a href="#how">How it works</a>
-            <a href={GITHUB} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-            <Link to="/live" className="btn small">
-              Live demo
-            </Link>
-          </nav>
-        </div>
-
-        <div className="hero-copy">
-          <span className="chip">✦ Built on Hedera Stablecoin Studio</span>
-          <span className="eyebrow hero-eyebrow">For stablecoin issuers on Hedera</span>
-          <h1>
-            Stop a theft before it <span className="accent">spreads</span>
-          </h1>
-          <p>Levee is a circuit breaker for your treasury: every token that leaves needs a receipt on Hedera first. Tokens that move without one, from stolen keys or a rogue insider, are frozen and taken back in seconds, and only 2 of 3 admins can reopen.</p>
-          <form className="search" onSubmit={watch} role="search">
-            <label htmlFor="token" className="sr-only">
-              Hedera token ID
-            </label>
-            <input id="token" type="text" inputMode="text" autoComplete="off" spellCheck={false} placeholder="Paste a Hedera token ID…" value={token} onChange={(e) => setToken(e.target.value)} />
-            <button className="btn" type="submit">
-              Watch token
-            </button>
-          </form>
-        </div>
-      </header>
+      <HeroWordmark showcase={showcase} />
 
       <main>
         <ReceiptSection />
