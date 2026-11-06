@@ -28,7 +28,7 @@ The buttons run on a laptop with the local runner (`DEMO_MODE=1 npm run demo:run
 
 1. Open `/live`. Point at the treasury card: "Open, every payout needs a receipt first."
 2. Click **Pay Asha 500**. The receipt appears, then the payment, then the row turns ✓ matched.
-3. Click **Steal / Simulate theft** (1,000 RUPC in the latest recorded run). The stopwatch runs: detected, treasury frozen, tokens taken back and hacker frozen.
+3. Click **Steal / Simulate theft** (the button steals 10,000 RUPC; the latest recorded run used 1,000 and the timing does not depend on the amount). The stopwatch runs: detected, treasury frozen, tokens taken back and hacker frozen.
 4. Open the HashScan links in the run log: the theft, the freeze, the wipe, and the incident message on topic 0.0.11333500.
 5. Click **Reopen (2 of 3)**. Two admins sign; the treasury shows open again.
 

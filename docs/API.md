@@ -66,7 +66,7 @@ Refusals: `ok: false, reason, detail, timings` (no txId). Execute failures: `ok:
 
 200 when healthy, 503 otherwise: `{ ok, service: "watcher", lagMs, lastBeat }`. Healthy = Mirror lag ≤ 20 s and a tick succeeded within 20 s. An unhealthy watcher withholds heartbeats, so the gate refuses everything (`no-watcher`).
 
-A movement with no receipt yet waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000) for the receipt to be served before a `no-receipt` breach is raised (Mirror replicas can lag each other by ~1 s; see docs/LIVE_RUN.md). The receipt must still have reached consensus before the movement.
+A movement with no receipt yet waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000) for the receipt to be served before a `no-receipt` breach is raised (the public Mirror Node is behind a CDN with `max-age=1`, so the watcher cache-busts every read and, while a movement is held, proves from one transaction listing that no receipt exists before it, which raises the breach early; the grace is the backstop if that proof read fails; see docs/LIVE_RUN.md §4). The receipt must still have reached consensus before the movement.
 
 ### `GET /state`
 
