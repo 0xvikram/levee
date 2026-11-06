@@ -1,0 +1,55 @@
+{
+  "_note": "GET /api/v1/transactions/0.0.11333495-1793934832-507092702: plain HTS token transfer treasury -> attacker, payer = treasury, signed 2-of-3",
+  "transactions": [
+    {
+      "batch_key": null,
+      "bytes": null,
+      "charged_tx_fee": 1606010,
+      "consensus_timestamp": "1793934839.585335104",
+      "entity_id": null,
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "100000000",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "CRYPTOTRANSFER",
+      "nft_transfers": [],
+      "node": "0.0.9",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        {
+          "token_id": "0.0.11333594",
+          "account": "0.0.11333494",
+          "amount": 1000000,
+          "is_approval": false
+        },
+        {
+          "token_id": "0.0.11333594",
+          "account": "0.0.11333495",
+          "amount": -1000000,
+          "is_approval": false
+        }
+      ],
+      "transaction_hash": "sNrgW/uLOJ3nnd2soYRp6430UaTlPF7CAvEFixSH+vlQHpXyVhiH7mdyKBX4Tbvn",
+      "transaction_id": "0.0.11333495-1793934832-507092702",
+      "transfers": [
+        {
+          "account": "0.0.802",
+          "amount": 1606010,
+          "is_approval": false
+        },
+        {
+          "account": "0.0.11333495",
+          "amount": -1606010,
+          "is_approval": false
+        }
+      ],
+      "valid_duration_seconds": "120",
+      "valid_start_timestamp": "1793934832.507092702"
+    }
+  ]
+}

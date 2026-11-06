@@ -58,3 +58,51 @@ note: payee1 started as FROZEN; reopening it before the test
 - PASS: admin1 approve(6) — expected success, got SUCCESS ([0.0.11333484-1793934746-146817866](https://hashscan.io/testnet/transaction/0.0.11333484-1793934746-146817866))
 - PASS: payee1 is UNFROZEN after 2-of-3 — status UNFROZEN
 <!-- T1:end -->
+
+<!-- T2:start -->
+## T2: wipe order (frozen accounts cannot be wiped)
+
+**Result: PASS** — run 2026-11-06T03:13:17.182Z
+
+- PASS: setup: treasury -> attacker 200 RUPC — expected success, got SUCCESS ([0.0.11333495-1793934768-194891753](https://hashscan.io/testnet/transaction/0.0.11333495-1793934768-194891753))
+- PASS: watcher wipeAndFreeze(attacker, 50) — expected success, got SUCCESS ([0.0.11333487-1793934774-302498583](https://hashscan.io/testnet/transaction/0.0.11333487-1793934774-302498583))
+- PASS: attacker FROZEN — after wipeAndFreeze
+- PASS: wipeAndFreeze on an already FROZEN account fails — expected failure, got CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(165 = ACCOUNT_FROZEN_FOR_TOKEN) ([0.0.11333487-1793934777-542893691](https://hashscan.io/testnet/transaction/0.0.11333487-1793934777-542893691))
+  exact error: CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(165 = ACCOUNT_FROZEN_FOR_TOKEN)
+- PASS: watcher wipeFrozen(attacker, 50) — expected success, got SUCCESS ([0.0.11333487-1793934780-476395531](https://hashscan.io/testnet/transaction/0.0.11333487-1793934780-476395531))
+- PASS: attacker still FROZEN after wipeFrozen — unfreeze/wipe/freeze in one tx
+- PASS: attacker balance dropped by 100 RUPC (2 wipes) — before 200000000, after 100000000 (smallest units)
+- PASS: admin0 propose(Unfreeze) — expected success, got SUCCESS ([0.0.11333483-1793934787-156753364](https://hashscan.io/testnet/transaction/0.0.11333483-1793934787-156753364))
+- PASS: admin1 approve(7) — expected success, got SUCCESS ([0.0.11333484-1793934788-072163188](https://hashscan.io/testnet/transaction/0.0.11333484-1793934788-072163188))
+- PASS: cleanup: attacker UNFROZEN — 2-of-3 unfreeze
+<!-- T2:end -->
+
+<!-- T3:start -->
+## T3: pause behaviour (pause last; 2-of-3 unpause)
+
+**Result: PASS** — run 2026-11-06T03:13:49.102Z
+
+- PASS: watcher pauseToken() — expected success, got SUCCESS ([0.0.11333487-1793934810-515328352](https://hashscan.io/testnet/transaction/0.0.11333487-1793934810-515328352))
+- PASS: token PAUSED on the mirror node — pause_status
+- PASS: freezeAccount while paused fails — expected failure, got CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(265 = TOKEN_IS_PAUSED) ([0.0.11333487-1793934811-416068533](https://hashscan.io/testnet/transaction/0.0.11333487-1793934811-416068533))
+- PASS: wipeAndFreeze while paused fails — expected failure, got CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(265 = TOKEN_IS_PAUSED) ([0.0.11333487-1793934816-450672926](https://hashscan.io/testnet/transaction/0.0.11333487-1793934816-450672926))
+  exact error: CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(265 = TOKEN_IS_PAUSED)
+  exact error: CONTRACT_REVERT_EXECUTED / ResponseCodeInvalid(265 = TOKEN_IS_PAUSED)
+- PASS: admin0 propose(Unpause) — expected success, got SUCCESS ([0.0.11333483-1793934820-110674293](https://hashscan.io/testnet/transaction/0.0.11333483-1793934820-110674293))
+- PASS: admin2 approve(8) — expected success, got SUCCESS ([0.0.11333485-1793934820-084003200](https://hashscan.io/testnet/transaction/0.0.11333485-1793934820-084003200))
+- PASS: token UNPAUSED after 2-of-3 — pause_status
+<!-- T3:end -->
+
+<!-- T4:start -->
+## T4: detection timing (consensus -> visible on Mirror Node REST)
+
+**Result: PASS** — run 2026-11-06T03:14:14.156Z
+
+- PASS: run 1: unreceipted treasury -> attacker 1 RUPC — expected success, got SUCCESS ([0.0.11333495-1793934832-507092702](https://hashscan.io/testnet/transaction/0.0.11333495-1793934832-507092702))
+  run 1: consensus 1793934839.585335104, seen +2947 ms after consensus (3522 ms after submit)
+- PASS: run 2: unreceipted treasury -> attacker 1 RUPC — expected success, got SUCCESS ([0.0.11333495-1793934839-738618997](https://hashscan.io/testnet/transaction/0.0.11333495-1793934839-738618997))
+  run 2: consensus 1793934844.805179104, seen +2736 ms after consensus (3194 ms after submit)
+- PASS: run 3: unreceipted treasury -> attacker 1 RUPC — expected success, got SUCCESS ([0.0.11333495-1793934844-547615023](https://hashscan.io/testnet/transaction/0.0.11333495-1793934844-547615023))
+  run 3: consensus 1793934849.540604104, seen +3115 ms after consensus (3607 ms after submit)
+- PASS: median consensus -> mirror visibility over 3 run(s) — 2947 ms (runs: 2947, 2736, 3115 ms; submit -> seen median 3522 ms)
+<!-- T4:end -->
