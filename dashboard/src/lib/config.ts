@@ -34,22 +34,44 @@ export const services = {
   runner: (env.VITE_RUNNER_URL as string | undefined) ?? "/api/runner",
 };
 
+type Loc = { hostname: string; port: string; protocol: string };
+const here = (): Loc | undefined => (typeof window !== "undefined" ? window.location : undefined);
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/;
+
+/**
+ * Can this page reach the services at all? True on localhost, on the Vite dev/preview ports
+ * (which proxy /api/*), or when a service URL is set explicitly. False on the public site
+ * (Vercel), where /api/* does not exist: nothing may poll it or open an EventSource to it.
+ */
+export function servicesReachable(loc: Loc | undefined = here()): boolean {
+  if (env.VITE_GATE_URL || env.VITE_WATCHER_URL || env.VITE_CHECKER_URL || env.VITE_RUNNER_URL) return true;
+  if (!loc) return false;
+  return LOCAL_HOST.test(loc.hostname) || loc.port === "5173" || loc.port === "4173";
+}
+
+/** A service URL when the services can be reached from here, else "" (usePoll/useEventSource then do nothing). */
+export function serviceUrl(svc: keyof typeof services, path: string, loc: Loc | undefined = here()): string {
+  return servicesReachable(loc) ? `${services[svc]}${path}` : "";
+}
+
 const PORTS = { gate: 8710, watcher: 8711, checker: 8712 } as const;
 /**
  * SSE URL for a service. On local dev/preview the stream goes straight to the service port
  * (services send CORS * on /events), so the three never-ending streams do not use up the
  * browser's 6-connections-per-origin budget that the proxied polls share. See lib/health.ts.
  */
-export function eventsUrl(svc: keyof typeof PORTS, loc: { hostname: string; port: string; protocol: string } | undefined = typeof window !== "undefined" ? window.location : undefined): string {
+export function eventsUrl(svc: keyof typeof PORTS, loc: Loc | undefined = here()): string {
   const explicit = env[`VITE_${svc.toUpperCase()}_URL`] as string | undefined;
   if (explicit) return `${explicit}/events`;
-  if (loc && loc.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(loc.hostname) && (loc.port === "5173" || loc.port === "4173")) {
+  if (!servicesReachable(loc)) return ""; // public site: never open a stream to a missing /api/*
+  if (loc && loc.protocol === "http:" && LOCAL_HOST.test(loc.hostname) && (loc.port === "5173" || loc.port === "4173")) {
     return `http://${loc.hostname}:${PORTS[svc]}/events`;
   }
   return `${services[svc]}/events`;
 }
 export const MIRROR = (env.VITE_MIRROR_URL as string | undefined) ?? `https://${deploy.network}.mirrornode.hedera.com`;
 export const GITHUB = "https://github.com/0xvikram/levee";
+export const ARKIV_EXPLORER = "https://rabdi.explorer.arkiv.network";
 
 const hs = `https://hashscan.io/${deploy.network}`;
 export const hashscan = {

@@ -27,7 +27,8 @@ export function nextPoll<T>(prev: PollState<T>, r: PollResult<T>, now: number): 
   return { ...prev, fails: prev.fails + 1, at: now, ...(prev.fails + 1 >= 2 ? { ok: false, reachable: false } : {}) };
 }
 
-export type ServiceStatus = "checking" | "up" | "degraded" | "off";
+/** "local": the service runs on the operator's machine and is not reachable from this page (public site). */
+export type ServiceStatus = "checking" | "up" | "degraded" | "off" | "local";
 
 export function serviceStatus(poll: Pick<PollState<unknown>, "ok" | "reachable" | "fails" | "at">, sse?: "connecting" | "open" | "closed"): ServiceStatus {
   if (poll.ok) return "up";

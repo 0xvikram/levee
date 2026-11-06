@@ -308,6 +308,7 @@ a.tb-item:hover { text-decoration: underline; }
 .dot.degraded { background: var(--amber); }
 .dot.off { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sky-dim); }
 .dot.checking { background: rgba(239, 230, 210, 0.35); }
+.dot.local { background: transparent; box-shadow: inset 0 0 0 1.5px var(--sky-dim); opacity: 0.55; }
 .dot.breach { background: var(--breach); animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 
@@ -318,6 +319,8 @@ a.tb-item:hover { text-decoration: underline; }
 .banner.live { background: var(--breach); color: var(--white); }
 .banner.live .dot.breach { background: var(--white); }
 .banner.contained { background: var(--olive); color: var(--white); }
+.banner.chain { background: var(--moss); color: var(--sky); font-family: var(--f-body); font-weight: 400; font-size: 0.95rem; line-height: 1.4; box-shadow: inset 0 0 0 1px var(--line-dark); }
+.banner.chain .dot { flex: none; }
 .banner .mono { margin-left: auto; font-size: 1.1rem; }
 .banner.contained .mono { margin-left: 0; }
 @keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
@@ -473,3 +476,6 @@ a.tb-item:hover { text-decoration: underline; }
   .footer-img.drift { transform: none; }
   .footer-light, .footer-flies { display: none; }
 }
+
+/* chain mode: replay of a recorded incident */
+.replay-box { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 0 2px; }

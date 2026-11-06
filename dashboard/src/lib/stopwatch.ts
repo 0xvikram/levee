@@ -16,7 +16,7 @@ export interface ContainState {
   steps: IncidentAction[];
   plannedSteps?: number;
   containedMs?: number;
-  source?: "live" | "watcher" | "hcs";
+  source?: "live" | "watcher" | "hcs" | "replay";
 }
 
 export type ContainAction =

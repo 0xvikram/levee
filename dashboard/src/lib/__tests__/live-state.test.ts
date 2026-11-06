@@ -101,9 +101,10 @@ describe("service health", () => {
     expect(serviceStatus(nextPoll(initialPoll, { kind: "answer", status: 503, data: { ok: false } }, 1))).toBe("degraded");
     expect(serviceStatus(initialPoll)).toBe("checking");
   });
-  it("SSE goes straight to the service port on local dev, through the proxy elsewhere", () => {
+  it("SSE goes straight to the service port on local dev, and is never opened on the public site", () => {
     expect(eventsUrl("watcher", { hostname: "localhost", port: "5173", protocol: "http:" })).toBe("http://localhost:8711/events");
     expect(eventsUrl("gate", { hostname: "127.0.0.1", port: "4173", protocol: "http:" })).toBe("http://127.0.0.1:8710/events");
-    expect(eventsUrl("checker", { hostname: "levee.example", port: "", protocol: "https:" })).toBe("/api/checker/events");
+    // public site: no stream at all (there is no /api/* there; an EventSource would 404 in a loop)
+    expect(eventsUrl("checker", { hostname: "levee.example", port: "", protocol: "https:" })).toBe("");
   });
 });

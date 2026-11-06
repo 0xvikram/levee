@@ -3,7 +3,7 @@
 import { MIRROR, deploy } from "./config";
 import type { Incident } from "./types";
 
-function b64ToText(b64: string): string {
+export function b64ToText(b64: string): string {
   const bin = atob(b64);
   const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
   return new TextDecoder().decode(bytes);

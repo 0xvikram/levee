@@ -6,7 +6,7 @@
 //   2. if that is not open within SSE_GRACE_MS: poll the receipts topic on the Mirror Node
 //      every POLL_MS while the footer is on screen, one firefly per new sequence number
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
-import { MIRROR, deploy, eventsUrl } from "../lib/config";
+import { MIRROR, deploy, eventsUrl, servicesReachable } from "../lib/config";
 import { useEventSource } from "../lib/hooks";
 import {
   MOOD_FLICKER,
@@ -59,7 +59,8 @@ export function useFooterFeed(started: boolean, onScreen: boolean): FooterFeed {
     const t = setTimeout(() => setGraceOver(true), SSE_GRACE_MS);
     return () => clearTimeout(t);
   }, [started]);
-  const fallback = started && graceOver && sse !== "open";
+  // public site: no services to wait for, go straight to the Mirror Node
+  const fallback = started && (graceOver || !servicesReachable()) && sse !== "open";
 
   const last = useRef<number | null>(null);
   useEffect(() => {

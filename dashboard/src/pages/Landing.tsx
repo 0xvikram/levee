@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FooterScene, useFooterFeed } from "../components/FooterScene";
 import { HeroMedia } from "../components/HeroMedia";
 import { Link, navigate } from "../components/router";
-import { GITHUB, deploy, hashscan, services } from "../lib/config";
+import { GITHUB, deploy, hashscan, serviceUrl } from "../lib/config";
 import { useShowcase, type Showcase } from "../lib/incident";
 import { useCountUp, usePoll, usePrefersReducedMotion, useRiseIn, useSeenOnce } from "../lib/hooks";
 import type { WatcherSnapshot } from "../lib/types";
@@ -10,8 +10,8 @@ import type { WatcherSnapshot } from "../lib/types";
 const INCIDENTS = [
   { name: "Resolv USR", when: "Mar 2026", big: "~$25M", note: "extracted before anyone could stop it" },
   { name: "StablR", when: "May 2026", big: "~$2.8M", note: "cashed out by the attacker" },
-  { name: "Gala Games", when: "May 2024", big: "~$21M", note: "minted, about 45 minutes to stop" },
-  { name: "Hedera", when: "Mar 2023", big: "~$600K", note: "taken, 11 hours to contain" },
+  { name: "Gala Games", when: "May 2024", big: "~$21M", note: "sold from an unauthorised 5B GALA mint" },
+  { name: "Hedera", when: "Mar 2023", big: "Undisclosed", note: "smart-contract service exploit, network proxies paused" },
 ];
 
 const stepsFor = (m: Showcase) => [
@@ -384,7 +384,7 @@ function Footer({ showcase }: { showcase: Showcase }) {
   }, [interactive]);
 
   const feed = useFooterFeed(started, onScreen);
-  const watcher = usePoll<WatcherSnapshot>(started ? `${services.watcher}/state` : "", 15_000);
+  const watcher = usePoll<WatcherSnapshot>(started ? serviceUrl("watcher", "/state") : "", 15_000);
   const matched = watcher.reachable && typeof watcher.data?.matched === "number" ? watcher.data.matched : null;
 
   return (

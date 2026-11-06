@@ -1,7 +1,10 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Link } from "../components/router";
 import { breachModeReducer, calm, type BreachMode } from "../lib/breach";
-import { deploy, eventsUrl, hashscan, services } from "../lib/config";
+import { ARKIV_EXPLORER, GITHUB, deploy, eventsUrl, hashscan, serviceUrl, servicesReachable } from "../lib/config";
+import { decideMode, useChain } from "../lib/chain";
+import { formatDate } from "../lib/incident";
+import { replayContain, replayEndMs, replayPipeline } from "../lib/replay";
 import { feedReducer, initialFeed, isLiveBreach, REASONS, type FeedRow } from "../lib/feed";
 import { consensusToMs, countdown, formatAmount, shortTx, stopwatch } from "../lib/format";
 import { serviceStatus, type ServiceStatus } from "../lib/health";
@@ -18,6 +21,8 @@ const PASS_SECONDS = 180;
 const fmt = (raw: string) => formatAmount(raw, deploy.token.decimals);
 const sym = deploy.token.symbol;
 type Relations = Record<string, TokenRelation>;
+const label = (step: string, account?: string, amount?: string) => stepLabel(step, account, amount, { treasury: deploy.treasury, fmt, symbol: sym });
+const CHAIN_PIPE: PipelineState = { ...initialPipeline, caption: "Chain view · press “Replay latest incident” to run its recorded steps through the pipeline" };
 
 export function Live() {
   const reduced = usePrefersReducedMotion();
@@ -27,9 +32,10 @@ export function Live() {
   const [pipe, pipeDispatch] = useReducer(pipelineReducer, initialPipeline);
   const [mode, modeDispatch] = useReducer(breachModeReducer, calm);
   const [lagMs, setLagMs] = useState<number | null>(null);
+  const local = servicesReachable();
 
   // ---- watcher: snapshot (poll, also its health) + live events
-  const wState = usePoll<WatcherSnapshot>(`${services.watcher}/state`, 8_000);
+  const wState = usePoll<WatcherSnapshot>(serviceUrl("watcher", "/state"), 8_000);
   useEffect(() => {
     if (!wState.data) return;
     feedDispatch({ type: "snapshot", snapshot: wState.data });
@@ -72,7 +78,7 @@ export function Live() {
   });
 
   // ---- gate: decisions
-  const gHealth = usePoll<{ ok: boolean; spentToday?: string; capPerDay?: string }>(`${services.gate}/health`, 10_000);
+  const gHealth = usePoll<{ ok: boolean; spentToday?: string; capPerDay?: string }>(serviceUrl("gate", "/health"), 10_000);
   const gSse = useEventSource(eventsUrl("gate"), {
     decision: (d) => {
       const x = d as GateDecision;
@@ -84,7 +90,7 @@ export function Live() {
   });
 
   // ---- checker: passes (slow: reads Arkiv)
-  const cPasses = usePoll<PassView[]>(`${services.checker}/passes`, 10_000, 12_000);
+  const cPasses = usePoll<PassView[]>(serviceUrl("checker", "/passes"), 10_000, 12_000);
   useEffect(() => {
     if (Array.isArray(cPasses.data)) passesDispatch({ type: "snapshot", passes: cPasses.data });
   }, [cPasses.data]);
@@ -119,38 +125,68 @@ export function Live() {
     };
   }, []);
 
+  // ---- local or chain mode: services unreachable (public site, or nothing answered in 4 s)
+  const mountedAt = useRef(Date.now());
+  const anyUp = wState.reachable || gHealth.reachable || cPasses.reachable || wSse === "open" || gSse === "open" || cSse === "open";
+  const roomMode = decideMode({ local, anyUp, elapsedMs: now - mountedAt.current });
+  const chainMode = roomMode === "chain";
+  const chain = useChain(chainMode);
+  const genuine = chain?.genuine ?? null;
+
+  // ---- replay of the newest genuine incident, with its recorded step times
+  const [replay, setReplay] = useState<{ startMs: number; done: boolean } | null>(null);
+  const rNow = useNow(reduced ? 250 : 50, !!replay && !replay.done);
+  const rElapsed = replay ? (replay.done ? Number.POSITIVE_INFINITY : Math.max(0, rNow - replay.startMs)) : 0;
+  useEffect(() => {
+    if (replay && !replay.done && genuine && rElapsed >= replayEndMs(genuine.incident)) setReplay({ ...replay, done: true });
+  }, [replay, genuine, rElapsed]);
+  const chainContain = useMemo(() => (genuine ? containReducer(initialContain, { type: "hcs-incident", incident: genuine.incident }) : initialContain), [genuine]);
+  const replaying = chainMode && !!replay && !!genuine;
+  const shownContain = !chainMode ? contain : replaying ? replayContain(genuine!.incident, replay!.startMs, rElapsed) : chainContain;
+  const shownPipe = !chainMode ? pipe : replaying ? replayPipeline(genuine!.incident, replay!.startMs, rElapsed, label) : CHAIN_PIPE;
+  const shownRows = chainMode ? (chain?.rows ?? []) : feed.rows;
+
   // ---- Mirror Node: balance + freeze for treasury, attacker, payees, breach receivers
-  const watched = [deploy.treasury, deploy.attacker, ...deploy.payees, ...feed.rows.filter((r) => r.status === "breach").map((r) => r.to)].filter((a): a is string => !!a && /^0\.0\.\d+$/.test(a));
+  const watched = [deploy.treasury, deploy.attacker, ...deploy.payees, ...shownRows.filter((r) => r.status === "breach").map((r) => r.to)].filter((a): a is string => !!a && /^0\.0\.\d+$/.test(a));
   const watchKey = [...new Set(watched)].sort().join(",");
   const relations = useRelations(watchKey, mode.kind === "live" ? 2000 : 6000);
 
   const tokenParam = new URLSearchParams(window.location.search).get("token")?.trim();
   const otherToken = tokenParam && tokenParam !== deploy.token.tokenId ? tokenParam : null;
 
+  const st = (p: Parameters<typeof serviceStatus>[0], sse: Parameters<typeof serviceStatus>[1]): ServiceStatus => (local ? serviceStatus(p, sse) : "local");
   const health: [string, ServiceStatus][] = [
-    ["Gate", serviceStatus(gHealth, gSse)],
-    ["Watcher", serviceStatus(wState, wSse)],
-    ["Checker", serviceStatus(cPasses, cSse)],
+    ["Gate", st(gHealth, gSse)],
+    ["Watcher", st(wState, wSse)],
+    ["Checker", st(cPasses, cSse)],
   ];
+  const replayButton = chainMode && genuine && (
+    <div className="replay-box">
+      <button type="button" className="btn small" disabled={!!replay && !replay.done} onClick={() => setReplay({ startMs: Date.now(), done: false })}>
+        {replay?.done ? "Replay again" : "Replay latest incident"}
+      </button>
+      <span className="dim small">Replays the step times recorded on chain for the incident of {formatDate(genuine.consensusAt)}. Not a live event.</span>
+    </div>
+  );
 
   return (
     <div className={`room mode-${mode.kind}`}>
       <div className="room-frame" aria-hidden="true" />
-      <TopBar relations={relations} health={health} lagMs={lagMs} />
-      <Banner mode={mode} contain={contain} reduced={reduced} />
+      <TopBar relations={relations} health={health} lagMs={lagMs} chain={chainMode} />
+      {chainMode ? <ChainBanner /> : <Banner mode={mode} contain={contain} reduced={reduced} />}
       {otherToken && (
         <p className="room-notice">
           This demo watches {sym} ({deploy.token.tokenId}) on Hedera {deploy.network}. Watching {otherToken} needs its own gate and watcher.
         </p>
       )}
-      <Pipeline s={pipe} />
+      <Pipeline s={shownPipe} />
       <main className="room-grid">
         <TreasuryCard relations={relations} spentToday={gHealth.data?.spentToday} capPerDay={gHealth.data?.capPerDay} />
-        <FeedPanel rows={feed.rows} reachable={wState.reachable || wSse === "open"} />
-        <ContainPanel s={contain} reduced={reduced} relations={relations} />
+        <FeedPanel rows={shownRows} reachable={wState.reachable || wSse === "open"} emptyText={chainMode ? (chain ? "No treasury movements in the latest Mirror Node page." : "Reading the Mirror Node…") : undefined} />
+        <ContainPanel s={shownContain} reduced={reduced} relations={relations} extra={replayButton || undefined} />
       </main>
-      <PassesStrip passes={Object.values(passes)} reachable={cPasses.reachable || cSse === "open"} reduced={reduced} />
-      <DemoPanel />
+      <PassesStrip passes={chainMode ? [] : Object.values(passes)} reachable={cPasses.reachable || cSse === "open"} reduced={reduced} chain={chainMode} />
+      <DemoPanel chain={chainMode} />
     </div>
   );
 }
@@ -184,9 +220,9 @@ function useRelations(key: string, everyMs: number): Relations {
 
 // ------------------------------------------------------------------ top bar
 
-const HEALTH_WORD: Record<ServiceStatus, string> = { up: "up", degraded: "unhealthy", off: "off", checking: "…" };
+const HEALTH_WORD: Record<ServiceStatus, string> = { up: "up", degraded: "unhealthy", off: "off", checking: "…", local: "local only" };
 
-function TopBar({ relations, health, lagMs }: { relations: Relations; health: [string, ServiceStatus][]; lagMs: number | null }) {
+function TopBar({ relations, health, lagMs, chain = false }: { relations: Relations; health: [string, ServiceStatus][]; lagMs: number | null; chain?: boolean }) {
   const t = relations[deploy.treasury];
   const frozen = t?.freeze === "FROZEN";
   return (
@@ -207,13 +243,18 @@ function TopBar({ relations, health, lagMs }: { relations: Relations; health: [s
           <span key={name} className="tb-dot" title={`${name}: ${HEALTH_WORD[st]}`}>
             <i className={`dot ${st}`} aria-hidden="true" />
             {name}
-            <span className="sr-only"> {HEALTH_WORD[st]}</span>
-            {st !== "up" && <span className="dim"> {HEALTH_WORD[st]}</span>}
+            {st === "up" ? <span className="sr-only"> up</span> : <span className="dim"> {HEALTH_WORD[st]}</span>}
           </span>
         ))}
-        <span className="tb-dot mono">
-          <span className="dim">Mirror lag</span> {lagMs === null ? "–" : `${(lagMs / 1000).toFixed(1)} s`}
-        </span>
+        {chain ? (
+          <span className="tb-dot">
+            <span className="dim">Data</span> Mirror Node
+          </span>
+        ) : (
+          <span className="tb-dot mono">
+            <span className="dim">Mirror lag</span> {lagMs === null ? "–" : `${(lagMs / 1000).toFixed(1)} s`}
+          </span>
+        )}
       </span>
     </header>
   );
@@ -236,6 +277,17 @@ function Banner({ mode, contain, reduced }: { mode: BreachMode; contain: Contain
   return (
     <div className="banner contained" role="status">
       ✓ Contained in <span className="mono num">{mode.seconds.toFixed(2)} s</span>
+    </div>
+  );
+}
+
+export const CHAIN_BANNER = "Services run on the operator's machine. Showing the chain: receipts, transfers and incidents read live from the Hedera Mirror Node.";
+
+export function ChainBanner() {
+  return (
+    <div className="banner chain" role="status">
+      <i className="dot up" aria-hidden="true" />
+      {CHAIN_BANNER}
     </div>
   );
 }
@@ -358,14 +410,14 @@ function rowTime(r: FeedRow): string {
   return Number.isFinite(ms) ? new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
 }
 
-export function FeedPanel({ rows, reachable }: { rows: FeedRow[]; reachable: boolean }) {
+export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; reachable: boolean; emptyText?: string }) {
   return (
     <section className="card-dark feed" aria-labelledby="feed-h">
       <div className="card-head">
         <h2 id="feed-h">Every move</h2>
         <span className="eyebrow">newest first</span>
       </div>
-      {rows.length === 0 && <p className="dim small">{reachable ? "No treasury movements yet today." : "Watcher is off. Start it with npm run watcher."}</p>}
+      {rows.length === 0 && <p className="dim small">{emptyText ?? (reachable ? "No treasury movements yet today." : "Watcher is off. Start it with npm run watcher.")}</p>}
       <ol className="timeline" aria-live="polite">
         {rows.map((r) => {
           const tag = rowTag(r);
@@ -411,14 +463,14 @@ export function FeedPanel({ rows, reachable }: { rows: FeedRow[]; reachable: boo
 
 // ------------------------------------------------------------------ containment stopwatch
 
-export function ContainPanel({ s, reduced, relations = {} }: { s: ContainState; reduced: boolean; relations?: Relations }) {
+export function ContainPanel({ s, reduced, relations = {}, extra }: { s: ContainState; reduced: boolean; relations?: Relations; extra?: ReactNode }) {
   const now = useNow(reduced ? 1000 : 47, s.phase === "running");
   const ms = elapsedMs(s, now);
   const stalled = s.phase === "running" && ms > 120_000;
   const treasury = relations[deploy.treasury]?.freeze;
   const receiver = s.breachTo ? relations[s.breachTo]?.freeze : undefined;
 
-  const stateText = s.phase === "running" ? (stalled ? "Breach · waiting for the watcher" : "Breach live · containing") : s.phase === "contained" ? "Contained" : "All movements have receipts";
+  const stateText = s.source === "replay" ? (s.phase === "running" ? "Replay · containing (recorded)" : "Replay · contained (recorded)") : s.phase === "running" ? (stalled ? "Breach · waiting for the watcher" : "Breach live · containing") : s.phase === "contained" ? "Contained" : "All movements have receipts";
   const planned = s.plannedSteps ?? Math.max(s.steps.length, 2);
   const total = planned + 2; // detected + steps + published
   const done = s.phase === "contained" ? total : (s.detectedMs !== undefined ? 1 : 0) + s.steps.length;
@@ -430,6 +482,7 @@ export function ContainPanel({ s, reduced, relations = {} }: { s: ContainState; 
         <h2 id="contain-h">Containment</h2>
         {s.source === "hcs" && <span className="eyebrow">last incident · from HCS</span>}
         {s.source === "watcher" && <span className="eyebrow">last incident</span>}
+        {s.source === "replay" && <span className="eyebrow">replay · recorded on-chain data</span>}
       </div>
 
       <div className={`watch ${s.phase}`} role="timer" aria-live="off">
@@ -443,6 +496,8 @@ export function ContainPanel({ s, reduced, relations = {} }: { s: ContainState; 
         </span>
         <span className="dim small">from the theft reaching consensus to the last containment step</span>
       </div>
+
+      {extra}
 
       <div className="progress" aria-hidden="true">
         <i style={{ transform: `scaleX(${frac})` }} />
@@ -529,7 +584,7 @@ function freezeWord(f: string | undefined): string {
 // ------------------------------------------------------------------ machine passes
 
 const R = 17;
-export function PassesStrip({ passes, reachable, reduced }: { passes: PassView[]; reachable: boolean; reduced: boolean }) {
+export function PassesStrip({ passes, reachable, reduced, chain = false }: { passes: PassView[]; reachable: boolean; reduced: boolean; chain?: boolean }) {
   const now = useNow(reduced ? 1000 : 250);
   const sorted = [...passes].sort((a, b) => a.machine.localeCompare(b.machine));
   return (
@@ -538,8 +593,17 @@ export function PassesStrip({ passes, reachable, reduced }: { passes: PassView[]
         <h2 id="passes-h">Machine passes</h2>
         <span className="eyebrow">Arkiv · {PASS_SECONDS} s · renewed by heartbeats</span>
       </div>
-      {!reachable && sorted.length === 0 && <p className="dim small">Checker is off. Start it with npm run checker.</p>}
-      {reachable && sorted.length === 0 && <p className="dim small">No machines enrolled yet.</p>}
+      {(chain || !reachable) && sorted.length === 0 && (
+        <p className="dim small">
+          {chain ? "The checker runs on the operator's machine, so pass countdowns are not shown here. " : "Checker is off. Start it with npm run checker. "}
+          Machine passes live on Arkiv as entities that expire unless heartbeats renew them:{" "}
+          <a href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
+            Arkiv explorer
+          </a>
+          .
+        </p>
+      )}
+      {!chain && reachable && sorted.length === 0 && <p className="dim small">No machines enrolled yet.</p>}
       <ul className="pass-chips">
         {sorted.map((p) => {
           const left = passLeftMs(p, now);
@@ -568,8 +632,8 @@ export function PassesStrip({ passes, reachable, reduced }: { passes: PassView[]
 const payCmd = `curl -s -X POST localhost:8710/request -H 'content-type: application/json' -d '{"machine":"payouts-server","to":"${deploy.payees[0] ?? "0.0.x"}","amount":"500000000"}'`;
 const cliFor = (k: RunKind, cmd: string) => (k === "pay" ? payCmd : cmd);
 
-export function DemoPanel() {
-  const runner = usePoll<{ ok: boolean; busy: RunView | null }>(`${services.runner}/health`, 10_000, 3000);
+export function DemoPanel({ chain = false }: { chain?: boolean }) {
+  const runner = usePoll<{ ok: boolean; busy: RunView | null }>(chain ? "" : serviceUrl("runner", "/health"), 10_000, 3000);
   const [run, setRun] = useState<RunView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const running = run?.status === "running" || (!!runner.data?.busy && runner.data.busy.id !== run?.id);
@@ -594,7 +658,7 @@ export function DemoPanel() {
     else setError(r.error);
   };
 
-  const up = runner.ok;
+  const up = runner.ok && !chain;
   return (
     <section className="demo-panel card-dark" aria-labelledby="demo-h">
       <div className="card-head">
@@ -631,9 +695,19 @@ export function DemoPanel() {
         </>
       ) : (
         <>
-          <p className="dim small">
-            Start the buttons with <code>DEMO_MODE=1 npm run demo:runner</code>, or run these with npm run gate, watcher and checker up:
-          </p>
+          {chain ? (
+            <p className="dim small">
+              The demo buttons drive the operator's own gate, watcher and checker, so they are not available here. To run it yourself, clone{" "}
+              <a href={GITHUB} target="_blank" rel="noreferrer">
+                the repo
+              </a>{" "}
+              and, with npm run gate, watcher and checker up, run from its root:
+            </p>
+          ) : (
+            <p className="dim small">
+              Start the buttons with <code>DEMO_MODE=1 npm run demo:runner</code>, or run these with npm run gate, watcher and checker up:
+            </p>
+          )}
           <div className="cmds">
             {RUN_BUTTONS.map((b) => (
               <Cmd key={b.kind} label={b.label} cmd={cliFor(b.kind, b.cmd)} />

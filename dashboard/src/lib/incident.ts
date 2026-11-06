@@ -75,6 +75,15 @@ export function pickShowcase(msgs: TopicMessage[], o: { treasury: string; payees
   return null;
 }
 
+/** The newest genuine incident itself (same rule as pickShowcase), for the /live chain-mode replay. */
+export function pickGenuineIncident(msgs: TopicMessage[], o: { treasury: string; payees: string[]; decimals: number }): { incident: Incident; consensusAt: string } | null {
+  for (const m of msgs) {
+    const i = parseIncidentMessage(m.message);
+    if (i && showcaseFrom(i, m.consensus_timestamp, o)) return { incident: i, consensusAt: m.consensus_timestamp };
+  }
+  return null;
+}
+
 export async function fetchShowcase(timeoutMs = 6000): Promise<Showcase | null> {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
