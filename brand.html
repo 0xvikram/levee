@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Levee Brand</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=EB+Garamond:ital,wght@1,400&family=Instrument+Serif:ital@1&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/*
+  LEVEE BRAND RULES
+  Source of truth for the site, dashboard, deck and video.
+  Look (v3 "Parley", Nov 2026): cobalt grounds with cream-on-cobalt engravings ONLY in the hero
+  (levee coast, animated ordered dither, feathered into the page) and the footer; every section in
+  between is colour alone (tonal cobalt steps, glass, thin cream rules, halftone texture). Cream
+  text, a slim cobalt glass nav, Inter Tight 500 headings with the accent words in yellow (colour only,
+  same face), cobalt glass cards, a yellow pill primary button. Yellow #F2E34C is a SMALL accent only;
+  gold is retired. The v2 dusk navy video look is retired from the landing.
+*/
+:root{
+  /* ---------- colour tokens ---------- */
+  --sky:        #EFE6D2;  /* hazy cream sky: main light ground */
+  --haze:       #E6D8B4;  /* pale gold haze: secondary ground, cards on image */
+  --sun:        #F6ECC6;  /* light shafts / highlights */
+  --olive:      #5F6B3B;  /* meadow green: quiet accents, success */
+  --moss:       #2E3722;  /* deep grass: dark sections, footer */
+  --ink:        #1B1A17;  /* headlines and body text */
+  --smoke:      #6B665C;  /* secondary text */
+  --line:       rgba(27,26,23,.12);
+  --yellow:     #F2E34C;  /* the ONE accent: CTA buttons + the italic accent word */
+  --yellow-ink: #1B1A17;  /* text on yellow */
+  /* --gold #7A5A00 is RETIRED (Nov 2026): no gold or brown anywhere. */
+  /* ---------- landing (v3 Parley) tokens: cobalt grounds, cream text + engraving, yellow small accent ---------- */
+  --cobalt:     #1A3892;  /* page ground: between the engravings' sampled skies */
+  --cobalt-deep:#142C82;  /* darker surfaces */
+  --cobalt-ink: #0E1F5E;  /* nav glass (72%), window bar, text on yellow */
+  --cobalt-sky: #1F3F88;  /* footer: the footer engraving's own sky */
+  /* the hero engraving's own sky #203C91 is its dither dark tone and the hero ground */
+  --cream:      #F3EBD6;  /* text and engraved lines (7.6:1 on cobalt) */
+  --cream-2:    #E9DDBE;  /* engraving shade */
+  --cream-dim:  rgba(243,235,214,.74); /* secondary text */
+  --cream-faint:rgba(243,235,214,.64); /* "Built on Hedera" logo row */
+  --glass:      rgba(255,255,255,.18);
+  --glass-line: rgba(255,255,255,.35);
+  --white:      #FFFFFF;
+  --breach:     #C8432B;  /* ONLY for live breach state in the dashboard */
+  /* Status text on DARK grounds (ink, moss). Plain olive/breach fail there (3.0:1 / 3.6:1 on ink). */
+  --olive-lit:  #B6C383;  /* success / contained text on dark (9.2:1 on ink) */
+  --amber:      #D9B25C;  /* refused / warning text on dark (8.7:1 on ink) */
+  --breach-lit: #F08C74;  /* breach text on dark (7.2:1 on ink) */
+
+  /* ---------- type tokens ---------- */
+  --f-head:   "Inter Tight", "Helvetica Neue", Arial, sans-serif;  /* 500, tight tracking */
+  --f-accent: "Instrument Serif", Georgia, serif;                  /* italic only, one word/phrase */
+  --f-body:   "Inter", "Helvetica Neue", Arial, sans-serif;
+  --f-mono:   "JetBrains Mono", ui-monospace, Menlo, monospace;    /* /live: tx ids, timers, numbers */
+  --f-label:  "IBM Plex Mono", ui-monospace, Menlo, monospace;     /* landing: labels, pills, figures */
+  --f-serif:  "EB Garamond", Georgia, serif;                       /* landing: italic ledes (two at most) */
+
+  /* ---------- scale ---------- */
+  --h1: clamp(2.6rem, 6.2vw, 5.4rem);   /* line-height 1.02, tracking -0.035em */
+  --h2: clamp(2rem, 4vw, 3.4rem);       /* line-height 1.06, tracking -0.03em */
+  --h3: 1.35rem;
+  --body: 1.0625rem;                    /* line-height 1.55 */
+  --small: .875rem;
+
+  /* ---------- shape & effects ---------- */
+  --r-pill: 999px;
+  --r-card: 22px;
+  --blur: 16px;
+  --shadow: 0 10px 40px rgba(27,26,23,.12);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--cobalt);color:var(--cream);font-family:var(--f-body);font-size:var(--body);line-height:1.55;
+  padding:40px max(16px,4vw) 80px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:48px}
+h1,h2,h3{font-family:var(--f-head);font-weight:500;margin:0;text-wrap:balance}
+h1{font-size:var(--h1);line-height:1.02;letter-spacing:-.035em}
+h2{font-size:var(--h2);line-height:1.06;letter-spacing:-.03em}
+h3{font-size:var(--h3);letter-spacing:-.01em}
+.accent{color:var(--yellow)} /* landing: colour only, same face as the heading (/live keeps Instrument Serif italic) */
+.on-dark .accent{color:var(--yellow)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-dim)}
+p{margin:0;max-width:62ch}
+section{display:flex;flex-direction:column;gap:16px}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.sw{border-radius:16px;overflow:hidden;border:1px solid rgba(243,235,214,.18);background:var(--cobalt-deep)}
+.sw i{display:block;height:84px}
+.sw div{padding:10px 12px;font-family:var(--f-mono);font-size:.78rem;line-height:1.4}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+td,th{text-align:left;padding:10px 12px;border-bottom:1px solid rgba(243,235,214,.18);vertical-align:top}
+th{font-family:var(--f-head);font-weight:600}
+code{font-family:var(--f-label);font-size:.85em;background:rgba(243,235,214,.08);padding:1px 6px;border-radius:6px}
+/* components */
+.stage{position:relative;border-radius:28px;overflow:hidden;min-height:460px;padding:24px;
+  background:#203C91 url(dashboard/public/media/engraving/hero.jpg) center bottom/cover;display:flex;flex-direction:column;align-items:center;gap:28px}
+.nav{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px 10px 20px;border-radius:var(--r-pill);
+  background:rgba(14,31,94,.72);border:1px solid rgba(243,235,214,.18);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));flex-wrap:wrap}
+.nav .logo{font-family:var(--f-head);font-weight:500;color:var(--cream)}
+.nav nav{display:flex;gap:22px;font-size:.9rem;color:var(--cream);flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:var(--r-pill);padding:12px 20px;font-family:var(--f-head);font-weight:600;font-size:.95rem;
+  background:var(--yellow);color:var(--yellow-ink);cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:var(--r-pill);background:rgba(255,255,255,.55);
+  backdrop-filter:blur(10px);font-size:.82rem;color:var(--ink)}
+.search{display:flex;align-items:center;gap:10px;background:var(--white);border-radius:var(--r-pill);padding:6px 6px 6px 18px;box-shadow:var(--shadow);width:min(520px,100%)}
+.search input{flex:1;border:0;font:inherit;background:transparent;color:var(--ink);min-width:0}
+.hero-copy{text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:24px}
+.hero-copy p{color:var(--cream);text-align:center}
+.do{border-left:3px solid var(--olive);padding-left:12px}
+.dont{border-left:3px solid var(--breach);padding-left:12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header style="display:flex;flex-direction:column;gap:12px">
+  <span class="eyebrow">Levee · brand rules v3 (Parley cobalt) · Nov 2026</span>
+  <h1>Hold the line on <span class="accent">every token</span></h1>
+  <p>Levee lets a token issuer on Hedera undo a theft within seconds. The brand feels calm, warm and certain: a quiet landscape after the storm, not an alarm.</p>
+</header>
+
+<section>
+  <span class="eyebrow">01 · Colour</span>
+  <h2>Cobalt and cream, a little <span class="accent">yellow</span></h2>
+  <div class="swatches">
+    <div class="sw"><i style="background:#EFE6D2"></i><div>--sky<br>#EFE6D2<br>main ground</div></div>
+    <div class="sw"><i style="background:#E6D8B4"></i><div>--haze<br>#E6D8B4<br>second ground</div></div>
+    <div class="sw"><i style="background:#F6ECC6"></i><div>--sun<br>#F6ECC6<br>highlights</div></div>
+    <div class="sw"><i style="background:#5F6B3B"></i><div>--olive<br>#5F6B3B<br>quiet accent, success</div></div>
+    <div class="sw"><i style="background:#2E3722"></i><div>--moss<br>#2E3722<br>dark sections</div></div>
+    <div class="sw"><i style="background:#1B1A17"></i><div>--ink<br>#1B1A17<br>text</div></div>
+    <div class="sw"><i style="background:#6B665C"></i><div>--smoke<br>#6B665C<br>secondary text</div></div>
+    <div class="sw"><i style="background:#F2E34C"></i><div>--yellow<br>#F2E34C<br>buttons; accent word on dark only</div></div>
+    <div class="sw"><i style="background:#1A3892"></i><div>--cobalt<br>#1A3892<br>landing ground</div></div>
+    <div class="sw"><i style="background:#142C82"></i><div>--cobalt-deep<br>#142C82<br>darker surfaces</div></div>
+    <div class="sw"><i style="background:#0E1F5E"></i><div>--cobalt-ink<br>#0E1F5E<br>nav, window bar, text on yellow</div></div>
+    <div class="sw"><i style="background:#1F3F88"></i><div>--cobalt-sky<br>#1F3F88<br>footer (engraving sky)</div></div>
+    <div class="sw"><i style="background:#F3EBD6"></i><div>--cream<br>#F3EBD6<br>text, engraved lines</div></div>
+    <div class="sw"><i style="background:#E9DDBE"></i><div>--cream-2<br>#E9DDBE<br>engraving shade</div></div>
+    <div class="sw"><i style="background:repeating-linear-gradient(45deg,#E6D8B4 0 6px,#fff 6px 12px)"></i><div><s>--gold</s><br><s>#7A5A00</s><br>RETIRED, do not use</div></div>
+    <div class="sw"><i style="background:#C8432B"></i><div>--breach<br>#C8432B<br>dashboard breach only</div></div>
+    <div class="sw"><i style="background:#B6C383"></i><div>--olive-lit<br>#B6C383<br>success text on dark</div></div>
+    <div class="sw"><i style="background:#D9B25C"></i><div>--amber<br>#D9B25C<br>refusal text on dark</div></div>
+    <div class="sw"><i style="background:#F08C74"></i><div>--breach-lit<br>#F08C74<br>breach text on dark</div></div>
+  </div>
+  <table>
+    <tr><th>Rule</th><th>Detail</th></tr>
+    <tr><td>One accent</td><td>Yellow appears only on primary buttons and on the single italic accent word in a heading. Never on body text, borders or charts.</td></tr>
+    <tr><td>Landing theme (v3, Nov 2026)</td><td>Parley look: <code>--cobalt</code> ground, <code>--cream</code> text (<code>--cream-dim</code> secondary), cream-on-cobalt engravings. <code>--yellow</code> #F2E34C only as small accents: the accent words in headings, pills, the primary button (cobalt-ink text), focus rings, the Levee bar. Cobalt glass cards: cream 6–9% fill, 1px cream 18% border, backdrop blur. No other colours (tested in <code>contrast.test.ts</code>). Each engraving sits on its own sampled sky colour and is feathered with a CSS mask, never boxed; one faint grain + halftone overlay covers the whole page.</td></tr>
+    <tr><td>Gold is retired</td><td><code>--gold</code> #7A5A00 is no longer used anywhere. No gold, brown or tan colours. Yellow is used only on dark grounds (cobalt, ink, moss), where it reaches 9–15:1; never yellow text on cream. Text must always reach 4.5:1 (tested in <code>dashboard/src/lib/__tests__/contrast.test.ts</code>).</td></tr>
+    <tr><td>Three colours per frame</td><td>Any screen or slide uses the image plus at most ink, one ground colour and yellow.</td></tr>
+    <tr><td>Status text on dark grounds</td><td>On ink or moss, status <em>text</em> uses the lit tints: <code>--olive-lit</code> #B6C383 for success and contained (9.2:1 on ink), <code>--amber</code> #D9B25C for refusals and warnings (8.7:1), <code>--breach-lit</code> #F08C74 for a live breach (7.2:1). Plain <code>--olive</code> and <code>--breach</code> stay for fills, borders and frames only, since as text on ink they reach just 3.0:1 and 3.6:1. Refusals are amber, never red.</td></tr>
+    <tr><td>Red is a state, not a colour</td><td><code>--breach</code> is used only in the dashboard while a breach is live, then fades back to olive when contained.</td></tr>
+    <tr><td>Dark sections</td><td>Landing: cobalt grounds with <code>--cream</code> text. Dashboard (/live): <code>--ink</code>/<code>--moss</code> with <code>--sky</code> text. Yellow stays the accent.</td></tr>
+  </table>
+</section>
+
+<section>
+  <span class="eyebrow">02 · Type</span>
+  <h2>Tight grotesk, <span class="accent">yellow</span> accent</h2>
+  <table>
+    <tr><th>Role</th><th>Face</th><th>Use</th></tr>
+    <tr><td>Headlines</td><td>Inter Tight 500, tracking −0.03em (h1 −0.035em), line-height 0.98–1.04, generous sizes (h1 up to 6.5rem, h2 up to 4.25rem)</td><td>All headings. Sentence case. Same type scale as the Sellora site.</td></tr>
+    <tr><td>Accent</td><td>Same face as the heading, in <code>--yellow</code></td><td>One word or short phrase per heading. Colour only on the landing (the serif is not the accent). /live keeps Instrument Serif italic.</td></tr>
+    <tr><td>Body</td><td>Inter 400, 17px, line-height 1.6, antialiased</td><td>Paragraphs, nav, UI.</td></tr>
+    <tr><td>Labels and figures</td><td>IBM Plex Mono 400/500</td><td>Pills, eyebrows (uppercase, 0.08em), chart values, step numbers. /live keeps JetBrains Mono for data.</td></tr>
+    <tr><td>Editorial</td><td>EB Garamond italic 400</td><td>One or two ledes only (problem lede, footer line).</td></tr>
+  </table>
+</section>
+
+<section>
+  <span class="eyebrow">03 · Components</span>
+  <h2>The hero, built from the tokens</h2>
+  <div class="stage">
+    <div class="nav"><span class="logo">▲ Levee</span><nav><span>How it works</span><span>Pricing</span><span>FAQ</span><span>Docs</span></nav><button class="btn" type="button" style="color:var(--cobalt-ink)">Watch it live</button></div>
+    <div class="hero-copy">
+      <span class="chip">✦ Built on Hedera Stablecoin Studio</span>
+      <h1 style="color:var(--cream)">Hacked? Your stablecoin <span class="accent">snaps back</span> in seconds.</h1>
+      <p>For stablecoin issuers on Hedera. No receipt, no movement.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button class="btn" type="button" style="color:var(--cobalt-ink)">Watch it live</button><button class="btn" type="button" style="background:transparent;color:var(--cream);box-shadow:inset 0 0 0 1px rgba(243,235,214,.32)">Read the docs</button></div>
+    </div>
+  </div>
+  <table>
+    <tr><th>Component</th><th>Spec</th></tr>
+    <tr><td>Nav</td><td>Slim fixed pill: logo left, links centre (How it works, Pricing, FAQ, Docs), yellow "Watch it live" pill right. Cobalt-ink 72% glass, 1px cream 18% border, 16px blur.</td></tr>
+    <tr><td>Primary button</td><td>Pill, yellow fill, ink text, Inter Tight 600. One per view.</td></tr>
+    <tr><td>Secondary button</td><td>Pill, white fill, ink text.</td></tr>
+    <tr><td>Eyebrow pill</td><td>Small mono uppercase pill above each section heading: yellow text on a yellow 8% fill with a yellow 35% hairline.</td></tr>
+    <tr><td>Product window</td><td>Browser-style frame (16px radius, cream dots, title "levee · live") holding a cobalt mock of the incident view with the live numbers; the demo video returns with one flag (<code>DEMO_VIDEO</code>). Overlaps the bottom of the hero.</td></tr>
+    <tr><td>Cards</td><td>Landing: cobalt glass, 22px radius, 1px cream 18% border, backdrop blur. Dashboard: moss cards.</td></tr>
+    <tr><td>Engravings</td><td>Hero and footer only. Drawn as two-tone ordered dither (Bayer 8×8, art sky + cream), dithering in on first view (~1.2 s) with a faint drifting shimmer; ≤ 30 fps, paused off screen; the still image under reduced motion. Feathered into the ground with masks; the AI sparkle mark is never cropped or masked away.</td></tr>
+  </table>
+</section>
+
+<section>
+  <span class="eyebrow">04 · Imagery and motion</span>
+  <h2>Calm after the <span class="accent">storm</span></h2>
+  <div class="grid2">
+    <div class="do"><h3>Do</h3><p>Landing (v3, Nov 2026): cream-on-cobalt engravings: the levee coast with floating islands for the hero, no imagery in the sections between (colour, glass, rules and halftone only; the product window is a cobalt mock until the demo video returns), the levee coastline along the footer (links over its empty sky). Pixel-dither reveal, subtle shimmer, words rise in on scroll, all motion off under reduced motion. The dusk video and meadow photography are retired from the landing.</p></div>
+    <div class="dont"><h3>Don't</h3><p>Glowing blockchain cubes, hacker hoodies, padlocks, red alarms on the site, neon gradients, stock office photos, fast cuts, camera shake, text inside images. Never remove AI-content watermarks; frame them instead.</p></div>
+  </div>
+</section>
+
+<section>
+  <span class="eyebrow">05 · Voice</span>
+  <h2>Plain and <span class="accent">certain</span></h2>
+  <table>
+    <tr><th>Say</th><th>Not</th></tr>
+    <tr><td>"No receipt, no movement."</td><td>"Next-gen AI-powered security paradigm."</td></tr>
+    <tr><td>"Frozen and undone in 7 seconds." (only once measured)</td><td>Unmeasured speed claims.</td></tr>
+    <tr><td>"The robot can only close doors. Two people reopen them."</td><td>Jargon without an explanation.</td></tr>
+  </table>
+</section>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,46 @@
+---
+title: "Changelog"
+description: "What changed in Levee, from the git history."
+---
+
+All work so far landed on 6 Nov 2026 (IST), on branch `build` of [0xvikram/levee](https://github.com/0xvikram/levee). Commit hashes link the change to the code.
+
+<Update label="6 Nov 2026, evening (2)" description="Demo command centre">
+  - Demo runner gains **mint** and **reset** actions (`8175901`).
+  - `/live` becomes a one-screen demo command centre. The mint step waits for an unfrozen thief account and shows the supply spike (`495068f`, `775d167`).
+  - Demo stepper order is Send, Hack, Unlock, Fake mint, because a mint cannot land in a frozen account (`608b698`).
+</Update>
+
+<Update label="6 Nov 2026, evening (1)" description="Scheduled signing, signed requests, partners never wiped">
+  - **Normal sends are Hedera Scheduled Transactions with two separate signers.** The gate schedules with its key and writes the receipt. A separate issuer signer adds the second signature only after it finds the receipt on Hedera (`eb6a4ad`, `2483ced`, `a280c0b`).
+  - ContainmentController source verified on HashScan, full match (`31ce848`).
+  - **Every gate request is signed** by the requesting machine's own key. `/enrol` is locked with a per-run token (`e110c2a`, `7560843`).
+  - **Live unauthorised-mint attack**: 5,000 RUPC minted with a stolen key, wiped and frozen in 7.53 s (`91d30c2`).
+  - **The watcher never wipes a known partner.** It freezes it and lets admins decide (`3c9bb93`).
+  - Levee positioned for one buyer: stablecoin issuers on Hedera (`b7473fe`, `1157a0e`).
+</Update>
+
+<Update label="6 Nov 2026, morning (2)" description="Detection fix, docs, hosted dashboard">
+  - **Watcher judges an unreceipted movement early** when one Mirror answer proves the receipts read complete. Fresh, cache-busted Mirror reads (`4f53393`). Latest drain detected in 2.87 s; run D after it: 100 of 100 matched, 0 late matches.
+  - Read-only probe of the Mirror gRPC stream against fresh REST reads (`37269b4`).
+  - Hosted dashboard on Vercel with a chain mode for `/live` (`69b7e72`).
+  - Contract NatSpec and in-process EVM unit tests (`4073626`). MIT license and CI (`b6a368c`).
+  - README, Hedera friction log, business one-pager, live run record (`e3b338e`, `4853307`, `212ded0`, `874abec`).
+</Update>
+
+<Update label="6 Nov 2026, morning (1)" description="First live runs on testnet">
+  - Watcher waits up to 3 s for a receipt the Mirror Node has not served yet, after run A's false alarm (`2627532`, `6f3dba8`).
+  - Demo runner for the dashboard buttons: `DEMO_MODE=1`, 127.0.0.1 only, one run at a time (`def57b5`).
+  - Dashboard: landing page and `/live` control room (`e37022b`, `50c7d2a`).
+  - Machine profiles (laptop, server, ci) fixed at enrolment. Whole-token caps scaled to the smallest unit (`896e208`).
+  - Watcher resolves each account's real EVM address before Studio calls, fixing `INVALID_ACCOUNT_ID` on aliased accounts (`7a09320`).
+  - First-hour tests T1 to T4 pass live on testnet (`deb1ff9`).
+</Update>
+
+<Update label="6 Nov 2026, early morning" description="First code">
+  - Close-only ContainmentController contract (`60f2afa`).
+  - Receipt matching and shared rules (`a8e5454`).
+  - Gate, watcher, Mirror and HCS clients, containment planner (`133d45e`).
+  - Leash: machine agent, checker and Arkiv pass store (`5ceccc9`).
+  - Setup scripts: accounts, topics, Studio token, controller (`449a9ac`).
+</Update>

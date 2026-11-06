@@ -1,0 +1,420 @@
+/* =============================================================== landing (/)
+   Parley v3 (Nov 2026): cobalt grounds matched to the engravings' own skies, cream text and cream-on-cobalt engravings drawn as
+   animated ordered dither (components/DitherImage.tsx). Yellow #F2E34C is a SMALL accent only:
+   accent words in headings, pills, the primary button, focus rings, the Levee bar. No gold or
+   brown, no other colours. Tokens live in styles.css :root (copied from brand.html v3).
+   Type (from the Sellora site): Inter Tight 500 at -0.03em for headings (sentence case),
+   Inter 400 body, IBM Plex Mono for labels and figures, EB Garamond italic for two ledes.
+   Text pairs are checked in src/lib/__tests__/contrast.test.ts:
+     cream / cream-dim on cobalt (page), cobalt-deep, cobalt-ink, cobalt-sky and on cobalt glass
+     cream-faint on cobalt                                    "Built on Hedera" row
+     yellow on cobalt, cobalt-deep, cobalt-ink, cobalt glass  accent words, pills, numbers
+     cobalt-ink on yellow                                     primary button text
+     cream / yellow on the hero scrim (video sky #0F2554 at >= 75%) over a white star   hero copy (worst case)
+     everything above under the page grain (cream/ink at <= 5%)
+     cream on the nav glass over a cream pixel                fixed nav (worst case)
+   Nov 2026 patchwork (from /logos): between the hero and the footer, cobalt-deep cards with yellow pill labels
+   hold cream "patch" panels drawn in cobalt ink. Added pairs: cobalt-ink (and ink at 74%) on cream, cream-faint on
+   cobalt-deep, yellow on cobalt-ink (the Levee chart band), ink bars at 60% on cream.
+   Motion: transform / opacity / canvas only, all off under prefers-reduced-motion. */
+
+html.lp-page { scroll-padding-top: 96px; }
+html.lp-page, html.lp-page body { background: var(--cobalt); }
+.lp {
+  background: var(--cobalt); color: var(--cream); overflow-x: clip;
+  font-family: var(--f-body); font-weight: 400; font-size: 1.0625rem; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility;
+  font-feature-settings: "kern", "cv11";
+}
+.lp h1, .lp h2, .lp h3 { font-family: var(--f-head); font-weight: 500; letter-spacing: -0.03em; color: var(--cream); }
+/* the accent is colour only: same face, weight and tracking as the heading around it */
+.lp .accent { font-family: inherit; font-style: normal; font-weight: inherit; letter-spacing: inherit; color: var(--yellow); }
+.lp .serif { font-family: var(--f-serif); font-style: italic; font-weight: 400; letter-spacing: 0; }
+.lp .mono { font-family: var(--f-label); }
+.lp :focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; border-radius: 6px; }
+.lp a { color: inherit; text-underline-offset: 3px; }
+.lp .small { font-size: 0.875rem; }
+.lp-muted { color: var(--cream-dim); }
+.lp-center { text-align: center; margin: 0 auto; }
+/* one shared print texture over the whole page (fixed, under the nav): fine grain + a faint halftone,
+   so the engravings, gradients and the product still read as one print */
+.lp::after {
+  content: ""; position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0.05; mix-blend-mode: soft-light;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .95 0 0 0 0 .92 0 0 0 0 .84 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(circle, rgba(243, 235, 214, 0.9) 0 0.8px, transparent 1.2px) 0 0 / 5px 5px;
+}
+.lp-skip { position: absolute; left: 16px; top: -60px; z-index: 60; background: var(--yellow); color: var(--cobalt-ink); padding: 8px 14px; border-radius: var(--r-pill); font-weight: 500; text-decoration: none; }
+.lp-skip:focus { top: 16px; }
+
+/* ---------- buttons, pills, glass ---------- */
+.lp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--r-pill); padding: 13px 24px; min-height: 46px;
+  font-family: var(--f-head); font-weight: 500; font-size: 0.97rem; letter-spacing: -0.01em; text-decoration: none; white-space: nowrap;
+  transition: transform 0.2s var(--ease), background-color 0.2s, box-shadow 0.2s;
+}
+.lp-btn:hover { transform: translateY(-1px); }
+.lp-btn.primary { background: var(--yellow); color: var(--cobalt-ink); box-shadow: 0 1px 0 rgba(243, 235, 214, 0.45) inset, 0 10px 30px rgba(14, 31, 94, 0.35); }
+.lp-btn.ghost { background: rgba(243, 235, 214, 0.08); color: var(--cream); box-shadow: inset 0 0 0 1px rgba(243, 235, 214, 0.32); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.lp-btn.ghost:hover { background: rgba(243, 235, 214, 0.14); }
+.lp-btn.small { padding: 8px 16px; min-height: 44px; font-size: 0.875rem; }
+
+/* yellow pill label (from /logos .lg-letter): mono, cobalt-ink on yellow */
+.lp-pill {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; flex: none;
+  padding: 3px 11px; border-radius: var(--r-pill); white-space: nowrap;
+  font-family: var(--f-label); font-weight: 500; font-size: 0.78rem; letter-spacing: 0.02em;
+  color: var(--cobalt-ink); background: var(--yellow);
+}
+.lp-pill b { font-weight: 600; }
+
+/* ---------- patchwork (from /logos): cobalt-deep cards holding cream "patch" panels in cobalt ink ---------- */
+.lp-card {
+  position: relative; background: var(--cobalt-deep); color: var(--cream); border-radius: var(--r-card);
+  padding: clamp(18px, 2.5vw, 28px); display: flex; flex-direction: column; gap: 18px; min-width: 0;
+  box-shadow: inset 0 0 0 1px rgba(243, 235, 214, 0.12);
+}
+.lp-card-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 14px; min-width: 0; }
+.lp-card-head h2 { font-size: clamp(1.75rem, 3.2vw, 2.75rem); line-height: 1.05; margin: 0; min-width: 0; }
+.lp-card-head h3 { font-size: clamp(1.2rem, 1.8vw, 1.45rem); line-height: 1.2; margin: 0; min-width: 0; }
+.lp-cap { margin-left: auto; font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream-faint); }
+.lp-sec-head { max-width: none; }
+.lp-patch { background: var(--cream); color: var(--cobalt-ink); border-radius: 16px; padding: clamp(18px, 3vw, 32px); min-width: 0; }
+.lp-patch a { color: var(--cobalt-ink); }
+.lp-patch :focus-visible, .lp-patch:focus-visible { outline-color: var(--cobalt-ink); }
+.lp-ink-dim { color: rgba(14, 31, 94, 0.74); }
+
+/* ---------- dithered engraving (DitherImage) ----------
+   The wrapper is the fallback: cobalt gradient with a cream halftone that thickens towards the
+   bottom like ground. The canvas fades in over it once the image is ready. */
+.dither { position: relative; overflow: hidden; background: var(--dither-dark, var(--cobalt)); }
+.dither::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, rgba(243, 235, 214, 0.22) 0 1px, transparent 1.6px) 0 0 / 6px 6px;
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.5) 35%, transparent 75%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.5) 35%, transparent 75%);
+}
+.dither canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; image-rendering: crisp-edges; opacity: 0; transition: opacity 0.4s var(--ease); }
+.dither canvas.on { opacity: 1; }
+.dither img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.dither[data-state="ready"]::before, .dither[data-state="static"]::before { display: none; }
+
+/* ---------- nav: slim fixed glass bar, logo left, links centre, pill right ---------- */
+.lp-nav {
+  position: fixed; z-index: 40; top: 14px; left: 50%; transform: translateX(-50%);
+  width: min(1180px, calc(100% - 32px));
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px;
+  padding: 7px 7px 7px 20px; border-radius: var(--r-pill);
+  background: rgba(14, 31, 94, 0.72); border: 1px solid rgba(243, 235, 214, 0.18);
+  box-shadow: 0 10px 40px rgba(14, 31, 94, 0.3);
+  backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+.lp-logo { font-family: var(--f-head); font-weight: 500; font-size: 1.05rem; letter-spacing: -0.02em; text-decoration: none; color: var(--cream); justify-self: start; }
+.lp-logo span, .lp-logo .site-logo-mark { color: var(--yellow); font-size: 0.8em; margin-right: 2px; }
+.lp-nav nav { display: flex; align-items: center; gap: 28px; font-size: 0.9rem; }
+.lp-nav nav a { text-decoration: none; color: var(--cream); display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; }
+.lp-nav nav a:hover { text-decoration: underline; }
+.lp-nav-cta { justify-self: end; }
+
+/* ---------- hero: the lighthouse loop (media/hero-lighthouse.*) behind, copy in its sky ----------
+   The ground is the video's own sky #0F2554 (sampled from the poster), so its edges vanish into it; the bottom
+   of the hero turns to the page cobalt under the product window. The video is shown whole at 16:9 (never cropped)
+   and anchored to the bottom of the hero, which is at least as tall as the video, so the lighthouse on the left
+   and the Veo mark in the bottom-right corner always show. Its top and bottom edges fade into the ground;
+   the bottom-right corner is kept out of the fade so the Veo mark is never masked. */
+.lp-hero {
+  --hero-sky: #0f2554;
+  position: relative; min-height: max(100svh, 56.25vw); overflow: hidden;
+  background: linear-gradient(180deg, var(--hero-sky) 0%, var(--hero-sky) 78%, var(--cobalt) 100%);
+  display: flex; flex-direction: column; align-items: flex-start;
+  /* copy starts right of the lighthouse (which ends at ~21% of the width) */
+  padding: 120px max(16px, 4vw) clamp(220px, 32svh, 340px) 30vw;
+}
+.lp-hero-media {
+  position: absolute; left: 0; bottom: 0; z-index: 0; display: block;
+  width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 80%, transparent 100%), radial-gradient(9% 14% at 100% 100%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 80%, transparent 100%), radial-gradient(9% 14% at 100% 100%, #000 55%, transparent 100%);
+}
+.lp-hero > .lp-hero-copy { position: relative; z-index: 1; }
+/* soft scrim in the sky colour behind the copy: it quiets the stars and the beam behind the words. At least
+   75% strong anywhere under text; cream / yellow on it over a white star is a tested pair. */
+.lp-hero-copy::before {
+  content: ""; position: absolute; inset: -48px -64px; z-index: -1; pointer-events: none;
+  background: var(--hero-sky); opacity: 0.92; filter: blur(36px); border-radius: 48px;
+}
+
+.lp-hero-copy { position: relative; z-index: 1; }
+
+.lp-hero-copy {
+  text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 24px;
+  margin-top: clamp(32px, 9svh, 110px); max-width: 100%;
+}
+/* one short line: as large as fits in the right two thirds, never wrapping on desktop */
+.lp-hero-copy h1 { font-size: clamp(2.6rem, 5.4vw, 7rem); line-height: 0.98; letter-spacing: -0.035em; white-space: nowrap; }
+.lp-hero-copy p { font-size: clamp(1.06rem, 1.4vw, 1.25rem); color: var(--cream); text-align: left; max-width: 52ch; }
+.lp-chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px; border-radius: var(--r-pill);
+  font-family: var(--f-label); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream);
+  background: rgba(14, 31, 94, 0.6); border: 1px solid rgba(243, 235, 214, 0.2);
+}
+.lp-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 4px rgba(242, 227, 76, 0.18); }
+.lp-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start; margin-top: 4px; }
+
+/* entrance: CSS only, so the copy is there even without JS */
+@keyframes lp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+.lp-hero-copy > * { animation: lp-rise 0.9s var(--ease) both; }
+.lp-hero-copy > :nth-child(2) { animation-delay: 0.08s; }
+.lp-hero-copy > :nth-child(3) { animation-delay: 0.2s; }
+.lp-hero-copy > :nth-child(4) { animation-delay: 0.3s; }
+
+/* ---------- product window: overlaps the bottom of the hero. Chrome in cobalt-deep; the screen is a
+   cream patch in cobalt ink with a cobalt side panel (the /logos patchwork) ---------- */
+.lp-window-wrap { position: relative; z-index: 2; padding: 0 max(16px, 4vw); margin-top: calc(-1 * clamp(170px, 26svh, 300px)); }
+.lp-window-shell { max-width: 1120px; margin: 0 auto; animation: lp-rise 1s var(--ease) 0.35s both; }
+.lp-window {
+  display: block; text-decoration: none; color: var(--cream);
+  border-radius: var(--r-card); overflow: hidden; background: var(--cobalt-deep); padding: 0 10px 10px;
+  box-shadow: inset 0 0 0 1px rgba(243, 235, 214, 0.12), 0 40px 120px rgba(14, 31, 94, 0.6);
+  transition: transform 0.35s var(--ease);
+}
+.lp-window:hover { transform: translateY(-3px); }
+.lp-window:focus-visible { outline-offset: 6px; border-radius: var(--r-card); }
+.lp-window-bar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 12px 8px; }
+.lp-dots { display: inline-flex; gap: 7px; }
+.lp-dots i { width: 10px; height: 10px; border-radius: 50%; background: var(--cream); opacity: 0.4; }
+.lp-dots i:first-child { background: var(--yellow); opacity: 1; }
+.lp-window-title { font-family: var(--f-label); font-size: 0.74rem; letter-spacing: 0.06em; color: var(--cobalt-ink); background: var(--yellow); padding: 2px 12px; border-radius: var(--r-pill); }
+.lp-window-open { justify-self: end; font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream-dim); }
+.lp-window:hover .lp-window-open { color: var(--yellow); }
+.lp-window-body { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 16px; overflow: hidden; background: var(--cobalt); }
+.lp-window-body img, .lp-window-body video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.lp-window-body.mock { aspect-ratio: auto; min-height: 0; background: transparent; }
+.lp-mock { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 10px; }
+.lp-mock > span { border-radius: 16px; padding: clamp(18px, 2.6vw, 32px); display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.lp-mock-main { background: var(--cream); color: var(--cobalt-ink); }
+.lp-mock-side { background: var(--cobalt); color: var(--cream); }
+.lp-mock-state { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cobalt-ink); background: var(--yellow); padding: 3px 11px; border-radius: var(--r-pill); }
+.lp-mock-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--cobalt-ink); }
+.lp-mock-big { display: flex; flex-direction: column; gap: 4px; }
+.lp-mock-big b { font-family: var(--f-head); font-weight: 500; font-size: clamp(2.6rem, 6vw, 5rem); line-height: 0.95; letter-spacing: -0.04em; color: var(--cobalt-ink); }
+.lp-mock-big small { font-family: var(--f-label); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(14, 31, 94, 0.74); }
+.lp-mock-pipe { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; font-size: 0.72rem; color: var(--cobalt-ink); }
+.lp-mock-pipe span { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 2px solid rgba(14, 31, 94, 0.35); min-width: 0; }
+.lp-mock-pipe i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--cobalt-ink); flex: none; }
+.lp-mock-pipe span:last-child { border-top-color: var(--cobalt-ink); }
+.lp-mock-pipe span:last-child i { background: var(--cobalt-ink); }
+.lp-mock-chart { display: flex; flex-direction: column; gap: 8px; }
+.lp-mock-label { font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(14, 31, 94, 0.74); }
+.lp-mock-chart svg { display: block; width: 100%; height: clamp(70px, 9vw, 120px); }
+.lp-mock-chart .grid { stroke: rgba(14, 31, 94, 0.14); stroke-width: 1; }
+.lp-mock-chart .line { fill: none; stroke: var(--cobalt-ink); stroke-width: 2.5; }
+.lp-mock-chart .mark { stroke: rgba(14, 31, 94, 0.5); stroke-width: 1; stroke-dasharray: 3 4; }
+.lp-mock-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lp-mock-kpis span { display: flex; flex-direction: column; gap: 2px; font-family: var(--f-label); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream-dim); padding: 10px 12px; border-radius: 12px; background: var(--cobalt-deep); }
+.lp-mock-kpis b { font-weight: 500; font-size: clamp(1.05rem, 1.6vw, 1.4rem); letter-spacing: 0; text-transform: none; color: var(--cream); }
+.lp-mock-kpis span:nth-child(3) b { color: var(--yellow); }
+.lp-mock-log { display: flex; flex-direction: column; gap: 10px; font-size: 0.74rem; color: var(--cream-dim); }
+.lp-mock-log span { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 10px; }
+.lp-mock-log b { font-weight: 500; color: var(--cream); }
+.lp-mock-log span:last-child b { color: var(--yellow); }
+.lp-window-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 16px; }
+.lp-window-empty b { font-family: var(--f-label); font-weight: 500; font-size: clamp(1rem, 2.4vw, 1.6rem); color: var(--cream); }
+.lp-window-empty span { color: var(--cream-dim); font-size: 0.875rem; }
+
+/* ---------- Built on Hedera: a cobalt-deep card, pill label, each service a small cream patch ---------- */
+.lp-strip { max-width: 1120px; margin: 0 auto; padding: clamp(44px, 6vw, 72px) max(16px, 4vw) 0; box-sizing: content-box; }
+.lp-strip-card { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
+.lp-strip-card .lp-pill { align-self: center; }
+.lp-strip ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.lp-strip li { font-family: var(--f-head); font-weight: 500; font-size: 0.92rem; letter-spacing: -0.01em; color: var(--cobalt-ink); background: var(--cream); padding: 6px 12px; border-radius: 10px; white-space: nowrap; }
+
+/* ---------- sections ---------- */
+.lp-section { position: relative; padding: clamp(80px, 10vw, 136px) max(16px, 4vw) 0; }
+.lp-inner { position: relative; max-width: 1120px; margin: 0 auto; display: flex; flex-direction: column; gap: clamp(24px, 3vw, 36px); }
+.lp-head { display: flex; flex-direction: column; gap: 20px; max-width: 800px; }
+.lp-head h2 { font-size: clamp(2.3rem, 4.8vw, 4.25rem); line-height: 1.02; margin: 0; }
+.lp-sec-head .lp-card-head h2 { font-size: clamp(2rem, 4vw, 3.5rem); }
+.lp-lede { color: var(--cream-dim); font-size: 1.125rem; max-width: 56ch; margin: 0; }
+.lp-lede.serif { color: var(--cream); font-size: clamp(1.2rem, 1.6vw, 1.4rem); line-height: 1.45; }
+.lp h3 { font-size: 1.375rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0; }
+
+/* reveal (shared .js-motion hook): visible at rest, hidden only once JS is running */
+.lp-steps > [data-rise]:nth-child(2), .lp-plans > [data-rise]:nth-child(2), .lp-fit > [data-rise]:nth-child(2) { transition-delay: 90ms; }
+.lp-steps > [data-rise]:nth-child(3), .lp-plans > [data-rise]:nth-child(3) { transition-delay: 180ms; }
+
+/* 1. problem: bars on a cream patch in cobalt ink; Levee's row is a cobalt-ink band with a yellow bar */
+.lp-chart { margin: 0; display: flex; flex-direction: column; gap: 18px; }
+.lp-chart figcaption { display: flex; flex-direction: column; gap: 4px; }
+.lp-chart-title { font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cobalt-ink); }
+.lp-bars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.lp-bars li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: baseline; min-width: 0; }
+.lp-bar-name { color: var(--cobalt-ink); font-size: 0.98rem; }
+.lp-bar-name b { font-weight: 600; }
+.lp-bar-val { font-family: var(--f-label); color: var(--cobalt-ink); font-size: 0.9rem; white-space: nowrap; }
+.lp-track { grid-column: 1 / -1; display: block; width: 100%; height: 14px; }
+.lp-grid { stroke: rgba(14, 31, 94, 0.16); stroke-width: 1; }
+.lp-bar { fill: rgba(14, 31, 94, 0.6); }
+.lp-bar-what { grid-column: 1 / -1; color: rgba(14, 31, 94, 0.74); font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.04em; }
+.lp-bars li.levee { background: var(--cobalt-ink); border-radius: 12px; padding: 12px 14px; margin: 4px -14px 0; }
+.lp-bars li.levee .lp-bar-name, .lp-bars li.levee .lp-bar-val { color: var(--yellow); }
+.lp-bars li.levee .lp-bar-what, .lp-bars li.levee .lp-src { color: var(--cream-dim); }
+.lp-bars li.levee .lp-grid { stroke: rgba(243, 235, 214, 0.16); }
+.lp-bars li.levee .lp-bar { fill: var(--yellow); }
+.lp-bars li.levee :focus-visible { outline-color: var(--yellow); }
+.lp-axis { position: relative; height: 1.2em; font-family: var(--f-label); font-size: 0.7rem; color: rgba(14, 31, 94, 0.74); }
+.lp-axis span { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.lp-axis span:first-child { transform: none; }
+.lp-src { color: inherit; overflow-wrap: anywhere; }
+
+/* 2. how it works: three cobalt-deep cards, each with a cream patch holding a cobalt glyph and figure */
+.lp-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.lp-step { gap: 16px; }
+.lp-step-panel { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.lp-glyph { width: 64px; height: 64px; color: var(--cobalt-ink); display: block; }
+.lp-glyph-cut { fill: var(--cream); }
+.lp-step-fig { font-weight: 500; font-size: clamp(2rem, 3.4vw, 2.75rem); line-height: 1; letter-spacing: -0.02em; color: var(--cobalt-ink); }
+.lp-step-panel figcaption, .lp-stats span { font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(14, 31, 94, 0.74); }
+.lp-step h3 { font-size: 1.2rem; }
+.lp-step p { margin: 0; }
+
+/* 3. proof: a row of cream patch tiles, big cobalt-ink figures, mono captions */
+.lp-stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.lp-stats li { display: flex; flex-direction: column; gap: 8px; padding: 20px 18px; }
+.lp-stats b { font-family: var(--f-head); font-weight: 500; font-size: clamp(2rem, 3.4vw, 3rem); line-height: 1; letter-spacing: -0.04em; color: var(--cobalt-ink); white-space: nowrap; font-variant-numeric: tabular-nums; margin-bottom: auto; padding-bottom: 14px; }
+.lp-stats .lp-src { font-family: var(--f-label); font-size: 0.72rem; display: inline-flex; align-items: flex-end; min-height: 44px; }
+
+/* 4. fit: two cobalt-deep cards with cream ✓ / ✕ lists */
+.lp-fit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.lp-checks { list-style: none; margin: 0; display: flex; flex-direction: column; gap: 0; padding: 6px clamp(16px, 2.4vw, 24px); }
+.lp-checks li { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); gap: 8px; padding: 12px 0; border-top: 1px solid rgba(14, 31, 94, 0.14); }
+.lp-checks li:first-child { border-top: 0; }
+.lp-checks li::before { font-family: var(--f-label); font-weight: 600; color: var(--cobalt-ink); }
+.lp-checks.yes li::before { content: "✓"; }
+.lp-checks.no li::before { content: "✕"; }
+.lp-checks li.link::before { content: "→"; }
+.lp-checks a { text-decoration: underline; }
+
+/* 5. pricing: huge blurred word behind the cards; side plans cobalt-deep, the middle a cream card */
+.lp-pricing { overflow: hidden; padding-bottom: 24px; }
+.lp-pricing-word {
+  position: absolute; left: 50%; top: clamp(120px, 16vw, 210px); transform: translateX(-50%);
+  font-family: var(--f-head); font-weight: 500; font-size: clamp(5rem, 24vw, 22rem); line-height: 1; letter-spacing: -0.06em;
+  color: rgba(243, 235, 214, 0.09); filter: blur(8px); white-space: nowrap; pointer-events: none; user-select: none;
+}
+.lp-pricing .lp-head { align-items: center; text-align: center; margin: 0 auto; }
+.lp-pricing .lp-pill { align-self: center; }
+.lp-plans { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.lp-plan { padding: 28px 26px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lp-price { display: flex; align-items: baseline; gap: 6px; margin: 4px 0 0; }
+.lp-price b { font-family: var(--f-head); font-weight: 500; font-size: clamp(2.5rem, 4vw, 3.25rem); letter-spacing: -0.04em; line-height: 1; color: var(--cream); font-variant-numeric: tabular-nums; }
+.lp-price span { color: var(--cream-dim); }
+.lp-plan-note { margin: 0; font-family: var(--f-label); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream-faint); }
+.lp-plan ul { list-style: none; margin: 8px 0 12px; padding: 16px 0 0; border-top: 1px solid rgba(243, 235, 214, 0.16); display: flex; flex-direction: column; gap: 10px; color: var(--cream); font-size: 0.95rem; flex: 1; }
+.lp-plan ul li::before { content: "✓"; color: var(--yellow); margin-right: 10px; }
+.lp-plan .lp-btn { width: 100%; }
+.lp-plan.featured { box-shadow: 0 30px 80px rgba(14, 31, 94, 0.45); }
+.lp-plan.featured h3, .lp-plan.featured .lp-price b { color: var(--cobalt-ink); }
+.lp-plan.featured .lp-price span, .lp-plan.featured .lp-plan-note { color: rgba(14, 31, 94, 0.74); }
+.lp-plan.featured ul { color: var(--cobalt-ink); border-top-color: rgba(14, 31, 94, 0.16); }
+.lp-plan.featured ul li::before { color: var(--cobalt-ink); }
+.lp-plan.featured .lp-btn.primary { box-shadow: inset 0 0 0 1.5px var(--cobalt-ink); }
+
+/* 6. FAQ: one card, each question a row, the answer in a cream patch */
+.lp-faq-inner { max-width: 920px; }
+.lp-faq { display: flex; flex-direction: column; }
+.lp-faq details { border-top: 1px solid rgba(243, 235, 214, 0.12); }
+.lp-faq summary { list-style: none; cursor: pointer; padding: 18px 40px 18px 0; position: relative; display: flex; align-items: baseline; gap: 14px; font-family: var(--f-head); font-weight: 500; font-size: 1.15rem; letter-spacing: -0.02em; color: var(--cream); }
+.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-faq summary::after { content: "+"; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-family: var(--f-label); font-size: 1.3rem; color: var(--yellow); transition: transform 0.25s var(--ease); }
+.lp-faq details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
+.lp-faq-n { font-size: 0.7rem; letter-spacing: 0.06em; color: var(--cream-faint); flex: none; }
+.lp-faq details p { margin: 0 0 18px; padding: 18px 22px; line-height: 1.6; }
+
+/* 7. footer (Parley): links over the engraving's empty sky, the coastline along the bottom */
+.lp-footer { position: relative; overflow: hidden; margin-top: clamp(104px, 14vw, 190px); background: linear-gradient(180deg, var(--cobalt) 0, var(--cobalt-sky) 240px); }
+.lp-footer-inner { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: clamp(72px, 9vw, 120px) max(16px, 4vw) 24px; display: flex; flex-direction: column; gap: 44px; }
+.lp-footer-top { display: flex; }
+.lp-footer-word { display: block; font-family: var(--f-head); font-weight: 500; font-size: clamp(4rem, 13vw, 10.5rem); line-height: 0.9; letter-spacing: -0.055em; color: var(--cream); }
+.lp-footer-brand p { font-size: clamp(1.25rem, 1.7vw, 1.5rem); margin-top: 14px; color: var(--cream); }
+.lp-footer-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.lp-footer-cols div { display: flex; flex-direction: column; gap: 0; font-size: 0.9rem; min-width: 0; }
+.lp-footer-cols a { text-decoration: none; color: var(--cream); overflow-wrap: anywhere; display: flex; align-items: center; min-height: 44px; line-height: 1.3; }
+.lp-footer-cols a:hover { text-decoration: underline; }
+.lp-footer-h { font-family: var(--f-label); font-weight: 500; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cream-dim); margin: 0 0 4px; }
+.lp-footer-base { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid rgba(243, 235, 214, 0.2); padding-top: 18px; font-size: 0.8rem; color: var(--cream-dim); }
+/* the art: its top ~53% (about 29.6vw) is empty sky the same colour as the footer, so it tucks up under the base row */
+.lp-footer-art { position: relative; z-index: 0; margin-top: calc(-1 * min(26vw, 520px)); aspect-ratio: 2000 / 1116; }
+.lp-footer-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* dithered fade at the top edge: a sky-coloured halftone that thins out downwards */
+.lp-footer-art::before { /* top edge only: the bottom stays flush (and the sparkle mark stays visible) */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30%; z-index: 1; pointer-events: none;
+  background: radial-gradient(circle, var(--cobalt-sky) 0 1.5px, transparent 2px) 0 0 / 4px 4px, linear-gradient(180deg, var(--cobalt-sky) 0%, rgba(31, 63, 136, 0) 60%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+}
+.lp-footer-art.missing { aspect-ratio: auto; height: clamp(120px, 18vw, 240px); margin-top: 0; background: radial-gradient(circle, rgba(243, 235, 214, 0.22) 0 1px, transparent 1.6px) 0 0 / 6px 6px; -webkit-mask-image: linear-gradient(0deg, #000, transparent); mask-image: linear-gradient(0deg, #000, transparent); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 1000px) {
+  /* tablets: a shorter hero so the window sits close under the CTAs, not a screen lower */
+  .lp-hero { min-height: 56.25vw; padding-bottom: clamp(200px, 30vw, 300px); }
+  .lp-window-wrap { margin-top: calc(-1 * clamp(110px, 17vw, 190px)); }
+  .lp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lp-plans { grid-template-columns: 1fr; max-width: 560px; margin: 0 auto; width: 100%; }
+  /* how it works: 3 -> 2 (the third card full width) -> 1 */
+  .lp-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp-steps > li:nth-child(3) { grid-column: 1 / -1; }
+  .lp-mock { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .lp-steps { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .lp-nav { grid-template-columns: auto 1fr auto; padding-left: 16px; top: 10px; width: calc(100% - 20px); gap: 12px; }
+  .lp-nav nav { justify-content: flex-end; gap: 14px; }
+  .lp-nav nav a[href="#faq"], .lp-nav nav a[href="#pricing"], .lp-nav nav a[href="#how"] { display: none; }
+  /* phones: copy on the plain sky, the whole video below it (full bleed, uncropped), then the cobalt turn
+     under the product window, which overlaps the padding only */
+  .lp-hero {
+    min-height: 0; padding: 96px 16px 190px; align-items: center;
+    background: linear-gradient(180deg, var(--hero-sky) 0%, var(--hero-sky) calc(100% - 190px), var(--cobalt) 100%);
+  }
+  .lp-hero-copy { order: 1; margin-top: 28px; gap: 18px; text-align: center; align-items: center; }
+  .lp-hero-copy p { text-align: center; }
+  .lp-ctas { justify-content: center; }
+  .lp-hero-media {
+    order: 2; position: relative; flex: none; width: 100vw; max-width: none; margin: 28px calc(50% - 50vw) 0;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%), radial-gradient(14% 22% at 100% 100%, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%), radial-gradient(14% 22% at 100% 100%, #000 55%, transparent 100%);
+  }
+  .lp-hero-copy h1 { white-space: normal; text-wrap: balance; font-size: clamp(2.9rem, 13vw, 4rem); }
+  .lp-mock-side .lp-mock-log { display: none; }
+  .lp-mock-pipe { font-size: 0.64rem; }
+  .lp-window-wrap { margin-top: -72px; }
+  .lp-window { padding: 0 6px 6px; }
+  .lp-window-bar { padding: 8px 6px; grid-template-columns: auto 1fr; }
+  .lp-dots i { width: 8px; height: 8px; }
+  .lp-window-open { display: none; }
+  .lp-window-title { justify-self: center; margin-right: 30px; }
+  .lp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp-stats li { padding: 16px 14px; }
+  .lp-stats li:last-child { grid-column: 1 / -1; }
+  .lp-patch { padding: 18px 16px; }
+  .lp-card { padding: 18px 16px; }
+  .lp-fit { grid-template-columns: 1fr; }
+  .lp-cap { margin-left: 0; flex-basis: 100%; }
+  .lp-bars li.levee { margin-left: -10px; margin-right: -10px; padding: 10px; }
+  .lp-faq summary { font-size: 1.05rem; }
+  .lp-faq details p { padding: 16px; }
+  .lp-footer-cols { grid-template-columns: 1fr 1fr; }
+  .lp-ctas { width: 100%; }
+  .lp-ctas .lp-btn { flex: 1 1 160px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero-copy > *, .lp-window-shell { animation: none; }
+  .lp-window:hover, .lp-btn:hover { transform: none; }
+  .dither canvas { transition: none; }
+}

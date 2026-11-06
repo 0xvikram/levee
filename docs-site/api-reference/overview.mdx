@@ -1,0 +1,31 @@
+---
+title: "API overview"
+description: "Levee runs as a few small HTTP services. All JSON, with Server-Sent Events for live feeds."
+---
+
+| Service | Default port | Env | Binds to |
+|---|---|---|---|
+| [Gate](/api-reference/gate) | 8710 | `GATE_PORT` | all interfaces |
+| [Watcher](/api-reference/watcher) | 8711 | `WATCHER_PORT` | all interfaces |
+| [Checker](/api-reference/checker) | 8712 | `CHECKER_PORT` | all interfaces |
+| [Demo runner](/api-reference/demo-runner) | 8713 | `DEMO_RUNNER_PORT` | 127.0.0.1 only, demo only |
+| [Issuer signer](/api-reference/issuer-signer) | 8715 | `SIGNER_PORT` | 127.0.0.1 only |
+
+## Conventions
+
+- **Amounts** are strings in the token's smallest unit. RUPC has 6 decimals: `"500000000"` is 500 RUPC.
+- **Account ids** are `0.0.x`.
+- **Transaction ids** use the Mirror Node spelling `0.0.x-<sec>-<nanos9>`.
+- **Consensus times** are `"<sec>.<nanos9>"`.
+- **Event streams.** Every `/events` endpoint is Server-Sent Events with `Access-Control-Allow-Origin: *`. Comment lines (`: connected`, `: ping`, `: ka`) are keep-alives.
+- **CORS.** The watcher's `/state` also sends CORS `*`. The other JSON endpoints do not. Proxy them or read them server side.
+
+## Authentication
+
+There are no API keys. Trust comes from signatures and network placement:
+
+- Gate payment requests must be signed by an enrolled machine key. See [Gate](/api-reference/gate).
+- Checker enrolment is locked by `ENROL_TOKEN` when it is set.
+- The issuer signer and the demo runner listen on 127.0.0.1 only.
+
+Put the gate, watcher and checker behind your own network controls. They are not meant to face the public internet.

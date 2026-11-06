@@ -1,0 +1,42 @@
+{
+  "_note": "Hand-written from Mirror Node REST docs: CRYPTOAPPROVEALLOWANCE paid by the treasury (list endpoint does not show token/spender).",
+  "transactions": [
+    {
+      "consensus_timestamp": "1762400200.000000001",
+      "entity_id": null,
+      "name": "CRYPTOAPPROVEALLOWANCE",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [],
+      "transaction_id": "0.0.6000-1762400195-000000001",
+      "transfers": [{ "account": "0.0.6000", "amount": -500000, "is_approval": false }]
+    },
+    {
+      "consensus_timestamp": "1762400210.000000001",
+      "entity_id": null,
+      "name": "CRYPTOAPPROVEALLOWANCE",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "INVALID_SIGNATURE",
+      "scheduled": false,
+      "token_transfers": [],
+      "transaction_id": "0.0.6000-1762400205-000000001",
+      "transfers": []
+    },
+    {
+      "consensus_timestamp": "1762400220.000000001",
+      "entity_id": null,
+      "name": "CRYPTOAPPROVEALLOWANCE",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [],
+      "transaction_id": "0.0.6001-1762400215-000000001",
+      "transfers": []
+    }
+  ],
+  "links": { "next": null }
+}

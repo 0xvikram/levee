@@ -1,0 +1,43 @@
+---
+title: "Reopen (2 of 3)"
+description: "The watcher can only close things. Opening anything again needs two of the three admins."
+---
+
+The ContainmentController splits actions into two kinds.
+
+| Close actions | Open actions |
+|---|---|
+| Freeze, wipe and freeze, burn, pause | Unfreeze, unpause, change the watcher |
+| The watcher or any admin can call them | Need 2 of 3 admins to approve the same proposal |
+
+## How a reopen works
+
+1. One admin calls `propose(action, target)`. This counts as their approval.
+2. A second, different admin calls `approve(id)`.
+3. At two approvals the proposal executes in the same transaction. For `Unfreeze`, the contract calls the Studio token's `unfreeze(target)`.
+
+A repeat approval by the same admin reverts with `AlreadyApproved`. Approving an executed proposal reverts with `AlreadyExecuted`.
+
+The three actions are `Unfreeze` (0), `Unpause` (1) and `SetWatcher` (2).
+
+## In the demo
+
+```bash
+npx tsx scripts/reopen.ts treasury attacker
+```
+
+Admin 1 proposes, admin 2 approves and the approval executes the unfreeze. Accounts that are not frozen are skipped. `scripts/demo/reset.ts` also unpauses the token first, if it is paused.
+
+## Live reopens
+
+Latest stolen-key run, 6 Nov 2026:
+
+| Account | Propose | Approve |
+|---|---|---|
+| Treasury `0.0.11333495` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793942707-749023249) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793942710-022256943) |
+| Attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793942713-763876883) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793942712-224380819) |
+
+## Limits
+
+- Admins are set when the contract is deployed. They cannot be changed afterwards.
+- Two admins acting together can reopen anything and replace the watcher. Levee does not protect against 2 of 3 admins colluding.

@@ -1,0 +1,39 @@
+---
+title: "Threat model"
+description: "What Levee protects against, what it only partly covers, and what it does not do."
+---
+
+One user: the issuer's treasury and ops team. One threat: someone signs with the treasury's keys outside the normal process. One rule: no receipt, no movement. One response: freeze and claw back.
+
+## Protects against / does not
+
+| Protects against | Does not |
+|---|---|
+| Stolen treasury keys used outside the process | USDC or any token you did not issue |
+| An insider moving tokens outside the process | A theft while the watcher is down (reported after restart, not undone) |
+| A stolen minting (cash-in) key minting without a receipt: wiped and receiver frozen, live | A second mint with the same stolen key (the key keeps its role) |
+| Receipts that do not match the movement: amount, recipient, reused, written after | An approved payment to the wrong recipient |
+| Payments while the watcher is down: the gate refuses them all | 2 of 3 admins colluding |
+| Payment requests not signed by an enrolled machine with an allowed role | A root-level attacker on the requesting machine (it holds that machine's key) |
+
+## Every threat, with evidence
+
+| Threat | Levee | How | Evidence |
+|---|---|---|---|
+| Stolen treasury keys | Reverses it | Outflow with no receipt: freeze treasury, wipe and freeze receiver | Live: detected 2.87 s, contained 6.86 s |
+| Insider moving tokens outside the process | Reverses it | Same rule. No receipt is a breach, whoever signed | Same code path (`src/watcher/match.ts`) |
+| Compromised payout service asking for odd payments | Partly: gate rules | Caps and the recipient list refuse them at the gate and flag them at the watcher | Live refusals `over-transfer-cap`, `unknown-destination` |
+| Unauthorised mint with a stolen minting key | Reverses the mint, not a repeat | Mint without receipt: wipe and freeze receiver. The key keeps its cash-in role | Live: detected 4.65 s, wiped and frozen 7.53 s |
+| Forged or replayed payment requests | Refused | Signed by the enrolled machine key, fresh, unreplayed, allowed role | Live: `bad-signature`, `wrong-role`, `replayed-request`, `stale-request` |
+| A schedule made with a stolen gate key and no receipt | Refused | The issuer signer will not sign without a matching receipt, and the schedule expires | Live: schedule 0.0.11340812 expired unexecuted |
+| Stolen gate key writing receipts | Limited | It can get payments signed, but only to known recipients within the caps | By design |
+| Stolen watcher key | Outage and loss, no gain | Can freeze accounts and wipe receivers, partners too (the guard is off chain). Cannot unfreeze, pay or mint | `contracts/ContainmentController.sol` |
+| Watcher down during a theft | Not covered | Gate refuses payments, but the theft is only reported after restart | `src/watcher/index.ts`, priming |
+| Thief moves funds onward | Partly | Treasury frozen first. Wipe takes what is left. Receiver frozen. Next hop not followed | `src/watcher/contain.ts` |
+| Tokens you did not issue (USDC) | Not covered | No freeze or wipe key | By design |
+| Approved payment to the wrong recipient | Not covered | A valid receipt is trusted | By design |
+| 2 of 3 admins colluding | Not covered | They can reopen and replace the watcher | `contracts/ContainmentController.sol` |
+
+## Levee and a pre-signing policy engine
+
+Levee is not a replacement for a pre-signing policy engine such as the Fireblocks policy engine and API co-signer. That kind of tool stops bad requests that pass through it, before signing. Levee catches what was signed outside it, such as a stolen quorum or an insider, and undoes it. Use both: the policy engine as the first line, Levee as the second.

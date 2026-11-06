@@ -20,6 +20,7 @@ export const env = {
   gatePort: Number(process.env.GATE_PORT ?? "8710"),
   watcherPort: Number(process.env.WATCHER_PORT ?? "8711"),
   checkerPort: Number(process.env.CHECKER_PORT ?? "8712"),
+  signerPort: Number(process.env.SIGNER_PORT ?? "8715"),
 };
 
 /** One Hedera account created by setup. Private keys live ONLY in state/keys.json (gitignored). */
@@ -45,6 +46,8 @@ export interface DeployState {
   gate: AccountRef; // gate account (submit key holder for receipts)
   payees: AccountRef[]; // known destinations
   attacker: AccountRef; // demo attacker account (receives the stolen tokens)
+  /** issuer-signer account: key = the treasurySigner key, pays for its ScheduleSign (src/signer/account.ts) */
+  issuerSigner?: AccountRef;
   controller: { contractId: string; evm: string }; // ContainmentController
   topics: {
     receipts: string; // HCS topic id, submit key = gate

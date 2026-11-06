@@ -1,0 +1,62 @@
+---
+title: "Introduction"
+description: "Levee is a circuit breaker for stablecoin issuers on Hedera. No receipt, no movement."
+---
+
+**No receipt, no movement.**
+
+Levee is a circuit breaker for stablecoin issuers on Hedera. Every token that leaves the issuer's treasury must have a receipt on Hedera first. If tokens move without one, because of stolen keys or a rogue insider, Levee freezes the treasury and takes the tokens back in about seven seconds. Only 2 of 3 admins can reopen.
+
+The same rule covers mints. Tokens minted with a stolen minting key and no receipt are wiped from the receiver.
+
+<Note>
+Levee is a prototype built for ETHGlobal Mumbai 2026. It runs on Hedera testnet. It is not on mainnet and the contract is not audited. See [Audit status](/security/audit-status) and [Known limits](/security/known-limits).
+</Note>
+
+## Who it is for
+
+Levee is for **stablecoin issuers on Hedera**, specifically the issuer's treasury and ops team.
+
+Taking tokens back needs the token's own freeze and wipe keys. Only the issuer holds those. Hedera Stablecoin Studio gives them to the issuer as roles, and the issuer can hand those roles to Levee's contract. That is why Levee cannot protect USDC or any token you did not issue.
+
+## The story in three steps
+
+The examples on this site use a rupee stablecoin issuer with token RUPC ([0.0.11333594](https://hashscan.io/testnet/token/0.0.11333594), live on testnet). Its treasury pays two partners: Asha Pay (distributor, [0.0.11333490](https://hashscan.io/testnet/account/0.0.11333490)) and Ravi Exchange (partner, [0.0.11333492](https://hashscan.io/testnet/account/0.0.11333492)).
+
+<Steps>
+  <Step title="Send 500 RUPC to Asha Pay">
+    The issuer's payout service signs a request with its own enrolled machine key and asks Levee. Levee checks the request, writes a receipt on Hedera and waits for consensus. Then the transfer gets its two treasury signatures and executes. The watcher sees the transfer, finds its receipt and marks it matched.
+  </Step>
+  <Step title="A theft is frozen and clawed back">
+    Someone with the treasury's keys sends RUPC straight out, skipping Levee. There is no receipt. The watcher sees it. A close-only contract freezes the treasury, wipes the tokens from the receiving account and freezes that account. The incident is logged on Hedera.
+  </Step>
+  <Step title="Reopen with 2 of 3 admins">
+    The contract and the watcher can close things but never reopen them. Unfreezing needs two of the three admins to sign.
+  </Step>
+</Steps>
+
+## Latest live numbers
+
+All runs on Hedera testnet, 6 Nov 2026. Times are measured from the theft's consensus timestamp, on the watcher's clock. Every number links to a transaction on [Live proof](/product/live-proof).
+
+| What | Result |
+|---|---|
+| Stolen treasury keys, 1,000 RUPC | Detected 2.87 s, treasury frozen 4.85 s, tokens wiped and receiver frozen 6.86 s |
+| Stolen minting key, 5,000 RUPC minted | Detected 4.65 s, wiped and receiver frozen 7.53 s, total supply back to its pre-mint value |
+| Normal payments | 393 of 393 matched, 0 false alarms (runs B, C and D) |
+| Reopen | Both incidents reopened live with 2 of 3 admins |
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run the testnet demo on your own machine.
+  </Card>
+  <Card title="How it works" icon="diagram-project" href="/how-it-works">
+    The gate, the receipt, the watcher and the contract in one diagram.
+  </Card>
+  <Card title="Protect your token" icon="shield" href="/integrate/protect-existing-token">
+    Attach Levee to an existing Stablecoin Studio token.
+  </Card>
+  <Card title="Live dashboard" icon="activity" href="https://levee-theta.vercel.app/live">
+    The hosted view reads the chain directly.
+  </Card>
+</CardGroup>

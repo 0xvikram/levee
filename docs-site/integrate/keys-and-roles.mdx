@@ -1,0 +1,49 @@
+---
+title: "Keys and roles"
+description: "Who holds which key, and what each key can and cannot do."
+---
+
+Each key in Levee does one job. No single online key can move tokens out of the treasury on its own.
+
+One honest caveat: someone holding the gate key can write a receipt and get a payment signed by the issuer signer, but only to a known recipient and within the caps, the same as the gate itself.
+
+## Keys
+
+| Key | Held by | Can | Cannot |
+|---|---|---|---|
+| Treasury signer (key 1 of the treasury) | Issuer signer process only | Add the second signature to a scheduled transfer that has a matching receipt | Write receipts |
+| Gate (key 2 of the treasury) | Gate process | Create schedules, write receipts, cash-in when it holds the supplier role | Complete a transfer alone |
+| Cold (key 3 of the treasury) | Offline | Count as one of the treasury's 2 of 3 signatures | Be used by any Levee service |
+| Watcher | Watcher process | Freeze, wipe, burn and pause through the controller. Submit to the incidents and heartbeats topics | Unfreeze, unpause, pay, mint, or replace itself |
+| Admins (3) | Three people | Close actions, and any two together can reopen or change the watcher | Act alone on an open action |
+| Machine keys | Each enrolled machine | Sign heartbeats and payment requests | Anything on chain |
+| Checker wallet | Checker | Create, extend and delete passes on Arkiv | Anything on Hedera |
+| Operator | Issuer | Keeps `DEFAULT_ADMIN` on the Studio token and runs the setup scripts | n/a |
+
+## Studio roles
+
+| Role | Granted to |
+|---|---|
+| `FREEZE_ROLE`, `WIPE_ROLE`, `BURN_ROLE`, `PAUSE_ROLE` | The ContainmentController |
+| Cash-in (unlimited supplier) | The gate, optional, so legitimate mints are gated |
+| `DEFAULT_ADMIN` | Stays with the issuer. Never the controller |
+
+## Topic submit keys
+
+| Topic | Submit key |
+|---|---|
+| Receipts | Gate |
+| Incidents | Watcher |
+| Heartbeats | Watcher |
+
+The topics have no admin key, so nobody can change the submit key or delete a topic.
+
+## The watcher key matters most
+
+Through the controller, the watcher key can freeze any account and wipe receivers' balances. The "never wipe a partner" rule lives in the watcher's code, not on chain yet. A stolen watcher key calling the controller directly could also wipe a partner. Wiped tokens are burned, not sent anywhere, so a thief gains nothing, but holders lose them.
+
+Keep the watcher key in a KMS or HSM. An on-chain partner guard is on the roadmap.
+
+## In the demo
+
+All keys are files in `state/` (gitignored), and every service runs on one Mac. The gate and the issuer signer are separate processes with separate keys, but their keys sit in the same file. In a real setup the issuer runs the signer on its own infrastructure.

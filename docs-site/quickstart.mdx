@@ -1,0 +1,130 @@
+---
+title: "Quickstart"
+description: "Run the Levee testnet demo locally: send, hack, unlock, fake mint, reset."
+---
+
+This runs the full demo on one machine against Hedera testnet and the Arkiv Rabdi testnet. It creates real testnet accounts, topics, a Stablecoin Studio token and the containment contract.
+
+<Warning>
+The demo moves testnet funds. Never use mainnet keys. The health checks of the machine agent run on macOS only.
+</Warning>
+
+## Before you start
+
+- Node 20 or newer (CI uses Node 24).
+- A Hedera testnet account from [portal.hedera.com](https://portal.hedera.com).
+- A funded Arkiv Rabdi wallet and an access key from [hub.arkiv.network](https://hub.arkiv.network).
+
+## 1. Install and configure
+
+```bash
+git clone https://github.com/0xvikram/levee.git
+cd levee
+npm ci
+cp .env.example .env
+```
+
+Fill in `.env`:
+
+| Variable | What |
+|---|---|
+| `OPERATOR_ID`, `OPERATOR_KEY` | Your Hedera testnet operator account and its private key |
+| `ARKIV_PRIVATE_KEY` | The Arkiv wallet that owns the machine passes (needs test GLM) |
+| `ARKIV_ACCESS_KEY` | Free at hub.arkiv.network. Without it, Arkiv queries are rate limited |
+| `CAP_PER_TRANSFER`, `CAP_PER_DAY` | Caps in whole tokens. Defaults: 10000 and 50000 |
+
+Never commit `.env`. The setup scripts write keys and IDs to `state/`, which is gitignored.
+
+## 2. Set up the chain side
+
+```bash
+npm run setup          # accounts -> topics -> Studio token -> controller (skips what exists)
+npm run setup:status   # what is left + operator balance
+npm run setup:signer   # fee account for the issuer signer
+```
+
+Optional live tests of the Hedera behaviour Levee depends on:
+
+```bash
+npm run t1 && npm run t2 && npm run t3 && npm run t4   # roles, wipe order, pause, timing
+```
+
+## 3. Start the services
+
+```bash
+scripts/demo/up.sh
+```
+
+`up.sh` starts, in order: the checker (Arkiv), one agent per machine, the watcher, the issuer signer and the gate. It enrols `payouts-server` (profile server) and `laptop-vikram` (profile laptop) on the first run. It waits until the watcher is healthy, the gate answers and `payouts-server` holds a live Arkiv pass. It also makes a random `ENROL_TOKEN` for this run and keeps the Mac awake.
+
+Flags: `--memory` (checker without Arkiv), `--no-laptop`, `--restart`, `--allow-sleep`. Logs go to `state/logs/`.
+
+Send one signed payment from the repo root:
+
+```bash
+npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500
+```
+
+A raw `curl` to the gate is refused `bad-signature`. Requests must be signed by the machine's key, and `npm run request` does that for you.
+
+## 4. Open the dashboard and the runner
+
+```bash
+cd dashboard && npm ci && npm run dev    # landing + /live on http://localhost:5173
+```
+
+In a second terminal, from the repo root:
+
+```bash
+DEMO_MODE=1 npm run demo:runner          # lets the dashboard buttons run the demo actions
+```
+
+The runner binds to `127.0.0.1` only, accepts requests only from the dashboard origins, and runs one action at a time. It refuses to start without `DEMO_MODE=1`.
+
+## 5. Run the story
+
+Open `http://localhost:5173/live` and click the buttons in this order.
+
+<Steps>
+  <Step title="Send">
+    Sends 500 RUPC to Asha Pay through the gate. The receipt appears, then the transfer, then the row turns matched.
+  </Step>
+  <Step title="Hack">
+    Steals 10,000 RUPC with two treasury keys, skipping the gate (`scripts/attack.ts 10000`). Watch the clock: detected, treasury frozen, tokens wiped and receiver frozen.
+  </Step>
+  <Step title="Unlock (2 of 3)">
+    Two admins sign to unfreeze the treasury and the attacker (`scripts/reopen.ts treasury attacker`).
+  </Step>
+  <Step title="Fake mint">
+    Mints 5,000 RUPC to the attacker with a stolen minting key (`scripts/attack-mint.ts 5000`). It runs after Unlock, because a mint cannot land in a frozen account. Watch the supply go up and come back down.
+  </Step>
+  <Step title="Reset">
+    Unpauses the token if it is paused and reopens every frozen demo account with 2 of 3 admins (`scripts/demo/reset.ts`). Safe to run when nothing is frozen.
+  </Step>
+</Steps>
+
+The same actions work from the command line:
+
+```bash
+npx tsx scripts/demo/normal-path.ts          # 1 approved transfer + 3 refusals
+npx tsx scripts/demo/schedule-no-receipt.ts  # a schedule with no receipt: the issuer signer refuses it
+npx tsx scripts/demo/normal-load.ts 100      # false-alarm test: asserts matched == N, breaches == 0
+npx tsx scripts/attack.ts 1000               # stolen-key drain
+npx tsx scripts/attack-mint.ts 5000          # stolen minting key
+npx tsx scripts/reopen.ts treasury attacker  # 2-of-3 reopen
+```
+
+## 6. Stop
+
+```bash
+scripts/demo/down.sh
+```
+
+## Tests
+
+Unit tests need no network and no keys:
+
+```bash
+npx vitest run                  # root, includes the controller EVM tests
+cd dashboard && npx vitest run  # dashboard
+```

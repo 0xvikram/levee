@@ -1,0 +1,42 @@
+---
+title: "Known limits"
+description: "An honest list of what Levee does not do today."
+---
+
+## Scope
+
+- Only tokens the issuer created with Stablecoin Studio. It cannot touch USDC or any token you do not issue, because it needs the token's freeze and wipe keys.
+- One token, one treasury, one gate per deployment.
+- Testnet only. Not on mainnet. The contract is not audited.
+
+## Containment
+
+- **Not instant.** Stolen tokens sit in the receiving account for about 6 to 10 s (5.6 s to the wipe's consensus in the latest run). If the thief moves them on inside that window, the wipe takes only what is left and the receiver is frozen. Onward hops are not followed.
+- **Watcher down.** While the watcher is down the gate signs nothing. But a theft that skips the gate in that window is not contained automatically. On restart the watcher reports the day's past breaches without acting on them.
+- **Repeat mints.** A stolen minting key can mint again after its first mint is wiped. Revoking the cash-in role or pausing the token is not automatic. `PAUSE_ON_BREACH` exists but is off by default.
+- **Treasury burn.** Burning unauthorised supply left in the token treasury is unit-tested only, never run live.
+- **Trusted receipts.** A payment with a valid receipt is trusted. An approved payment to the wrong recipient is not caught.
+
+## Keys
+
+- **Watcher key.** A stolen watcher key could freeze accounts and wipe receivers, partners included, by calling the controller directly. The partner rule is not on chain yet. It can never unfreeze, pay or mint.
+- **Gate key.** Someone holding the gate key can write a receipt and get a payment signed, but only to a known recipient within the caps.
+- **Admins.** 2 of 3 admins colluding can reopen anything and replace the watcher. Admins cannot be changed after deployment.
+- **Demo keys.** In the demo every key is a file in `state/` on one Mac. The gate and the issuer signer are separate processes with separate keys, but their keys sit in the same file.
+
+## The machine pass
+
+- Health checks are macOS only.
+- They are read-only user-space checks, self-reported by the machine's own agent. A root-level attacker on the machine can lie to them and holds the machine key that signs its requests.
+- Enrolment records (public key, role) live in the checker's local state, not on Arkiv. `/enrol` is open if `ENROL_TOKEN` is unset. `up.sh` always sets one.
+- The gate's replay cache is in memory. A gate restart forgets used nonces, so a captured request could be replayed within its 60 s window after a restart.
+
+## Data source
+
+- The public Mirror Node is the only data source. When it lags over 20 s the gate stops all payouts.
+- Scheduled signing makes a payout slower (p50 8.4 s) and costlier (about 0.18 HBAR) than the earlier direct signing (p50 3.66 s, about 0.020 HBAR).
+
+## Testing
+
+- Run C did not reach 300 transfers because the Mac went to sleep. The 300 run was not repeated.
+- Everything in the demo runs on one Mac: checker, gate, watcher, issuer signer and both machine agents.

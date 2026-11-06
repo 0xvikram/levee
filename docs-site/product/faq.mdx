@@ -1,0 +1,44 @@
+---
+title: "FAQ"
+description: "Short answers to the questions issuers ask most."
+---
+
+<AccordionGroup>
+  <Accordion title="Can Levee protect USDC?">
+    No. Levee only protects tokens you issue, because claw-back needs the token's own freeze and wipe keys. USDC on Hedera (0.0.456858) has a freeze key but no wipe key, and only Circle holds its keys.
+  </Accordion>
+  <Accordion title="We already use Fireblocks or a multisig. Why Levee?">
+    A pre-signing policy engine or a multisig stops bad requests that go through it, before signing. It does not see a stolen quorum or an insider who signs outside it. The demo attack uses exactly two of the three treasury keys.
+
+    Levee watches the ledger whoever signed, and undoes what has no receipt. Use both: the policy engine as the first line, Levee as the second. A custodian or MPC approval callback is on the roadmap. There is no Fireblocks integration or partnership.
+  </Accordion>
+  <Accordion title="What if the watcher is down?">
+    No payments go out. The gate refuses to sign unless the watcher posted a heartbeat on Hedera in the last 2 minutes (`no-watcher`). It also refuses if the Mirror Node is more than 20 s behind.
+
+    Honest limit: a thief who skips the gate while the watcher is down is not stopped automatically. On restart the watcher reports that theft as a past breach but does not claw it back. An admin has to act. A second, independent watcher would close this gap. It is not built.
+  </Accordion>
+  <Accordion title="What if the thief moves the money on fast?">
+    The treasury is frozen first, so no more can leave. The wipe takes whatever is still in the thief's account, and that account is frozen even if empty. Tokens already moved to a second account are not followed yet. In the latest run the thief had about 5.6 s before the wipe reached consensus.
+  </Accordion>
+  <Accordion title="Why Hedera?">
+    Stablecoin Studio gives the token native freeze, wipe, burn and pause roles, so a contract can claw back without custom token code. HCS gives every receipt a public, ordered consensus timestamp, and its submit key means only the gate can write receipts. Threshold keys (2 of 3) and scheduled transactions are built in. Fees are low and fixed in USD.
+  </Accordion>
+  <Accordion title="Why a receipt before the payment, not after?">
+    Hedera orders both by consensus time, so "the receipt came first" is provable. A receipt written after the money moved is itself a breach (`receipt-after-movement`). The gate fixes the payment's transaction id before writing the receipt, so the match is exact.
+  </Accordion>
+  <Accordion title="Is wiping risky? What about false alarms?">
+    A known partner is never wiped, only frozen until admins decide. Only unknown receivers are wiped, and only the amount of the incident. Live: 0 false alarms in 393 payments after the Mirror read fixes. Before them there was 1 in 100, and it wiped a real partner, which is why the partner rule exists. Honest limit: the partner rule is in the watcher, not yet on chain.
+  </Accordion>
+  <Accordion title="Do I need a new token?">
+    No. Levee attaches to an existing Stablecoin Studio token through Studio roles. You do need to re-key the paying treasury to a 2-of-3 KeyList that includes the gate. See [Protect an existing token](/integrate/protect-existing-token).
+  </Accordion>
+  <Accordion title="How much slower are payouts?">
+    With scheduled two-party signing, a payout took p50 8.4 s from request to executed transfer on testnet. Before scheduled signing it took p50 3.66 s.
+  </Accordion>
+  <Accordion title="What does Arkiv do here?">
+    It holds the health pass of the machine that requests payments. The pass expires 3 minutes after the last good health check, so a dead or switched-off machine loses it without anyone revoking it. See [Machine health pass](/concepts/machine-pass).
+  </Accordion>
+  <Accordion title="Is it on mainnet? Is it audited?">
+    No to both. Levee runs on testnet. See the [Mainnet checklist](/integrate/mainnet-checklist) and [Audit status](/security/audit-status).
+  </Accordion>
+</AccordionGroup>

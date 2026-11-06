@@ -1,0 +1,140 @@
+{
+  "_note": "Real testnet capture (public Mirror Node, unrelated third-party contract): contract-driven mint = TOKENMINT to the token-treasury contract + CRYPTOTRANSFER to the beneficiary, as children of one transaction id.",
+  "transactions": [
+    {
+      "batch_key": null,
+      "bytes": null,
+      "charged_tx_fee": 16641324,
+      "consensus_timestamp": "1793924859.839611701",
+      "entity_id": "0.0.6757567",
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "1890000000",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "ETHEREUMTRANSACTION",
+      "nft_transfers": [],
+      "node": "0.0.5",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [],
+      "transaction_hash": "zZij/PtzsWdrDZQkVdhead7IqrhCE9a7F4cWr7M+CtlinHUNKh1XMDFTW4YawqqB",
+      "transaction_id": "0.0.4507444-1793924853-096041979",
+      "transfers": [
+        {
+          "account": "0.0.802",
+          "amount": 16641324,
+          "is_approval": false
+        },
+        {
+          "account": "0.0.6072558",
+          "amount": -16641324,
+          "is_approval": false
+        }
+      ],
+      "valid_duration_seconds": "120",
+      "valid_start_timestamp": "1793924853.096041979"
+    },
+    {
+      "batch_key": null,
+      "bytes": null,
+      "charged_tx_fee": 0,
+      "consensus_timestamp": "1793924859.839611702",
+      "entity_id": "0.0.359",
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "0",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "CONTRACTCALL",
+      "nft_transfers": [],
+      "node": null,
+      "nonce": 1,
+      "parent_consensus_timestamp": "1793924859.839611701",
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [],
+      "transaction_hash": "1pvddHmoj9wnPakpvU0D75F24RlCH2I1SmHE7O7C8zl7Bwcl2i5/MqXvdAyw9e5i",
+      "transaction_id": "0.0.4507444-1793924853-096041979",
+      "transfers": [],
+      "valid_duration_seconds": null,
+      "valid_start_timestamp": "1793924853.096041979"
+    },
+    {
+      "batch_key": null,
+      "bytes": null,
+      "charged_tx_fee": 0,
+      "consensus_timestamp": "1793924859.839611703",
+      "entity_id": "0.0.10650120",
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "0",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "TOKENMINT",
+      "nft_transfers": [],
+      "node": null,
+      "nonce": 2,
+      "parent_consensus_timestamp": "1793924859.839611701",
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        {
+          "token_id": "0.0.10650120",
+          "account": "0.0.10650119",
+          "amount": 10000,
+          "is_approval": false
+        }
+      ],
+      "transaction_hash": "YR82DrpKm9Q4AFFZQEA+w3JvDJLZ1b0gHmNHBqgHspF92TF3tq0Xxf92mMYevPth",
+      "transaction_id": "0.0.4507444-1793924853-096041979",
+      "transfers": [],
+      "valid_duration_seconds": null,
+      "valid_start_timestamp": "1793924853.096041979"
+    },
+    {
+      "batch_key": null,
+      "bytes": null,
+      "charged_tx_fee": 0,
+      "consensus_timestamp": "1793924859.839611704",
+      "entity_id": null,
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "0",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "CRYPTOTRANSFER",
+      "nft_transfers": [],
+      "node": null,
+      "nonce": 3,
+      "parent_consensus_timestamp": "1793924859.839611701",
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        {
+          "token_id": "0.0.10650120",
+          "account": "0.0.10648629",
+          "amount": 10000,
+          "is_approval": false
+        },
+        {
+          "token_id": "0.0.10650120",
+          "account": "0.0.10650119",
+          "amount": -10000,
+          "is_approval": false
+        }
+      ],
+      "transaction_hash": "rz+4A6pUOsdZgsM8ZpnkPPTJziLvXr0KRopNbS3z9nGpwpRK2BsrnK4KZTh/lwK0",
+      "transaction_id": "0.0.4507444-1793924853-096041979",
+      "transfers": [],
+      "valid_duration_seconds": null,
+      "valid_start_timestamp": "1793924853.096041979"
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 {
-  "name": "fire-exit",
+  "name": "levee",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Leash + Fire Exit: receipt-gated treasury moves and automatic breach containment for Hedera Stablecoin Studio tokens",
+  "description": "Levee: receipt-gated treasury payouts and automatic stolen-key containment for Hedera Stablecoin Studio tokens, with machine passes on Arkiv",
   "scripts": {
     "compile": "tsx scripts/compile.ts",
     "test": "vitest run",
@@ -13,10 +13,19 @@
     "setup:token": "tsx src/setup/token.ts",
     "setup:controller": "tsx src/setup/controller.ts",
     "gate": "tsx src/gate/server.ts",
+    "signer": "tsx src/signer/server.ts",
+    "setup:signer": "tsx src/signer/account.ts",
     "watcher": "tsx src/watcher/index.ts",
     "checker": "tsx src/checker/server.ts",
     "agent": "tsx src/agent/index.ts",
-    "arkiv:smoke": "tsx src/checker/arkiv-smoke.ts"
+    "request": "tsx src/agent/request.ts",
+    "arkiv:smoke": "tsx src/checker/arkiv-smoke.ts",
+    "t2": "tsx scripts/tests/t2-wipe-order.ts",
+    "t3": "tsx scripts/tests/t3-pause.ts",
+    "t4": "tsx scripts/tests/t4-timing.ts",
+    "setup": "npm run setup:accounts && npm run setup:topics && npm run setup:token && npm run setup:controller",
+    "setup:status": "tsx src/setup/status.ts",
+    "demo:runner": "tsx scripts/demo/runner.ts"
   },
   "engines": {
     "node": ">=20"
@@ -24,12 +33,14 @@
   "dependencies": {
     "@arkiv-network/sdk": "^1.0.1",
     "@hashgraph/sdk": "^2.81.0",
+    "@hashgraph/stablecoin-npm-contracts": "^4.4.0",
     "@hashgraph/stablecoin-npm-sdk": "^4.4.0",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "solc": "^0.8.24"
   },
   "devDependencies": {
+    "@ethereumjs/evm": "^10.1.3",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.6",
     "tsx": "^4.23.15",

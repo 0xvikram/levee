@@ -1,0 +1,50 @@
+---
+title: "Containment"
+description: "What Levee does on a breach, in what order, and why."
+---
+
+On a breach, the watcher plans the steps (`src/watcher/contain.ts`) and sends each one to the ContainmentController, signed by the watcher key. A failed step is recorded and the next one still runs.
+
+## The steps, in order
+
+| # | Step | When | Contract function |
+|---|---|---|---|
+| 1 | Freeze the treasury | Tokens left the treasury, or it granted an allowance | `freezeAccount` |
+| 2 | Wipe and freeze each unknown receiver | It received unreceipted tokens | `wipeAndFreeze`, or `wipeFrozen` if already frozen |
+| 2 | Freeze each known partner | A recipient on the list received them | `freezeAccount` only |
+| 3 | Burn unauthorised supply | A mint left tokens in the token treasury | `burnSupply` |
+| 4 | Pause the token | Only if `PAUSE_ON_BREACH` is on (off by default) | `pauseToken` |
+
+Receivers are handled biggest amount first. The wipe amount is capped to the account's current balance, so the call does not fail if part was already moved on.
+
+## Why this order
+
+- **Treasury first.** It stops any further outflow.
+- **Wipe before freeze.** Hedera refuses to wipe a frozen account (`ACCOUNT_FROZEN_FOR_TOKEN`, test T2). The controller wipes then freezes in one transaction. For an account that is already frozen, `wipeFrozen` unfreezes, wipes and refreezes in one transaction, so it never ends unfrozen.
+- **Pause last.** A paused token rejects freeze, wipe and burn (`TOKEN_IS_PAUSED`, test T3). Pausing first would make cleanup impossible until someone unpauses.
+
+## Partners are frozen, not wiped
+
+If the receiver is a known recipient (Asha Pay, Ravi Exchange in the demo), it is only frozen with the note "known partner: frozen, not wiped; admins decide". A false alarm must not take a real partner's money.
+
+This rule came from run A, where a false alarm wiped Asha Pay before the rule existed (commit `3c9bb93`). The rule lives in the watcher's code, not on chain yet.
+
+## Mints
+
+An unreceipted mint to an account is wiped from the receiver and the receiver is frozen. The treasury is **not** frozen, because a mint is not a treasury outflow. Freezing it would stop real payouts and contain nothing.
+
+Live: 5,000 RUPC minted with a stolen minting key, detected in 4.65 s, wiped and frozen in 7.53 s. Total supply went back to its pre-mint value. The attacker's retry failed with `ACCOUNT_FROZEN_FOR_TOKEN`.
+
+<Warning>
+The stolen minting key keeps its cash-in role. It can mint again after the first mint is wiped. Revoking the role or pausing automatically is not built yet. Burning supply left in the token treasury is unit-tested only, never run live.
+</Warning>
+
+## What "claw back" means
+
+It is an HTS wipe. The tokens leave the receiver's account and total supply drops by that amount. They do not travel back to the treasury. The issuer re-mints if it wants the treasury balance restored.
+
+## The incident record
+
+Every incident is published to the incidents topic ([0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500)) with its breaches, each step's transaction id, and timings measured from the breach's consensus time.
+
+The incident id is a deterministic `bytes32` built from the breach transaction ids. The contract echoes it in its `Contained` event.

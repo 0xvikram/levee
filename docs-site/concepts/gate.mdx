@@ -1,0 +1,63 @@
+---
+title: "Gate"
+description: "The gate checks every payment request, then writes the receipt before the money moves."
+---
+
+The gate is the only normal way tokens leave the treasury. It holds one of the treasury's three keys and the receipts topic's submit key. It never holds the treasury-signer key.
+
+If any check fails, the gate refuses with a reason. Nothing moves and no receipt is written.
+
+## Checks, in order
+
+<Steps>
+  <Step title="Signed request">
+    The request must be signed with the requesting machine's enrolled key. The signature is EIP-191 over the canonical JSON `{machine, to, amount, kind, nonce, sentAt}`. Refusals: `bad-signature` (unsigned or wrong key), `unknown-machine` (not enrolled, or the checker could not be asked).
+  </Step>
+  <Step title="Fresh and not replayed">
+    `sentAt` must be within 60 s of the gate clock (`stale-request`). The pair `(machine, nonce)` must be new (`replayed-request`).
+  </Step>
+  <Step title="Machine role">
+    The machine's enrolled role must be in `GATE_ALLOWED_ROLES`, default `finance,payouts` (`wrong-role`).
+  </Step>
+  <Step title="Arkiv pass">
+    The machine must hold a live health pass on Arkiv (`no-pass`). See [Machine health pass](/concepts/machine-pass).
+  </Step>
+  <Step title="Caps">
+    The amount must be within `CAP_PER_TRANSFER` (`over-transfer-cap`). Today's spend plus the amount must be within `CAP_PER_DAY` (`over-daily-cap`).
+  </Step>
+  <Step title="Known recipient">
+    For transfers, `to` must be on the recipient list written at setup (`unknown-destination`).
+  </Step>
+  <Step title="Watcher alive">
+    The watcher must have posted a heartbeat on Hedera in the last 120 s (`no-watcher`). No watcher, no payments.
+  </Step>
+</Steps>
+
+## What happens on approval
+
+For a **transfer**:
+
+1. `ScheduleCreate` of the fixed transfer, treasury to recipient, signed and paid by the gate key only. It expires after `SCHEDULE_TTL_S` (default 300 s).
+2. The receipt goes to the receipts topic, naming the scheduled transaction id and the schedule id. The gate waits for consensus.
+3. The gate tells the issuer signer the schedule id and waits up to `SIGNER_WAIT_S` (default 75 s) for it to sign.
+
+For a **mint** (Studio cash-in): the gate freezes the cash-in call so its id is fixed, writes the receipt, then signs with its key and executes. The gate account holds the cash-in role.
+
+The steps up to the receipt run one request at a time, so two requests cannot both spend the same daily cap.
+
+## Live refusals
+
+These were seen live on testnet. Each took under one second and moved no money.
+
+| Request | Reason |
+|---|---|
+| A machine failing the remote-access check | `no-pass`, 347 ms |
+| 10,001 RUPC with a 10,000 cap | `over-transfer-cap`, 669 ms |
+| 500 RUPC to the attacker account | `unknown-destination`, 969 ms |
+| Unsigned body | `bad-signature` |
+| Laptop key claiming to be `payouts-server` | `bad-signature` |
+| Laptop signing as itself (role `employee`) | `wrong-role` |
+| The approved request sent again | `replayed-request` |
+| `sentAt` more than 60 s old | `stale-request` |
+
+Full request and response shapes: [Gate API](/api-reference/gate).

@@ -1,0 +1,57 @@
+---
+title: "Receipts (HCS)"
+description: "Every legitimate movement leaves a public receipt on a Hedera Consensus Service topic first."
+---
+
+A receipt is a small JSON message on a Hedera Consensus Service (HCS) topic. The gate writes it before the money moves. It names the exact transaction id of the transfer or mint it approves.
+
+"Unreceipted" is then a precise, machine-checkable definition of theft.
+
+## What a receipt contains
+
+```json
+{
+  "v": 1,
+  "type": "receipt",
+  "txId": "0.0.11333489-1793977084-654477314",
+  "token": "0.0.11333594",
+  "from": "0.0.11333495",
+  "to": "0.0.11333490",
+  "amount": "500000000",
+  "kind": "transfer",
+  "machine": "payouts-server",
+  "approvedAt": "<ISO time the gate approved it>",
+  "scheduleId": "0.0.11340805"
+}
+```
+
+- `txId` is the id the movement will have on the Mirror Node. The gate fixes it before anything is signed.
+- `amount` is in the token's smallest unit. RUPC has 6 decimals, so `500000000` is 500 RUPC.
+- `scheduleId` is present on transfers, which are Hedera scheduled transactions.
+
+## Why on HCS
+
+- **Ordered and timestamped.** Hedera gives every message a consensus timestamp. "The receipt came first" is provable.
+- **Only the gate can write.** The receipts topic has a submit key that is the gate's key. The topics have no admin key, so nobody can change the submit key or delete the topic.
+- **Public.** Anyone can read the receipts topic. An auditor does not need to trust the issuer's logs.
+- **Cheap.** About 0.004 HBAR per message, measured on testnet.
+
+## The rules a receipt must pass
+
+The watcher matches each movement to a receipt (`src/watcher/match.ts`). The receipt must:
+
+1. Have the same transaction id as the movement.
+2. Have reached consensus **before** the movement. Otherwise it is `receipt-after-movement`.
+3. Match token, from, to, amount and kind exactly. Otherwise it is `receipt-mismatch`.
+4. Not have been used before. Otherwise it is `receipt-reused`.
+5. Still pass the caps and the recipient list. Otherwise it is `over-transfer-cap`, `over-daily-cap` or `unknown-destination`.
+
+A movement with no receipt at all is `no-receipt`.
+
+## The three topics
+
+| Topic | Submit key | Testnet id |
+|---|---|---|
+| Receipts | Gate | [0.0.11333498](https://hashscan.io/testnet/topic/0.0.11333498) |
+| Incidents | Watcher | [0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) |
+| Heartbeats | Watcher | [0.0.11333501](https://hashscan.io/testnet/topic/0.0.11333501) |

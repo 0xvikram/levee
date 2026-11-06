@@ -1,0 +1,48 @@
+---
+title: "Demo runner"
+description: "127.0.0.1:8713, demo only. Lets the dashboard buttons run the fixed demo actions."
+---
+
+Source: `scripts/demo/runner.ts`. Start from the repo root with:
+
+```bash
+DEMO_MODE=1 npm run demo:runner
+```
+
+<Warning>
+This is a demo tool. It can move testnet funds. It refuses to start without `DEMO_MODE=1`, binds to 127.0.0.1 only, accepts browser requests only from the dashboard origins, runs one action at a time, and never passes request input to a command. Do not run it in production.
+</Warning>
+
+Allowed origins are `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:4173`, `http://127.0.0.1:4173`, plus any in `DEMO_ORIGIN` (comma-separated). Other origins get 403.
+
+## POST /run/:kind
+
+<ParamField path="kind" type="string" required>
+  One of `pay`, `attack`, `mint`, `reopen`, `reset`.
+</ParamField>
+
+| Kind | What runs |
+|---|---|
+| `pay` | A signed gate request: 500 RUPC from `payouts-server` to the first payee |
+| `attack` | `npx tsx scripts/attack.ts 10000` |
+| `mint` | `npx tsx scripts/attack-mint.ts 5000` |
+| `reopen` | `npx tsx scripts/reopen.ts treasury attacker` |
+| `reset` | `npx tsx scripts/demo/reset.ts` |
+
+<ResponseField name="202" type="object">`{ ok: true, run }`: the run started.</ResponseField>
+<ResponseField name="404" type="object">`{ ok: false, error: "unknown run" }`</ResponseField>
+<ResponseField name="409" type="object">`{ ok: false, error: "a run is already in progress", run }`</ResponseField>
+
+`run` = `{ id, kind, status: "running" | "ok" | "failed", startedAt, endedAt?, exitCode?, links }`. `links` are the HashScan URLs seen in the output.
+
+## GET /runs/:id
+
+`{ ok: true, run }` with `lines` (the last 400 output lines). Returns 404 for an unknown id.
+
+## GET /health
+
+`{ ok: true, service: "demo-runner", busy }`. `busy` is the current run or `null`.
+
+## GET /events (SSE)
+
+`event: run` on every status change, and `event: line` with `{ id, line }` for each output line. On connect it sends the latest run with its last 80 lines.

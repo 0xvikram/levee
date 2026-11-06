@@ -1,0 +1,62 @@
+---
+title: "Run in production"
+description: "What changes between the testnet demo and a real deployment."
+---
+
+<Warning>
+Levee has run on testnet only. This page lists what a real deployment needs. Items marked roadmap are not built.
+</Warning>
+
+## Keys in a KMS or HSM
+
+In the demo, the gate, watcher, admin, treasury and machine keys are files in `state/`. In production they belong in a KMS or HSM with per-key policies.
+
+- The **watcher key** matters most. Until the controller has an on-chain partner guard, it can wipe any receiver.
+- The **cold treasury key** stays offline.
+- The **issuer signer** runs on the issuer's own infrastructure, apart from the gate.
+
+KMS/HSM support is on the roadmap.
+
+## A dedicated Mirror Node
+
+The public Mirror Node has a CDN cache (`max-age=1`), ingest lag (p50 1.7 s, p99 2.8 s measured) and rate limits. Use a paid or self-hosted Mirror Node and point `MIRROR_URL` at it. The target is detection under 2 s (2.87 s on the public one today).
+
+The Mirror gRPC topic stream delivered about 0.3 s earlier than fresh REST reads, but a stream cannot prove that nothing was missed on a quiet topic. It was not adopted.
+
+## More than one watcher (roadmap)
+
+Today there is one watcher. While it is down the gate refuses all payouts, but a theft that skips the gate in that window is only reported after restart, not undone. A second, independent watcher would close this gap. It is not built.
+
+## Gate throughput
+
+One gate is serial up to the receipt. With scheduled signing a payout takes p50 8.4 s (5-transfer run). To scale: run several gates, each with its own daily budget and recipient set, or batch several payouts into one receipt. Both are on the roadmap. The watcher is read-only and is not the bottleneck.
+
+## Monitoring
+
+Each service has a health endpoint and an event stream:
+
+| Service | Health | Events |
+|---|---|---|
+| Gate | `GET /health` (caps, spend today, recipients) | `GET /events` |
+| Watcher | `GET /health` (200 healthy, 503 not) and `GET /state` | `GET /events` |
+| Issuer signer | `GET /health`, `GET /decisions` | `GET /events` |
+| Checker | `GET /passes` | `GET /events` |
+
+On chain, watch:
+
+- The **incidents topic** for every containment.
+- The **heartbeats topic**. No heartbeat for 120 s means the gate is refusing all payouts.
+- The **receipts topic** for every approved payout.
+
+Alert on a watcher `/health` 503, any `breach` or `incident` event, and any `signer-refused` or `signer-unavailable` from the gate.
+
+## Fees
+
+Measured on testnet: about 0.18 HBAR per payout with scheduled signing, and about 0.23 HBAR per containment. Hedera fees are fixed in USD, so the cost per payout does not swing with the HBAR price.
+
+## Process
+
+- The machine agent's checks run on macOS only. Windows and Linux agents are on the roadmap.
+- The gate's replay cache is in memory. A restart forgets used nonces.
+
+See the [Mainnet checklist](/integrate/mainnet-checklist).

@@ -1,0 +1,67 @@
+---
+title: "Issuer signer"
+description: "127.0.0.1:8715. Adds the treasury-signer signature to a gate schedule only after it finds the matching receipt."
+---
+
+Source: `src/signer/server.ts`, `src/signer/service.ts`, `src/signer/verify.ts`. Start with `npm run signer`.
+
+A separate process that loads **only** the issuer's treasury-signer key (key 1 of the treasury's 2-of-3). It pays for its `ScheduleSign` from its own account, whose key is that same treasury-signer key (created once with `npm run setup:signer`). It binds to 127.0.0.1.
+
+Env: `SIGNER_PORT` (8715), `SIGNER_RECEIPT_WAIT_S` (60), `SIGNER_POLL_S` (10; 0 = notifications only).
+
+## POST /schedule
+
+Ask the signer to judge one schedule. Waits for the decision.
+
+<ParamField body="scheduleId" type="string" required>
+  The Hedera schedule id, `0.0.x`. Anything else returns 400.
+</ParamField>
+
+<ResponseField name="200" type="object">
+  `{ ok: true, scheduleId, scheduledTxId, transfer: { token, from, to, amount }, receiptSequence, receiptConsensusAt, signTxId, status: "SUCCESS", executedStatus: "SUCCESS", verifyMs, signMs, at }`
+</ResponseField>
+<ResponseField name="409" type="object">
+  `{ ok: false, scheduleId, scheduledTxId?, reason, detail, at, verifyMs }`
+</ResponseField>
+
+### What it checks
+
+1. The schedule was created by the gate account and is not deleted, executed or expired.
+2. Its body is one plain token transfer of the token: treasury minus the amount, recipient plus the amount, nothing else (no HBAR, NFTs, allowances, aliases or other transaction types).
+3. A receipt for exactly that scheduled transaction id is on the receipts topic, paid by the gate, with the same token, from, to, amount, `kind: "transfer"` and (if present) schedule id.
+4. The gate's rules still pass: per-transfer cap, daily cap (every receipt that UTC day before this one), known recipients.
+
+"No receipt yet" is re-checked every 0.75 s for up to `SIGNER_RECEIPT_WAIT_S`, then refused for good. Every other failure is refused at once. A decision is final for the life of the process.
+
+Besides the gate's notification, it polls `GET /api/v1/schedules?account.id=<gate>` every `SIGNER_POLL_S`, so a schedule the gate never announced is still judged.
+
+### Refusal reasons
+
+| Reason | Meaning |
+|---|---|
+| `schedule-not-found` | No such schedule on the Mirror Node |
+| `not-from-gate` | Created by an account other than the gate |
+| `deleted`, `already-executed`, `expired` | The schedule is no longer signable |
+| `not-a-plain-transfer` | The body is anything other than one plain token transfer |
+| `wrong-token` | Not the protected token |
+| `not-from-treasury` | The transfer debits an account other than the treasury |
+| `no-receipt` | No receipt for this scheduled transaction id within the wait |
+| `receipt-not-from-gate` | A receipt exists but the gate did not pay for it |
+| `receipt-mismatch` | The receipt does not match the transfer |
+| `over-transfer-cap`, `over-daily-cap`, `unknown-destination` | The rules no longer pass |
+| `sign-failed` | The ScheduleSign itself failed |
+
+## GET /decisions
+
+`{ ok: true, decisions: [...] }`: the last 50 decisions, same shape as `POST /schedule` replies.
+
+## GET /health
+
+```json
+{ "ok": true, "service": "issuer signer", "gate": "0.0.x", "treasury": "0.0.x", "token": "0.0.x",
+  "receiptsTopic": "0.0.x", "receiptsRead": 0, "signed": 0, "refused": 0, "pending": 0, "sseClients": 0 }
+```
+
+## GET /events (SSE)
+
+Replays the last 50 frames. `event: signed` and `event: refused`, with the decision as data.

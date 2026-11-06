@@ -1,0 +1,136 @@
+{
+  "_note": "Live testnet run 2026-11-06: Levee scheduled transfer. transactions = /api/v1/transactions/{scheduledTxId} (SCHEDULECREATE + the executed CRYPTOTRANSFER with scheduled=true, same transaction_id); receiptMessage = /api/v1/topics/0.0.11333498/messages/499; schedule = /api/v1/schedules/0.0.11340805",
+  "transactions": [
+    {
+      "batch_key": null,
+      "charged_tx_fee": 14654161,
+      "consensus_timestamp": "1793977088.911298104",
+      "entity_id": "0.0.11340805",
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "500000000",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "SCHEDULECREATE",
+      "nft_transfers": [],
+      "node": "0.0.9",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [],
+      "transaction_hash": "67B6xBnjEnuIoQBHbKpNK04i9q5Fgi5hM2lbnJQ1z+32Edxx75HIcraQI4MNWe24",
+      "transaction_id": "0.0.11333489-1793977084-654477314",
+      "transfers": [
+        {
+          "account": "0.0.802",
+          "amount": 14654161,
+          "is_approval": false
+        },
+        {
+          "account": "0.0.11333489",
+          "amount": -14654161,
+          "is_approval": false
+        }
+      ],
+      "valid_duration_seconds": "120",
+      "valid_start_timestamp": "1793977084.654477314"
+    },
+    {
+      "batch_key": null,
+      "charged_tx_fee": 1318874,
+      "consensus_timestamp": "1793977095.027573994",
+      "entity_id": null,
+      "high_volume": false,
+      "high_volume_pricing_multiplier": 0,
+      "max_fee": "100000000",
+      "max_custom_fees": [],
+      "memo_base64": "",
+      "name": "CRYPTOTRANSFER",
+      "nft_transfers": [],
+      "node": null,
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": true,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        {
+          "token_id": "0.0.11333594",
+          "account": "0.0.11333490",
+          "amount": 500000000,
+          "is_approval": false
+        },
+        {
+          "token_id": "0.0.11333594",
+          "account": "0.0.11333495",
+          "amount": -500000000,
+          "is_approval": false
+        }
+      ],
+      "transaction_hash": "1CdVEPpx1ijJ18IX+wru+S268idvps9pCJ31/333smqKePpFzmA8BtmPvFBsPocf",
+      "transaction_id": "0.0.11333489-1793977084-654477314",
+      "transfers": [
+        {
+          "account": "0.0.802",
+          "amount": 1318874,
+          "is_approval": false
+        },
+        {
+          "account": "0.0.11333489",
+          "amount": -1318874,
+          "is_approval": false
+        }
+      ],
+      "valid_duration_seconds": null,
+      "valid_start_timestamp": "1793977084.654477314"
+    }
+  ],
+  "receiptMessage": {
+    "chunk_info": {
+      "initial_transaction_id": {
+        "account_id": "0.0.11333489",
+        "nonce": 0,
+        "scheduled": false,
+        "transaction_valid_start": "1793977081.963853491"
+      },
+      "number": 1,
+      "total": 1
+    },
+    "consensus_timestamp": "1793977089.865050293",
+    "message": "eyJ2IjoxLCJ0eXBlIjoicmVjZWlwdCIsInR4SWQiOiIwLjAuMTEzMzM0ODktMTc5Mzk3NzA4NC02NTQ0NzczMTQiLCJ0b2tlbiI6IjAuMC4xMTMzMzU5NCIsImZyb20iOiIwLjAuMTEzMzM0OTUiLCJ0byI6IjAuMC4xMTMzMzQ5MCIsImFtb3VudCI6IjUwMDAwMDAwMCIsImtpbmQiOiJ0cmFuc2ZlciIsIm1hY2hpbmUiOiJwYXlvdXRzLXNlcnZlciIsImFwcHJvdmVkQXQiOiIyMDI2LTExLTA2VDE0OjU4OjA5LjQxOFoiLCJzY2hlZHVsZUlkIjoiMC4wLjExMzQwODA1In0=",
+    "payer_account_id": "0.0.11333489",
+    "running_hash": "R7kS93kWX/o+8/vAOB1eDAdnvU9cgF2uxQqcXNQk4w4LJSTd6i39ru9jd8EOLGC+",
+    "running_hash_version": 3,
+    "sequence_number": 499,
+    "topic_id": "0.0.11333498"
+  },
+  "schedule": {
+    "admin_key": null,
+    "deleted": false,
+    "consensus_timestamp": "1793977088.911298104",
+    "creator_account_id": "0.0.11333489",
+    "executed_timestamp": "1793977095.027573994",
+    "expiration_time": "1793977388.417000000",
+    "memo": "levee payouts-server",
+    "payer_account_id": "0.0.11333489",
+    "schedule_id": "0.0.11340805",
+    "signatures": [
+      {
+        "consensus_timestamp": "1793977088.911298104",
+        "public_key_prefix": "AiWRzZ9XGERfViYWzdJJt67TTO77ymirPigSuFvYnQy1",
+        "signature": "FiWqt33YOswYFFMn56winRI0LKtcjbjpCZd/PCnPR0hCaPQqYddrkmvrg+NkjZPtpNH64c3jR4mS\ng+BAMWBsBQ==",
+        "type": "ECDSA_SECP256K1"
+      },
+      {
+        "consensus_timestamp": "1793977095.027573993",
+        "public_key_prefix": "A2dMPYRSB1VQWYSQCiDWLySaQalEkfUNqSJHoQyc9bwF",
+        "signature": "bLjMEwVQzvFDvORHUX7kYXxGfUdA3BnwKUkrbJYK5KdwNEpi+BuPt59BSb+NfPA97LyOPCe+bjPE\n1LhyF6xJoQ==",
+        "type": "ECDSA_SECP256K1"
+      }
+    ],
+    "transaction_body": "CIDC1y9KKQoAEiUKBRja37MFEg0KBRjy3rMFEICU69wDEg0KBRj33rMFEP+T69wD",
+    "wait_for_expiry": false
+  }
+}

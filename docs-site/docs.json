@@ -1,0 +1,123 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "maple",
+  "name": "Levee",
+  "description": "A circuit breaker for stablecoin issuers on Hedera. No receipt, no movement.",
+  "colors": {
+    "primary": "#5F6B3B",
+    "light": "#E6D8B4",
+    "dark": "#5F6B3B"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://levee-theta.vercel.app"
+  },
+  "favicon": "/favicon.svg",
+  "fonts": {
+    "family": "Inter",
+    "heading": { "family": "Inter Tight", "weight": 600 },
+    "body": { "family": "Inter" }
+  },
+  "appearance": { "default": "system" },
+  "background": {
+    "color": { "light": "#FBF8F1", "dark": "#1B1A17" }
+  },
+  "navbar": {
+    "links": [
+      { "label": "Live dashboard", "href": "https://levee-theta.vercel.app/live" }
+    ],
+    "primary": { "type": "github", "href": "https://github.com/0xvikram/levee" }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["index", "quickstart", "how-it-works"]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/receipts",
+              "concepts/gate",
+              "concepts/watcher",
+              "concepts/containment",
+              "concepts/reopen",
+              "concepts/scheduled-signing",
+              "concepts/machine-pass"
+            ]
+          },
+          {
+            "group": "Integrate",
+            "pages": [
+              "integrate/protect-existing-token",
+              "integrate/keys-and-roles",
+              "integrate/configuration",
+              "integrate/production",
+              "integrate/mainnet-checklist"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/gate",
+              "api-reference/issuer-signer",
+              "api-reference/watcher",
+              "api-reference/checker",
+              "api-reference/demo-runner"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Security",
+        "groups": [
+          {
+            "group": "Security",
+            "pages": [
+              "security/threat-model",
+              "security/known-limits",
+              "security/incident-playbook",
+              "security/contract",
+              "security/audit-status"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Product",
+        "groups": [
+          {
+            "group": "Product",
+            "pages": [
+              "product/pricing",
+              "product/live-proof",
+              "product/faq",
+              "product/changelog",
+              "product/contact"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        { "anchor": "Live dashboard", "icon": "activity", "href": "https://levee-theta.vercel.app/live" },
+        { "anchor": "GitHub", "icon": "github", "href": "https://github.com/0xvikram/levee" }
+      ]
+    }
+  },
+  "footer": {
+    "socials": { "github": "https://github.com/0xvikram/levee" }
+  },
+  "seo": { "indexing": "navigable" }
+}

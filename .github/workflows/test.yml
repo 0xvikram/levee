@@ -1,0 +1,33 @@
+name: tests
+
+on:
+  push:
+    branches: [main, build]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dashboard/package-lock.json
+      # Unit tests only: no network, no keys. Live testnet checks (npm run t1..t4) run by hand.
+      - name: Root tests
+        run: |
+          npm ci
+          npx vitest run
+      - name: Dashboard tests and build
+        working-directory: dashboard
+        run: |
+          npm ci
+          npx vitest run
+          npm run build
