@@ -38,7 +38,7 @@ The buttons run on a laptop with the local runner (`DEMO_MODE=1 npm run demo:run
 
 Latest recorded numbers (6 Nov 2026, watcher clock from the theft's consensus): detected 2.87 s, treasury frozen 4.85 s, taken back + frozen 6.86 s. Stolen minting key: detected 4.65 s, wiped + frozen 7.53 s. Links are in the README.
 
-Say it if asked: the whole demo runs on one Mac (checker, gate, watcher, both machine agents), and the gate process holds key 1 (treasury signer) and key 2 (gate) of the 2-of-3, so it signs both. In a real setup the issuer's service keeps its own key.
+Say it if asked: the whole demo runs on one Mac (checker, gate, watcher, both machine agents), and every key file sits on that Mac. The signing itself is split: the gate signs a Hedera scheduled transfer with its own key only, and a separate issuer-signer process adds the second signature after it finds the receipt on Hedera. In a real setup those run on separate machines.
 
 ## Likely questions
 
