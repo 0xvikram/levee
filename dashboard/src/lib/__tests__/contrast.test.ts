@@ -20,13 +20,14 @@ function over(fg: string, alpha: number, bg: string): string {
 const C = { sky: "#EFE6D2", haze: "#E6D8B4", white: "#FFFFFF", ink: "#1B1A17", moss: "#2E3722", smoke: "#6B665C", yellow: "#F2E34C", olive: "#5F6B3B", oliveLit: "#B6C383", amber: "#D9B25C", breachLit: "#F08C74", breach: "#C8432B" };
 
 /** Landing (Parley v3) tokens: cobalt grounds, cream text, yellow a small accent only. Gold #7A5A00 is retired. */
-const N = { cobalt: "#1A3892", deep: "#142C82", ink: "#0E1F5E", sky: "#1F3F88", cream: "#F3EBD6", heroSky: "#203C91" };
+const N = { cobalt: "#1A3892", deep: "#142C82", ink: "#0E1F5E", sky: "#1F3F88", cream: "#F3EBD6", heroSky: "#0F2554" };
 /** Cobalt glass card: cream at 9% (the top of its gradient, the lightest it gets) over the page ground. */
 const GLASS = over(N.cream, 0.09, N.cobalt);
 const CREAM_DIM = (bg: string) => over(N.cream, 0.74, bg);
 const CREAM_FAINT = (bg: string) => over(N.cream, 0.64, bg);
-/** Hero copy: the scrim is the hero's own sky at 85%; worst case is a cream engraved pixel right behind a letter. */
-const HERO_SCRIM = over(N.heroSky, 0.85, N.cream);
+/** Hero copy: the scrim is the lighthouse video's own sky (#0F2554) at >= 75% under any text (92% blurred);
+ *  worst case is a white star or beam pixel right behind a letter. */
+const HERO_SCRIM = over(N.heroSky, 0.75, C.white);
 /** Fixed nav: cobalt-ink glass at 72%; worst case is cream art behind it. */
 const NAV_GLASS = over(N.ink, 0.72, N.cream);
 /** Page grain: cream at <= 5% over the ground (soft-light is gentler than this plain mix). */
@@ -80,8 +81,11 @@ const PAIRS: [string, string, string][] = [
   ["yellow on glass card (Levee bar label, step numbers)", C.yellow, GLASS],
   ["yellow pill text on its 8% yellow fill", C.yellow, over(C.yellow, 0.08, N.cobalt)],
   ["cobalt-ink on yellow (primary button, fit mark)", N.ink, C.yellow],
-  ["cream hero copy on the scrim over a cream pixel", N.cream, HERO_SCRIM],
-  ["yellow hero accent on the scrim over a cream pixel", C.yellow, HERO_SCRIM],
+  ["cream hero copy on the scrim over a white star", N.cream, HERO_SCRIM],
+  ["yellow hero accent on the scrim over a white star", C.yellow, HERO_SCRIM],
+  ["cream ghost button (cream 8%) on the hero scrim over a white star", N.cream, over(N.cream, 0.08, HERO_SCRIM)],
+  ["cream hero copy on the plain video sky", N.cream, N.heroSky],
+  ["yellow hero accent on the plain video sky", C.yellow, N.heroSky],
   ["cream nav link on the nav glass over a cream pixel", N.cream, NAV_GLASS],
   ["cream heading over the blurred Pricing word", N.cream, over(N.cream, 0.09, N.cobalt)],
   // tonal section band: cobalt-ink at 22% over the ground, and a glass card on it
@@ -158,7 +162,7 @@ describe("landing palette is cobalt + cream + yellow only", () => {
       "20,44,130", // cobalt-deep #142c82
       "14,31,94", // cobalt-ink #0e1f5e
       "31,63,136", // cobalt-sky #1f3f88
-      "32,60,145", // hero sky #203c91
+      "15,37,84", // hero sky #0f2554 (the lighthouse video's own sky)
       "243,235,214", // cream #f3ebd6
       "242,227,76", // yellow #f2e34c
       "0,0,0", // mask alpha only

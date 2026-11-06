@@ -10,7 +10,7 @@
      cream-faint on cobalt                                    "Built on Hedera" row
      yellow on cobalt, cobalt-deep, cobalt-ink, cobalt glass  accent words, pills, numbers
      cobalt-ink on yellow                                     primary button text
-     cream / yellow on the hero scrim (hero sky at 85%) over a cream pixel   hero copy (worst case)
+     cream / yellow on the hero scrim (video sky #0F2554 at >= 75%) over a white star   hero copy (worst case)
      everything above under the page grain (cream/ink at <= 5%)
      cream on the nav glass over a cream pixel                fixed nav (worst case)
    Nov 2026 patchwork (from /logos): between the hero and the footer, cobalt-deep cards with yellow pill labels
@@ -117,41 +117,50 @@ html.lp-page, html.lp-page body { background: var(--cobalt); }
 .lp-nav nav a:hover { text-decoration: underline; }
 .lp-nav-cta { justify-self: end; }
 
-/* ---------- hero: dithered engraving behind, copy in the empty sky ---------- */
+/* ---------- hero: the lighthouse loop (media/hero-lighthouse.*) behind, copy in its sky ----------
+   The ground is the video's own sky #0F2554 (sampled from the poster), so its edges vanish into it; the bottom
+   of the hero turns to the page cobalt under the product window. The video is shown whole at 16:9 (never cropped)
+   and anchored to the bottom of the hero, which is at least as tall as the video, so the lighthouse on the left
+   and the Veo mark in the bottom-right corner always show. Its top and bottom edges fade into the ground;
+   the bottom-right corner is kept out of the fade so the Veo mark is never masked. */
 .lp-hero {
-  position: relative; min-height: 100svh; overflow: hidden; background: #203c91; /* hero.jpg's own sky */
-  display: flex; flex-direction: column; align-items: center;
-  padding: 120px max(16px, 4vw) clamp(220px, 32svh, 340px);
+  --hero-sky: #0f2554;
+  position: relative; min-height: max(100svh, 56.25vw); overflow: hidden;
+  background: linear-gradient(180deg, var(--hero-sky) 0%, var(--hero-sky) 78%, var(--cobalt) 100%);
+  display: flex; flex-direction: column; align-items: flex-start;
+  /* copy starts right of the lighthouse (which ends at ~21% of the width) */
+  padding: 120px max(16px, 4vw) clamp(220px, 32svh, 340px) 30vw;
 }
-/* full bleed; the bottom dissolves into the page ground under the product window */
-.lp-hero-art {
-  position: absolute; inset: 0; z-index: 0;
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 80%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 0%, #000 80%, transparent 100%);
+.lp-hero-media {
+  position: absolute; left: 0; bottom: 0; z-index: 0; display: block;
+  width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 80%, transparent 100%), radial-gradient(9% 14% at 100% 100%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0%, #000 8%, #000 80%, transparent 100%), radial-gradient(9% 14% at 100% 100%, #000 55%, transparent 100%);
 }
-/* copy band in the art's OWN sky colour at 85%: invisible over the empty sky, it only quiets any
-   island or cloud behind the words (worst case over a cream pixel is a tested pair) */
-.lp-hero-scrim {
-  position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background: linear-gradient(180deg, rgba(32, 60, 145, 0.85) 0%, rgba(32, 60, 145, 0.85) 58%, rgba(32, 60, 145, 0) 76%);
-}
-.lp-hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 22%; z-index: 0; pointer-events: none; background: linear-gradient(180deg, rgba(26, 56, 146, 0), var(--cobalt)); }
 .lp-hero > .lp-hero-copy { position: relative; z-index: 1; }
+/* soft scrim in the sky colour behind the copy: it quiets the stars and the beam behind the words. At least
+   75% strong anywhere under text; cream / yellow on it over a white star is a tested pair. */
+.lp-hero-copy::before {
+  content: ""; position: absolute; inset: -48px -64px; z-index: -1; pointer-events: none;
+  background: var(--hero-sky); opacity: 0.92; filter: blur(36px); border-radius: 48px;
+}
+
+.lp-hero-copy { position: relative; z-index: 1; }
 
 .lp-hero-copy {
-  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 24px;
+  text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 24px;
   margin-top: clamp(32px, 9svh, 110px); max-width: 100%;
 }
-/* one short line: as large as fits at 1440-1920 (about 5.5-7.5rem), never wrapping on desktop */
-.lp-hero-copy h1 { font-size: clamp(3rem, 8vw, 7.5rem); line-height: 0.98; letter-spacing: -0.035em; white-space: nowrap; }
-.lp-hero-copy p { font-size: clamp(1.06rem, 1.4vw, 1.25rem); color: var(--cream); text-align: center; max-width: 52ch; }
+/* one short line: as large as fits in the right two thirds, never wrapping on desktop */
+.lp-hero-copy h1 { font-size: clamp(2.6rem, 5.4vw, 7rem); line-height: 0.98; letter-spacing: -0.035em; white-space: nowrap; }
+.lp-hero-copy p { font-size: clamp(1.06rem, 1.4vw, 1.25rem); color: var(--cream); text-align: left; max-width: 52ch; }
 .lp-chip {
   display: inline-flex; align-items: center; gap: 8px; padding: 5px 13px; border-radius: var(--r-pill);
   font-family: var(--f-label); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cream);
   background: rgba(14, 31, 94, 0.6); border: 1px solid rgba(243, 235, 214, 0.2);
 }
 .lp-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); box-shadow: 0 0 0 4px rgba(242, 227, 76, 0.18); }
-.lp-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+.lp-ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start; margin-top: 4px; }
 
 /* entrance: CSS only, so the copy is there even without JS */
 @keyframes lp-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
@@ -350,7 +359,7 @@ html.lp-page, html.lp-page body { background: var(--cobalt); }
 /* ---------- responsive ---------- */
 @media (max-width: 1000px) {
   /* tablets: a shorter hero so the window sits close under the CTAs, not a screen lower */
-  .lp-hero { min-height: 0; padding-bottom: clamp(200px, 30vw, 300px); }
+  .lp-hero { min-height: 56.25vw; padding-bottom: clamp(200px, 30vw, 300px); }
   .lp-window-wrap { margin-top: calc(-1 * clamp(110px, 17vw, 190px)); }
   .lp-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lp-plans { grid-template-columns: 1fr; max-width: 560px; margin: 0 auto; width: 100%; }
@@ -366,9 +375,20 @@ html.lp-page, html.lp-page body { background: var(--cobalt); }
   .lp-nav { grid-template-columns: auto 1fr auto; padding-left: 16px; top: 10px; width: calc(100% - 20px); gap: 12px; }
   .lp-nav nav { justify-content: flex-end; gap: 14px; }
   .lp-nav nav a[href="#faq"], .lp-nav nav a[href="#pricing"], .lp-nav nav a[href="#how"] { display: none; }
-  .lp-hero { min-height: 0; padding-top: 96px; padding-bottom: 190px; }
-  .lp-hero-scrim { background: linear-gradient(180deg, rgba(32, 60, 145, 0.85) 0%, rgba(32, 60, 145, 0.85) 76%, rgba(32, 60, 145, 0) 92%); }
-  .lp-hero-copy { margin-top: 28px; gap: 18px; }
+  /* phones: copy on the plain sky, the whole video below it (full bleed, uncropped), then the cobalt turn
+     under the product window, which overlaps the padding only */
+  .lp-hero {
+    min-height: 0; padding: 96px 16px 190px; align-items: center;
+    background: linear-gradient(180deg, var(--hero-sky) 0%, var(--hero-sky) calc(100% - 190px), var(--cobalt) 100%);
+  }
+  .lp-hero-copy { order: 1; margin-top: 28px; gap: 18px; text-align: center; align-items: center; }
+  .lp-hero-copy p { text-align: center; }
+  .lp-ctas { justify-content: center; }
+  .lp-hero-media {
+    order: 2; position: relative; flex: none; width: 100vw; max-width: none; margin: 28px calc(50% - 50vw) 0;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%), radial-gradient(14% 22% at 100% 100%, #000 55%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0%, #000 10%, #000 86%, transparent 100%), radial-gradient(14% 22% at 100% 100%, #000 55%, transparent 100%);
+  }
   .lp-hero-copy h1 { white-space: normal; text-wrap: balance; font-size: clamp(2.9rem, 13vw, 4rem); }
   .lp-mock-side .lp-mock-log { display: none; }
   .lp-mock-pipe { font-size: 0.64rem; }

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { CompareChart, FaqSection, Footer, HederaStrip, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
+import { CompareChart, FaqSection, Footer, HederaStrip, HeroMedia, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
 import { FALLBACK_SHOWCASE } from "../lib/incident";
 import { FACTS, INDUSTRY } from "../lib/numbers";
 import { DOCS, DOCS_URL, deploy } from "../lib/config";
@@ -45,22 +45,67 @@ describe("Landing structure", () => {
     expect(container.querySelector(".lp-window-wrap")!.querySelectorAll("img, video")).toHaveLength(0);
   });
 
-  it("falls back to the cobalt halftone when the hero engraving is missing", () => {
+  it("plays the lighthouse loop behind the hero copy (webm then mp4, muted, looping, inline, poster, decorative)", () => {
     const { container } = render(<Landing />);
-    const art = container.querySelector(".lp-hero .dither")!;
-    fireEvent.error(art.querySelector("img")!);
-    expect(art).toHaveAttribute("data-state", "fallback");
-    expect(art.querySelector("img")).toBeNull();
+    expect(container.querySelector(".lp-hero .dither, .lp-hero canvas")).toBeNull();
+    const v = container.querySelector(".lp-hero video.lp-hero-media") as HTMLVideoElement;
+    expect(v).not.toBeNull();
+    expect(v).toHaveAttribute("aria-hidden", "true");
+    expect(v.muted).toBe(true);
+    expect(v.autoplay).toBe(true);
+    expect(v.loop).toBe(true);
+    expect(v.hasAttribute("playsinline")).toBe(true);
+    expect(v).toHaveAttribute("preload", "metadata");
+    expect(v).toHaveAttribute("poster", "/media/hero-lighthouse.jpg");
+    expect([...v.querySelectorAll("source")].map((s) => [s.getAttribute("src"), s.getAttribute("type")])).toEqual([
+      ["/media/hero-lighthouse.webm", "video/webm"],
+      ["/media/hero-lighthouse.mp4", "video/mp4"],
+    ]);
   });
 
-  it("puts the hero engraving behind the copy as dithered art (decorative, with its own sky colour)", () => {
+  it("falls back to the poster still when neither video source can play", () => {
     const { container } = render(<Landing />);
-    const art = container.querySelector(".lp-hero .dither") as HTMLElement;
-    expect(art).not.toBeNull();
-    expect(art).toHaveAttribute("aria-hidden", "true");
-    expect(art.style.getPropertyValue("--dither-dark")).toBe("#203C91");
-    // jsdom has no 2D canvas, so the still image is shown, which is also the reduced-motion path
-    expect(art.querySelector("img")).toHaveAttribute("src", "/media/engraving/hero.jpg");
+    const sources = container.querySelectorAll(".lp-hero video source");
+    fireEvent.error(sources[1]);
+    expect(container.querySelector(".lp-hero video")).toBeNull();
+    const img = container.querySelector(".lp-hero img.lp-hero-media")!;
+    expect(img).toHaveAttribute("src", "/media/hero-lighthouse.jpg");
+    fireEvent.error(img);
+    expect(container.querySelector(".lp-hero .lp-hero-media")).toBeNull();
+  });
+
+  it("shows only the poster under reduced motion (no autoplay)", () => {
+    const mm = vi.fn((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.stubGlobal("matchMedia", mm);
+    try {
+      const { container } = render(<HeroMedia />);
+      expect(container.querySelector("video")).toBeNull();
+      expect(container.querySelector("img")).toHaveAttribute("src", "/media/hero-lighthouse.jpg");
+    } finally {
+      vi.unstubAllGlobals();
+      vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
+    }
+  });
+
+  it("pauses the hero video when it scrolls off screen and plays it when back", () => {
+    let cb: (e: { isIntersecting: boolean }[]) => void = () => undefined;
+    const IO = vi.fn(function (this: unknown, fn: typeof cb) {
+      cb = fn;
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal("IntersectionObserver", IO);
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    try {
+      render(<HeroMedia />);
+      cb([{ isIntersecting: false }]);
+      expect(pause).toHaveBeenCalled();
+      cb([{ isIntersecting: true }]);
+      expect(play).toHaveBeenCalled();
+    } finally {
+      play.mockRestore();
+      pause.mockRestore();
+    }
   });
 
   it("styles the sections as the /logos patchwork: cobalt-deep cards holding cream patches", () => {

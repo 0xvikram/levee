@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./landing.css";
-import { DitherImage } from "../components/DitherImage";
 import { Link } from "../components/router";
 import { SiteLogo } from "../components/SiteLogo";
 import { ChevronMark } from "../components/logos";
@@ -12,9 +11,10 @@ import { usePrefersReducedMotion, useRiseIn } from "../lib/hooks";
 const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
 /** The product window plays the recorded demo when true; until the new video lands it shows a cobalt mock with the live numbers. */
 export const DEMO_VIDEO = false;
-/** Media lives only in the hero and the footer. The hero engraving's own sampled sky is the dither's dark tone and the hero ground. */
+/** Media lives only in the hero and the footer. The hero is the lighthouse loop (8 s, seamless); its sky,
+ *  sampled from the poster (the most common dark pixel in the top third), is the hero ground #0F2554. */
 const ART = {
-  hero: { src: "/media/engraving/hero.jpg", sky: "#203C91" },
+  hero: { webm: "/media/hero-lighthouse.webm", mp4: "/media/hero-lighthouse.mp4", poster: "/media/hero-lighthouse.jpg", sky: "#0F2554" },
   footer: "/media/footer-engraving.jpg",
 };
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
@@ -38,8 +38,7 @@ export function Landing() {
         Skip to content
       </a>
       <header className="lp-hero">
-        <DitherImage className="lp-hero-art" src={ART.hero.src} dark={ART.hero.sky} priority posY={1} cell={1.5} />
-        <div className="lp-hero-scrim" aria-hidden="true" />
+        <HeroMedia />
         <div className="lp-nav">
           <Link to="/" className="lp-logo">
             <SiteLogo />
@@ -93,6 +92,65 @@ export function Landing() {
 
       <Footer />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- hero media
+
+/** True when the browser asks to save data (Chrome's Save-Data / Lite mode). */
+function saveData(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+}
+
+/**
+ * The hero's lighthouse loop: muted, looping and inline, webm then mp4, with the poster under it. It plays only
+ * while the hero is on screen and pauses when scrolled away. Reduced motion, Save-Data or a video that cannot
+ * load: the poster still instead. Decorative (aria-hidden). Shown whole, never cropped, so the Veo mark in its
+ * bottom-right corner stays visible.
+ */
+export function HeroMedia() {
+  const reduced = usePrefersReducedMotion();
+  const vid = useRef<HTMLVideoElement>(null);
+  const [lite] = useState(saveData);
+  const [videoOk, setVideoOk] = useState(true);
+  const [posterOk, setPosterOk] = useState(true);
+  const still = reduced || lite || !videoOk;
+
+  useEffect(() => {
+    const v = vid.current;
+    if (!v || still) return;
+    v.muted = true; // React does not always write the attribute, which autoplay needs
+    const play = () => v.play?.()?.catch(() => undefined);
+    if (typeof IntersectionObserver === "undefined") {
+      play();
+      return;
+    }
+    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : v.pause?.()));
+    io.observe(v);
+    return () => io.disconnect();
+  }, [still]);
+
+  if (still) {
+    return posterOk ? <img className="lp-hero-media" src={ART.hero.poster} alt="" aria-hidden="true" decoding="async" onError={() => setPosterOk(false)} /> : null;
+  }
+  return (
+    <video
+      ref={vid}
+      className="lp-hero-media"
+      aria-hidden="true"
+      muted
+      autoPlay
+      loop
+      playsInline
+      preload="metadata"
+      poster={ART.hero.poster}
+      onError={(e) => e.target === e.currentTarget && setVideoOk(false)}
+    >
+      <source src={ART.hero.webm} type="video/webm" />
+      {/* only the last <source> failing means neither could play */}
+      <source src={ART.hero.mp4} type="video/mp4" onError={() => setVideoOk(false)} />
+    </video>
   );
 }
 
