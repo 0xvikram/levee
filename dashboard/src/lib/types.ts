@@ -63,6 +63,7 @@ export interface GateDecision {
   reason?: string;
   detail?: string;
   txId?: string;
+  receiptTxId?: string;
 }
 
 export interface PassView {

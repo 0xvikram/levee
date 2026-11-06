@@ -15,6 +15,7 @@ export interface FeedRow {
   consensusAt?: string;
   at?: string; // ISO, for gate-only rows
   machine?: string;
+  receiptTxId?: string;
   contained?: boolean;
   historic?: boolean;
 }
@@ -97,7 +98,7 @@ export function feedReducer(state: FeedState, a: FeedAction): FeedState {
     case "decision": {
       const d = a.decision;
       if (d.ok && d.txId) {
-        return { rows: upsert(state.rows, { key: d.txId, txId: d.txId, to: d.to, amount: d.amount, kind: d.kind, status: "pending", at: d.at, machine: d.machine }) };
+        return { rows: upsert(state.rows, { key: d.txId, txId: d.txId, to: d.to, amount: d.amount, kind: d.kind, status: "pending", at: d.at, machine: d.machine, ...(d.receiptTxId ? { receiptTxId: d.receiptTxId } : {}) }) };
       }
       if (!d.ok && !d.txId) {
         const key = `refused:${d.at}:${d.machine}`;

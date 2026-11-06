@@ -39,3 +39,21 @@ export async function freezeStatus(account: string): Promise<FreezeStatus> {
   const s = j.tokens?.[0]?.freeze_status;
   return s === "FROZEN" || s === "UNFROZEN" || s === "NOT_APPLICABLE" ? s : "UNKNOWN";
 }
+
+export interface TokenRelation {
+  balance: string | null; // smallest unit
+  freeze: FreezeStatus;
+}
+
+/** Balance + freeze status of one account for the deployed token (one Mirror call). */
+export async function tokenRelation(account: string): Promise<TokenRelation> {
+  const r = await fetch(`${MIRROR}/api/v1/accounts/${account}/tokens?token.id=${deploy.token.tokenId}`);
+  if (!r.ok) return { balance: null, freeze: "UNKNOWN" };
+  const j = (await r.json()) as { tokens?: { freeze_status?: string; balance?: number | string }[] };
+  const t = j.tokens?.[0];
+  const s = t?.freeze_status;
+  return {
+    balance: t?.balance === undefined ? null : String(t.balance),
+    freeze: s === "FROZEN" || s === "UNFROZEN" || s === "NOT_APPLICABLE" ? s : "UNKNOWN",
+  };
+}

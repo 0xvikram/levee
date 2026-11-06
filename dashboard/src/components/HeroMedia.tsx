@@ -1,51 +1,59 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePrefersReducedMotion } from "../lib/hooks";
 
-const IMG = "/media/hero.jpg";
-const VIDEOS = [
-  { src: "/media/hero.webm", type: "video/webm" },
-  { src: "/media/hero.mp4", type: "video/mp4" },
-];
-
-/** True only if the file exists and is served as a video (dev servers answer HTML for misses). */
-async function isVideo(src: string): Promise<boolean> {
-  try {
-    const r = await fetch(src, { method: "HEAD" });
-    return r.ok && (r.headers.get("content-type") ?? "").startsWith("video/");
-  } catch {
-    return false;
-  }
-}
+const POSTER = "/media/hero.jpg";
 
 /**
- * Hero background: the brand gradient, then /media/hero.jpg, then the muted loop if
- * hero.webm / hero.mp4 exist. Any missing file just leaves the layer below showing.
- * Reduced motion: the still only.
+ * Full-bleed muted loop (webm, then mp4) with the matching still as poster. Under reduced motion
+ * only the still is shown. Layers: brand gradient → still → video, so any missing file just
+ * leaves the layer below showing. `parallax` drifts the layer slowly on scroll (transform only).
  */
-export function HeroMedia() {
+export function HeroMedia({ parallax = false }: { parallax?: boolean }) {
   const reduced = usePrefersReducedMotion();
   const [imgOk, setImgOk] = useState(true);
-  const [sources, setSources] = useState<typeof VIDEOS>([]);
+  const [videoOk, setVideoOk] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+  const vid = useRef<HTMLVideoElement>(null);
+
+  // React does not always write the muted attribute, which some browsers need before autoplay.
+  useEffect(() => {
+    const v = vid.current;
+    if (!v) return;
+    v.muted = true;
+    v.play?.()?.catch(() => undefined);
+  }, [reduced, videoOk]);
 
   useEffect(() => {
-    if (reduced) return setSources([]);
-    let alive = true;
-    Promise.all(VIDEOS.map((v) => isVideo(v.src))).then((ok) => alive && setSources(VIDEOS.filter((_, i) => ok[i])));
-    return () => {
-      alive = false;
+    if (!parallax || reduced) return;
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const on = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const y = Math.min(window.scrollY, window.innerHeight);
+        el.style.transform = `translate3d(0, ${(y * 0.18).toFixed(1)}px, 0) scale(1.06)`;
+      });
     };
-  }, [reduced]);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", on);
+    };
+  }, [parallax, reduced]);
 
   return (
     <div className="media" aria-hidden="true">
-      <img src={IMG} alt="" className={imgOk ? "" : "hidden"} onError={() => setImgOk(false)} decoding="async" />
-      {sources.length > 0 && (
-        <video autoPlay muted loop playsInline preload="auto" poster={imgOk ? IMG : undefined} onError={() => setSources([])}>
-          {sources.map((s) => (
-            <source key={s.src} src={s.src} type={s.type} />
-          ))}
-        </video>
-      )}
+      <div className="media-layer" ref={ref}>
+        <img src={POSTER} alt="" className={imgOk ? "" : "hidden"} onError={() => setImgOk(false)} decoding="async" />
+        {!reduced && videoOk && (
+          <video ref={vid} autoPlay muted loop playsInline preload="metadata" poster={imgOk ? POSTER : undefined} onError={() => setVideoOk(false)}>
+            <source src="/media/hero.webm" type="video/webm" />
+            <source src="/media/hero.mp4" type="video/mp4" />
+          </video>
+        )}
+      </div>
     </div>
   );
 }
