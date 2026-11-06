@@ -2,14 +2,16 @@
 
 Status: hackathon prototype on Hedera testnet. No customers, no revenue, no pilots yet. Everything about pricing and market below is a hypothesis to test, not a result.
 
+**Positioning.** Levee is a circuit breaker for stablecoin issuers on Hedera. Every token that leaves the issuer's treasury must have a receipt on Hedera first. If tokens move without one — stolen keys, a rogue insider — Levee freezes the treasury and takes them back in about seven seconds, and only 2 of 3 admins can reopen. One buyer: the issuer's treasury and ops team. It works only for tokens the issuer controls (it needs the token's freeze and wipe keys), so it cannot protect USDC. Phases and hard limits: [SCOPE.md](SCOPE.md).
+
 ## Lean Canvas
 
 | block | Levee |
 |---|---|
 | **Problem** | 1. A stolen treasury or minter key empties or inflates a stablecoin in one transaction (Resolv USR, Mar 2026, ~$25M extracted; StablR, May 2026, ~$2.8M extracted; sources in the README). 2. Issuers can freeze, but only after a human notices. 3. Auditors and regulators cannot easily check that every treasury move was approved. |
-| **Customer segments** | Stablecoin Studio issuers on Hedera; payout and remittance fintechs that hold a Studio token treasury; DAOs and treasuries that pay contributors from a multisig. |
-| **Unique value proposition** | Every legitimate move leaves a public receipt on HCS first. Anything without one is frozen and clawed back in about 10 s, with a public incident record. Reopening needs 2 of 3 admins. |
-| **Solution** | Gate (receipt before signature), watcher (match every movement by tx id), ContainmentController (close-only roles on the Studio token), Leash (machine passes on Arkiv). |
+| **Customer segments** | Stablecoin issuers on Hedera that use Stablecoin Studio (the only segment we target now). Later, only if they issue their own Studio token: payout and remittance fintechs. |
+| **Unique value proposition** | Every legitimate move leaves a public receipt on HCS first. Anything without one is frozen and clawed back in about 7 s (6.86 s measured on testnet), with a public incident record. Reopening needs 2 of 3 admins. |
+| **Solution** | Phase 1: gate (receipt before signature), watcher (match every movement by tx id), ContainmentController (close-only roles on the Studio token). Phase 2, optional: caps, known recipients, machine-health pass on Arkiv. |
 | **Channels** | Hedera / Stablecoin Studio ecosystem (docs, partner listings, hackathon showcase); direct outreach to Studio issuers visible on testnet and mainnet; security auditors who see the incident pattern; open-source repo. |
 | **Revenue streams (hypothesis)** | Monthly fee per protected treasury; per-payout fee above a free tier; paid hosted watcher with alerting; incident-response support. |
 | **Cost structure** | Hedera fees (measured ≈ 0.020 HBAR per gated payout, ≈ 0.23 HBAR per containment on testnet); a dedicated Mirror Node or provider; hosting for gate and watcher; a contract audit; KMS/HSM. |
