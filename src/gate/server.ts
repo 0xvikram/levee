@@ -4,6 +4,7 @@
 //     -> receipt to HCS, wait for consensus -> sign (treasurySigner + gate = 2 of 3) -> execute
 //   GET /health, GET /events (SSE of decisions)
 import express from "express";
+import { pathToFileURL } from "node:url";
 import {
   AccountId,
   ContractExecuteTransaction,
@@ -185,7 +186,7 @@ async function main() {
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => {
     console.error("gate failed to start:", (e as Error).message);
     process.exit(1);

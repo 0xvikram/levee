@@ -255,3 +255,36 @@ describe("MirrorClient", () => {
     expect(await m.tokenRelationship("0.0.6666", "0.0.5001")).toEqual({ balance: 42n, frozen: true });
   });
 });
+
+describe("real testnet capture: contract-driven mint (third-party contract)", () => {
+  const txs: MirrorTransaction[] = fx("testnet-contract-mint.json").transactions;
+  it("has the parent + HTS-precompile CONTRACTCALL + TOKENMINT + CRYPTOTRANSFER shape we expect", () => {
+    expect(txs.map((t) => [t.name, t.nonce])).toEqual([
+      ["ETHEREUMTRANSACTION", 0],
+      ["CONTRACTCALL", 1],
+      ["TOKENMINT", 2],
+      ["CRYPTOTRANSFER", 3],
+    ]);
+    expect(txs.slice(1).every((t) => t.parent_consensus_timestamp === txs[0].consensus_timestamp)).toBe(true);
+  });
+  it("yields one mint to the beneficiary under the parent tx id at the parent's consensus time", () => {
+    const mint = txs[2];
+    const token = mint.token_transfers![0].token_id;
+    const tokenTreasury = mint.token_transfers![0].account;
+    const mv = extractMovements(txs, { token, treasury: "0.0.1", tokenTreasury });
+    expect(mv).toEqual([
+      { txId: txs[0].transaction_id, consensusAt: txs[0].consensus_timestamp, token, from: null, to: "0.0.10648629", amount: "10000", kind: "mint" },
+    ]);
+  });
+});
+
+describe("real testnet: account.id view of the token treasury returns only the children", () => {
+  // Verified live: /transactions?account.id=<token treasury> returns TOKENMINT#2 + CRYPTOTRANSFER#3 (no parent).
+  const txs: MirrorTransaction[] = fx("testnet-contract-mint.json").transactions.filter((t: MirrorTransaction) => t.name === "TOKENMINT" || t.name === "CRYPTOTRANSFER");
+  it("still yields the mint under the shared tx id", () => {
+    const tokenTreasury = "0.0.10650119";
+    const mv = extractMovements(txs, { token: "0.0.10650120", treasury: "0.0.1", tokenTreasury });
+    expect(mv).toHaveLength(1);
+    expect(mv[0]).toMatchObject({ kind: "mint", to: "0.0.10648629", amount: "10000", consensusAt: txs[0].consensus_timestamp });
+  });
+});

@@ -4,6 +4,7 @@
 //   every 30 s: heartbeat on the heartbeats topic (the gate refuses to sign without one)
 //   GET /state, GET /events (SSE), GET /health
 import express from "express";
+import { pathToFileURL } from "node:url";
 import { ContractExecuteTransaction, ContractFunctionParameters, ContractId, Long, Status, type Client, type PrivateKey } from "@hashgraph/sdk";
 import { env, readState } from "../shared/config.js";
 import { longZero, roleClient, roleKey } from "../shared/hedera.js";
@@ -145,7 +146,7 @@ async function main() {
   app.listen(env.watcherPort, () => console.log(`[watcher] listening on :${env.watcherPort}, watching ${state.treasury.id} + ${tokenTreasury}`));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => {
     console.error("watcher failed to start:", (e as Error).message);
     process.exit(1);
