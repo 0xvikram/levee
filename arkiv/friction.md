@@ -10,4 +10,4 @@ Honest notes for the Arkiv team, written while building Leash (6 Nov 2026).
 6. `permissionlessExtension` is a creation flag that cannot be changed later; the default is false, which is what we want, but it is worth passing explicitly so the intent is visible in code review.
 7. `NoEntityFoundError` is the only signal for "expired": an expired entity is indistinguishable from one that never existed, so "expired vs. never created" needs our own bookkeeping.
 8. README install section lists `viem` as a peer dependency to install by hand, and mentions Node 22.10+.
-(Add live-run findings below once the wallet is funded.)
+The wallet was funded later the same day and the checker ran live on Rabdi through the Hedera test runs; live entities are listed in [how-you-use-arkiv.md](how-you-use-arkiv.md).

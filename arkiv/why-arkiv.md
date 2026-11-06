@@ -1,4 +1,4 @@
-# Why Arkiv (draft)
+# Why Arkiv
 
 Leash needs a liveness signal that a thief on the company's own network cannot fake and that disappears by itself when nobody renews it. Arkiv gives exactly that as a primitive:
 

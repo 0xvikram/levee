@@ -92,9 +92,30 @@ Fix (commit `2627532`, tests in `tests/watcher/watcher.test.ts`): a movement who
 
 The run did not reach 300 because **the Mac went into idle sleep** at 04:22:54 UTC (`pmset -g log`: "Entering Sleep state due to 'Idle Sleep'") and stayed asleep until ~04:48. All services paused. The remaining 107 requests were refused `no-pass: no heartbeat for 537 s, pass expired (machine offline or asleep, not a breach)`, which is the designed behaviour: a sleeping machine loses its pass and that is reported as offline, never as a breach. After wake the watcher withheld heartbeats until its ticks were fresh again (fail closed), then recovered by itself; the agent re-created its Arkiv pass. `up.sh` now runs `caffeinate -i -m -s` for the life of the demo (opt out with `--allow-sleep`). The 300 run was not repeated (the main session asked for no further runs from this agent).
 
-## 3. Containment still works with the grace
+## 3. Containment with the grace in place: stolen-key drain + 2-of-3 reopen
 
-Not re-run by this agent: the main session is timing a live stolen-key drain with the 3 s grace in place. Expected effect: when the receipts topic is quiet (as in an attack), an unreceipted movement waits up to 3 s before it is judged, so detection moves from ~2–4 s to ~5–7 s after consensus and containment from 8.3 s to roughly 11 s. When receipts are flowing, a later receipt proves the read complete and the movement is judged at once. Set `WATCHER_RECEIPT_GRACE_MS=0` for the old behaviour (and the false alarms).
+Run by the main session after the fix, with `WATCHER_RECEIPT_GRACE_MS=3000`. `scripts/attack.ts 1000` signs a treasury transfer with two stolen keys (treasurySigner + cold), skipping the gate, so no receipt exists.
+
+| step | watcher clock (from theft consensus) | consensus (from theft consensus) | link |
+|---|---|---|---|
+| theft: treasury → attacker `0.0.11333494`, 1,000 RUPC | 0 | consensus `1793940613.009` | [tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793940607-721315934) |
+| detected (`no-receipt`) | 6.89 s | | |
+| treasury frozen (`freezeAccount`) | 9.44 s | 8.28 s | [tx](https://hashscan.io/testnet/transaction/0.0.11333487-1793940615-613691402) |
+| attacker wiped + frozen (`wipeAndFreeze`, 1,000 RUPC) | 10.72 s | 10.17 s | [tx](https://hashscan.io/testnet/transaction/0.0.11333487-1793940618-278571902) |
+| incident published | | seq 4, consensus `1793940623.958` | [topic 0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) |
+
+"Watcher clock" is what the incident message reports (`detectedMs`, `actions[].atMs`): the watcher's time when each step's receipt came back. "Consensus" is the containment transaction's consensus timestamp on the Mirror Node. Containment fees: freeze 0.096 HBAR, wipe + freeze 0.138 HBAR (Mirror `charged_tx_fee`).
+
+Compared with the first drain before the fix (10,000 RUPC; detected 4.19 s, treasury frozen 6.44 s, wiped + frozen 8.31 s; [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793935170-233904996), [freeze](https://hashscan.io/testnet/transaction/0.0.11333487-1793935173-898405003), [wipe](https://hashscan.io/testnet/transaction/0.0.11333487-1793935180-013412119)), detection is 2.7 s later, as expected: the receipts topic was quiet, so the watcher waited out most of the 3 s grace before judging the movement.
+
+2-of-3 reopen afterwards (`scripts/reopen.ts treasury attacker`), admin0 proposes, admin1 approves and the approval executes the unfreeze:
+
+| account | propose (admin0) | approve (admin1) |
+|---|---|---|
+| treasury `0.0.11333495` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793940640-406300935) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793940644-187266580) |
+| attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793940643-925485422) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793940645-297104239) |
+
+All seven transactions above returned `SUCCESS` on the Mirror Node (checked 6 Nov 2026).
 
 ## Budget
 

@@ -13,10 +13,9 @@ npm run t1 && npm run t2 && npm run t3 && npm run t4
 
 ## Status (6 Nov 2026)
 
-**Blocked on test HBAR.** Accounts and topics exist; the Studio token and the controller do not yet.
-The operator (0.0.11333301) is down to ~2.3 HBAR. The rest of setup plus T1-T4 needs about **40 HBAR**,
-and the token step needs ~30 HBAR on hand at once (HTS create fee forwarded as msg.value; the unused part comes back).
-One daily top-up of 100 HBAR at portal.hedera.com covers everything.
+**Done. T1-T4 all pass live** (results below). Setup completed after a testnet HBAR top-up: token RUPC `0.0.11333594`, controller `0.0.11333603`, topics `0.0.11333498` / `0.0.11333500` / `0.0.11333501`. Later live runs (normal path, false-alarm runs, stolen-key drain, 2-of-3 reopen) are in [LIVE_RUN.md](LIVE_RUN.md).
+
+The cost table below is the plan written while setup was blocked on HBAR; the "Measured" column was filled where we measured it.
 
 | Step | Estimate (HBAR) | Measured |
 |---|---|---|
@@ -29,7 +28,7 @@ One daily top-up of 100 HBAR at portal.hedera.com covers everything.
 | account HBAR balances (admins 0.5 each, watcher 1.5, gate 1, treasury 1) | 5.0 | deferred |
 | T1-T4 | ~4 | |
 
-## Findings so far (before the token exists)
+## Findings from setup
 
 - Studio SDK `StableCoin.create()` always sends 80 HBAR and a 10M gas limit; `token.ts` calls the
   factory's `deployStableCoin` directly with the same request instead. The request encodes correctly:
