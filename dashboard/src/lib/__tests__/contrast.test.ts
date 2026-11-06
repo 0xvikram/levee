@@ -63,6 +63,12 @@ const PAIRS: [string, string, string][] = [
 const MARKS: [string, string, string][] = [
   ["smoke industry bar on sky", C.smoke, C.sky],
   ["gold Levee bar on sky", C.gold, C.sky],
+  // /live command centre (moss cards): chart lines, event marks, before/after bars
+  ["yellow treasury line / Levee bar on moss", C.yellow, C.moss],
+  ["olive-lit supply line on moss", C.oliveLit, C.moss],
+  ["sky-dim industry bar on moss", over(C.sky, 0.7, C.moss), C.moss],
+  ["breach-lit theft mark on moss", C.breachLit, C.moss],
+  ["amber mint mark on moss", C.amber, C.moss],
 ];
 
 describe("brand contrast pairs", () => {

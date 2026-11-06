@@ -1,36 +1,57 @@
+// /live: one-screen demo command centre. Top bar · KPI strip · Story (left) · pipeline, stopwatch
+// and live chart (centre) · Proof with QR codes, before/after and every move (right).
+// Local mode drives the demo runner and listens to the services; hosted (chain) mode reads only
+// the Hedera Mirror Node and offers a replay of the newest genuine incident.
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Link } from "../components/router";
+import { LiveChart } from "../components/LiveChart";
+import { QR } from "../components/QR";
 import { breachModeReducer, calm, type BreachMode } from "../lib/breach";
 import { ARKIV_EXPLORER, GITHUB, deploy, eventsUrl, hashscan, payeeName, serviceUrl, servicesReachable } from "../lib/config";
 import { decideMode, useChain } from "../lib/chain";
 import { formatDate } from "../lib/incident";
 import { replayContain, replayEndMs, replayPipeline } from "../lib/replay";
 import { feedReducer, initialFeed, isLiveBreach, REASONS, type FeedRow } from "../lib/feed";
-import { consensusToMs, countdown, formatAmount, shortTx, stopwatch } from "../lib/format";
+import { consensusToMs, formatAmount, shortTx, stopwatch } from "../lib/format";
 import { serviceStatus, type ServiceStatus } from "../lib/health";
 import { useEventSource, useNow, usePoll, usePrefersReducedMotion } from "../lib/hooks";
+import { buildKpis, incidentStats, matchedToday, type Kpi } from "../lib/kpis";
+import { useIncidentTopic, useLiveSeries } from "../lib/live-data";
 import { latestIncident, tokenRelation, type TokenRelation } from "../lib/mirror";
+import { INDUSTRY, logPos } from "../lib/numbers";
 import { passesReducer, passLeftMs } from "../lib/passes";
 import { initialPipeline, NODE_LABEL, NODE_SUB, NODES, pipelineReducer, type PipelineState } from "../lib/pipeline";
-import { ring, RING_LOW } from "../lib/ring";
-import { getRun, linkLabel, RUN_BUTTONS, startRun, type RunKind, type RunView } from "../lib/runner";
+import { RUN_BUTTONS, useRunner, type RunKind, type RunView } from "../lib/runner";
+import { type ChartEvent, type ChartEventKind } from "../lib/series";
 import { containReducer, elapsedMs, initialContain, stepLabel, type ContainState } from "../lib/stopwatch";
+import { CAPTIONS, dedupeLinks, initialStory, milestones, proofFromContain, proofFromRun, STORY, stepTone, storyCaption, storyReducer, type ProofLink, type StoryState } from "../lib/story";
 import type { BreachView, CheckerEvent, GateDecision, Incident, Movement, PassView, WatcherSnapshot } from "../lib/types";
 
-const PASS_SECONDS = 180;
 const fmt = (raw: string) => formatAmount(raw, deploy.token.decimals);
 const sym = deploy.token.symbol;
 type Relations = Record<string, TokenRelation>;
 const label = (step: string, account?: string, amount?: string) => stepLabel(step, account, amount, { treasury: deploy.treasury, fmt, symbol: sym });
-const CHAIN_PIPE: PipelineState = { ...initialPipeline, caption: "Chain view · press “Replay latest incident” to run the recorded theft through Check ✗" };
+const CHAIN_PIPE: PipelineState = { ...initialPipeline, caption: "Hosted view · press “Replay latest incident” to run the recorded theft through Check ✗" };
+const RUN_EVENT: Record<RunKind, ChartEventKind> = { pay: "send", attack: "theft", mint: "mint", reopen: "unlock", reset: "reset" };
+
+/** One screen on desktop: lock html/body/#root to the viewport while /live is mounted. */
+function useOneScreen() {
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("cc-page");
+    return () => root.classList.remove("cc-page");
+  }, []);
+}
 
 export function Live() {
+  useOneScreen();
   const reduced = usePrefersReducedMotion();
   const [feed, feedDispatch] = useReducer(feedReducer, initialFeed);
   const [contain, containDispatch] = useReducer(containReducer, initialContain);
   const [passes, passesDispatch] = useReducer(passesReducer, {});
   const [pipe, pipeDispatch] = useReducer(pipelineReducer, initialPipeline);
   const [mode, modeDispatch] = useReducer(breachModeReducer, calm);
+  const [story, storyDispatch] = useReducer(storyReducer, initialStory);
   const [lagMs, setLagMs] = useState<number | null>(null);
   const local = servicesReachable();
 
@@ -78,7 +99,7 @@ export function Live() {
   });
 
   // ---- gate: decisions
-  const gHealth = usePoll<{ ok: boolean; spentToday?: string; capPerDay?: string }>(serviceUrl("gate", "/health"), 10_000);
+  const gHealth = usePoll<{ ok: boolean }>(serviceUrl("gate", "/health"), 10_000);
   const gSse = useEventSource(eventsUrl("gate"), {
     decision: (d) => {
       const x = d as GateDecision;
@@ -89,7 +110,7 @@ export function Live() {
     },
   });
 
-  // ---- checker: passes (slow: reads Arkiv)
+  // ---- checker: Arkiv passes (one chip in the top bar)
   const cPasses = usePoll<PassView[]>(serviceUrl("checker", "/passes"), 10_000, 12_000);
   useEffect(() => {
     if (Array.isArray(cPasses.data)) passesDispatch({ type: "snapshot", passes: cPasses.data });
@@ -107,7 +128,10 @@ export function Live() {
   }, [now]);
   const prevMode = useRef<BreachMode>(calm);
   useEffect(() => {
-    if (prevMode.current.kind === "live" && mode.kind === "contained") pipeDispatch({ type: "contained", seconds: mode.seconds, now: Date.now() });
+    if (prevMode.current.kind === "live" && mode.kind === "contained") {
+      pipeDispatch({ type: "contained", seconds: mode.seconds, now: Date.now() });
+      storyDispatch({ type: "contained", seconds: mode.seconds });
+    }
     prevMode.current = mode;
   }, [mode]);
 
@@ -125,7 +149,7 @@ export function Live() {
     };
   }, []);
 
-  // ---- local or chain mode: services unreachable (public site, or nothing answered in 4 s)
+  // ---- local or chain mode
   const mountedAt = useRef(Date.now());
   const anyUp = wState.reachable || gHealth.reachable || cPasses.reachable || wSse === "open" || gSse === "open" || cSse === "open";
   const roomMode = decideMode({ local, anyUp, elapsedMs: now - mountedAt.current });
@@ -133,7 +157,20 @@ export function Live() {
   const chain = useChain(chainMode);
   const genuine = chain?.genuine ?? null;
 
-  // ---- replay of the newest genuine incident, with its recorded step times
+  // ---- demo runner + story
+  const [runEvents, setRunEvents] = useState<ChartEvent[]>([]);
+  const runner = useRunner(local && !chainMode, (r) => {
+    if (r.status !== "running") storyDispatch({ type: "finish", kind: r.kind, ok: r.status === "ok" });
+  });
+  const go = async (kind: RunKind) => {
+    const ok = await runner.start(kind);
+    if (ok) {
+      storyDispatch({ type: "start", kind });
+      setRunEvents((e) => [...e, { t: Date.now(), kind: RUN_EVENT[kind] }].slice(-30));
+    }
+  };
+
+  // ---- replay of the newest genuine incident (chain mode)
   const [replay, setReplay] = useState<{ startMs: number; done: boolean } | null>(null);
   const rNow = useNow(reduced ? 250 : 50, !!replay && !replay.done);
   const rElapsed = replay ? (replay.done ? Number.POSITIVE_INFINITY : Math.max(0, rNow - replay.startMs)) : 0;
@@ -146,49 +183,108 @@ export function Live() {
   const shownPipe = !chainMode ? pipe : replaying ? replayPipeline(genuine!.incident, replay!.startMs, rElapsed, label) : CHAIN_PIPE;
   const shownRows = chainMode ? (chain?.rows ?? []) : feed.rows;
 
-  // ---- Mirror Node: balance + freeze for treasury, attacker, payees, breach receivers
-  const watched = [deploy.treasury, deploy.attacker, ...deploy.payees, ...shownRows.filter((r) => r.status === "breach").map((r) => r.to)].filter((a): a is string => !!a && /^0\.0\.\d+$/.test(a));
-  const watchKey = [...new Set(watched)].sort().join(",");
-  const relations = useRelations(watchKey, mode.kind === "live" ? 2000 : 6000);
+  // ---- Mirror Node: live series (3 s), incidents topic, freeze status of the accounts in play
+  const series = useLiveSeries();
+  const topic = useIncidentTopic();
+  const watched = [deploy.treasury, deploy.attacker, ...deploy.payees].filter((a): a is string => !!a && /^0\.0\.\d+$/.test(a));
+  const relations = useRelations(watched.join(","), mode.kind === "live" ? 2000 : 6000);
+  const treasuryRel = series.treasuryRel ?? relations[deploy.treasury];
+  const mirrorOk = series.treasury.length > 0 && series.treasury[series.treasury.length - 1].v !== null;
+
+  // ---- KPIs
+  const stats = useMemo(() => (topic ? incidentStats(topic, { nowMs: Date.now(), payees: deploy.payees }) : null), [topic]);
+  const kpis = buildKpis({
+    decimals: deploy.token.decimals,
+    symbol: sym,
+    treasury: treasuryRel?.balance,
+    supply: series.supplyRaw,
+    matched: chainMode ? (chain ? matchedToday(chain.rows, now) : null) : (wState.data?.matched ?? null),
+    matchedNote: chainMode ? "today · Mirror Node" : "watcher · this session",
+    incidents: stats,
+    lagMs,
+    chain: chainMode,
+    liveSeconds: mode.kind === "contained" ? mode.seconds : story.containedS,
+  });
+
+  // ---- caption
+  const caption = chainMode ? (replaying ? (replay!.done ? CAPTIONS.contained(replayEndMs(genuine!.incident) / 1000) : CAPTIONS.hack) : CAPTIONS.idle) : storyCaption(story, mode);
+
+  // ---- chart events
+  const chartEvents: ChartEvent[] = chainMode
+    ? shownRows.filter((r) => r.consensusAt && (r.status === "receipt" || r.status === "breach")).map((r) => ({ t: consensusToMs(r.consensusAt!), kind: r.status === "receipt" ? "send" : r.kind === "mint" ? "mint" : "theft" }))
+    : [...runEvents, ...feed.rows.filter((r) => r.status === "breach" && r.consensusAt && !r.historic).map((r) => ({ t: consensusToMs(r.consensusAt!), kind: (r.kind === "mint" ? "mint" : "theft") as ChartEventKind }))];
+
+  // ---- proof for the latest step
+  const isMint = !!shownContain.breachTxId && shownRows.some((r) => r.txId === shownContain.breachTxId && r.kind === "mint");
+  const proof = proofLinks({ chain: chainMode, run: runner.run, contain: shownContain, mint: isMint || story.last === "mint" });
+
+  // ---- Arkiv chip
+  const passList = Object.values(passes);
+  const arkiv: "live" | "expired" | "off" | "hosted" = chainMode ? "hosted" : !(cPasses.reachable || cSse === "open") ? "off" : passList.some((p) => passLeftMs(p, now) > 0) ? "live" : "expired";
+
+  const st = (p: Parameters<typeof serviceStatus>[0], sse: Parameters<typeof serviceStatus>[1]): ServiceStatus => (local ? serviceStatus(p, sse) : "local");
+  const health: [string, ServiceStatus][] = chainMode
+    ? []
+    : [
+        ["Receipts", st(gHealth, gSse)],
+        ["Watcher", st(wState, wSse)],
+      ];
 
   const tokenParam = new URLSearchParams(window.location.search).get("token")?.trim();
   const otherToken = tokenParam && tokenParam !== deploy.token.tokenId ? tokenParam : null;
-
-  const st = (p: Parameters<typeof serviceStatus>[0], sse: Parameters<typeof serviceStatus>[1]): ServiceStatus => (local ? serviceStatus(p, sse) : "local");
-  const health: [string, ServiceStatus][] = [
-    ["Receipts", st(gHealth, gSse)],
-    ["Watcher", st(wState, wSse)],
-    ["Arkiv (Phase 2)", st(cPasses, cSse)],
-  ];
-  const replayButton = chainMode && genuine && (
-    <div className="replay-box">
-      <button type="button" className="btn small" disabled={!!replay && !replay.done} onClick={() => setReplay({ startMs: Date.now(), done: false })}>
-        {replay?.done ? "Replay again" : "Replay latest incident"}
-      </button>
-      <span className="dim small">Replays the step times recorded on chain for the incident of {formatDate(genuine.consensusAt)}. Not a live event.</span>
-    </div>
-  );
+  const leveeS = shownContain.phase === "contained" && shownContain.containedMs ? shownContain.containedMs / 1000 : null;
 
   return (
-    <div className={`room mode-${mode.kind}`}>
+    <div className={`room cc mode-${mode.kind}`}>
       <div className="room-frame" aria-hidden="true" />
-      <TopBar relations={relations} health={health} lagMs={lagMs} chain={chainMode} />
-      {chainMode ? <ChainBanner /> : <Banner mode={mode} contain={contain} reduced={reduced} />}
-      {otherToken && (
-        <p className="room-notice">
-          This demo watches {sym} ({deploy.token.tokenId}) on Hedera {deploy.network}. Watching {otherToken} needs its own Levee setup.
-        </p>
-      )}
-      <Pipeline s={shownPipe} />
-      <main className="room-grid">
-        <TreasuryCard relations={relations} spentToday={gHealth.data?.spentToday} capPerDay={gHealth.data?.capPerDay} />
-        <FeedPanel rows={shownRows} reachable={wState.reachable || wSse === "open"} emptyText={chainMode ? (chain ? "No treasury movements in the latest Mirror Node page." : "Reading the Mirror Node…") : undefined} />
-        <ContainPanel s={shownContain} reduced={reduced} relations={relations} extra={replayButton || undefined} />
-      </main>
-      <DemoPanel chain={chainMode} />
-      <PassesStrip passes={chainMode ? [] : Object.values(passes)} reachable={cPasses.reachable || cSse === "open"} reduced={reduced} chain={chainMode} />
+      <TopBar treasury={treasuryRel} health={health} arkiv={arkiv} mirrorOk={mirrorOk} chain={chainMode} />
+      <KpiStrip kpis={kpis} />
+      <div className="cc-main">
+        <aside className="cc-col cc-story card-dark" aria-labelledby="story-h">
+          {chainMode ? (
+            <ChainStory genuine={genuine} replay={replay} onReplay={() => setReplay({ startMs: Date.now(), done: false })} />
+          ) : (
+            <StoryPanel story={story} up={runner.up} busy={runner.busy} run={runner.run} error={runner.error} onRun={go} />
+          )}
+          <p className={`cc-caption${mode.kind === "live" ? " live" : ""}`} aria-live="polite">
+            {caption}
+          </p>
+          {otherToken && (
+            <p className="dim small">
+              This demo watches {sym} ({deploy.token.tokenId}) on Hedera {deploy.network}. Watching {otherToken} needs its own Levee setup.
+            </p>
+          )}
+        </aside>
+        <section className="cc-col cc-centre" aria-label="Live view">
+          <Pipeline s={shownPipe} />
+          <ContainPanel s={shownContain} reduced={reduced} extra={null} />
+          <LiveChart
+            treasury={series.treasury}
+            supply={series.supply}
+            events={chartEvents}
+            now={now}
+            symbol={sym}
+            note={`Polled from the Mirror Node every 3 s.${series.seeded ? " Treasury history seeded from Mirror transactions;" : ""} supply line starts when this page opened.`}
+          />
+        </section>
+        <aside className="cc-col cc-proof" aria-label="Proof">
+          <ProofPanel links={proof} />
+          <BeforeAfter leveeS={leveeS} />
+          <FeedPanel rows={shownRows} reachable={wState.reachable || wSse === "open"} emptyText={chainMode ? (chain ? "No treasury movements in the latest Mirror Node page." : "Reading the Mirror Node…") : undefined} />
+        </aside>
+      </div>
     </div>
   );
+}
+
+function proofLinks(o: { chain: boolean; run: RunView | null; contain: ContainState; mint: boolean }): ProofLink[] {
+  const fromContain = proofFromContain(o.contain, { hashscanTx: hashscan.tx, treasury: deploy.treasury, mint: o.mint });
+  const topic = o.contain.phase === "contained" ? [{ label: "Incident on HCS", url: hashscan.topic(deploy.topics.incidents) }] : [];
+  if (o.chain || !o.run) return dedupeLinks([...fromContain, ...topic]);
+  const fromRun = proofFromRun(o.run.lines ?? [], o.run.links);
+  const runStart = Date.parse(o.run.startedAt);
+  const containFresh = o.contain.phase !== "idle" && (o.run.kind === "attack" || o.run.kind === "mint") && (o.contain.startMs === undefined || o.contain.startMs >= runStart - 5_000);
+  return dedupeLinks(containFresh ? [...fromRun, ...fromContain, ...topic] : fromRun);
 }
 
 function useRelations(key: string, everyMs: number): Relations {
@@ -221,12 +317,12 @@ function useRelations(key: string, everyMs: number): Relations {
 // ------------------------------------------------------------------ top bar
 
 const HEALTH_WORD: Record<ServiceStatus, string> = { up: "up", degraded: "unhealthy", off: "off", checking: "…", local: "local only" };
+const ARKIV_WORD = { live: "live", expired: "expired", off: "off", hosted: "operator only" } as const;
 
-function TopBar({ relations, health, lagMs, chain = false }: { relations: Relations; health: [string, ServiceStatus][]; lagMs: number | null; chain?: boolean }) {
-  const t = relations[deploy.treasury];
-  const frozen = t?.freeze === "FROZEN";
+export function TopBar({ treasury, health, arkiv, mirrorOk, chain = false }: { treasury?: TokenRelation | null; health: [string, ServiceStatus][]; arkiv: keyof typeof ARKIV_WORD; mirrorOk: boolean; chain?: boolean }) {
+  const frozen = treasury?.freeze === "FROZEN";
   return (
-    <header className="topbar">
+    <header className="topbar cc-top">
       <Link to="/" className="wordmark">
         ▲ Levee
       </Link>
@@ -235,49 +331,90 @@ function TopBar({ relations, health, lagMs, chain = false }: { relations: Relati
       </a>
       <span className="tb-item">
         <span className="dim">Treasury</span>
-        <span className="mono num">{t?.balance != null ? `${fmt(t.balance)} ${sym}` : "…"}</span>
-        <span className={`state-badge ${t ? (frozen ? "frozen" : "open") : ""}`}>{t ? (frozen ? "FROZEN" : "OPEN") : "…"}</span>
+        <span className="mono num tb-bal">{treasury?.balance != null ? `${fmt(treasury.balance).replace(/(\.\d{2})\d+$/, "$1")} ${sym}` : "…"}</span>
+        <span className={`state-badge ${treasury ? (frozen ? "frozen" : "open") : ""}`}>{treasury ? (frozen ? "FROZEN" : "OPEN") : "…"}</span>
       </span>
-      <span className="tb-health" aria-label="Service health">
-        {health.map(([name, st]) => (
-          <span key={name} className="tb-dot" title={`${name}: ${HEALTH_WORD[st]}`}>
-            <i className={`dot ${st}`} aria-hidden="true" />
+      <span className="tb-health" aria-label="Status">
+        {health.map(([name, s]) => (
+          <span key={name} className="tb-dot" title={`${name}: ${HEALTH_WORD[s]}`}>
+            <i className={`dot ${s}`} aria-hidden="true" />
             {name}
-            {st === "up" ? <span className="sr-only"> up</span> : <span className="dim"> {HEALTH_WORD[st]}</span>}
+            {s === "up" ? <span className="sr-only"> up</span> : <span className="dim"> {HEALTH_WORD[s]}</span>}
           </span>
         ))}
-        {chain ? (
-          <span className="tb-dot">
-            <span className="dim">Data</span> Mirror Node
-          </span>
-        ) : (
-          <span className="tb-dot mono">
-            <span className="dim">Mirror lag</span> {lagMs === null ? "–" : `${(lagMs / 1000).toFixed(1)} s`}
-          </span>
-        )}
+        <a className={`arkiv-chip a-${arkiv}`} href={ARKIV_EXPLORER} target="_blank" rel="noreferrer" title="Phase 2 machine health pass on Arkiv (optional rule)">
+          Arkiv pass: {ARKIV_WORD[arkiv]} {arkiv === "live" && <i className="dot up" aria-hidden="true" />}
+        </a>
+        <span className="tb-dot net">
+          <i className={`dot ${mirrorOk ? "up" : "checking"}`} aria-hidden="true" />
+          Hedera {deploy.network} · {chain ? "Mirror Node" : "live"}
+        </span>
       </span>
     </header>
   );
 }
 
-// ------------------------------------------------------------------ breach banner
+// ------------------------------------------------------------------ KPI strip
 
-function Banner({ mode, contain, reduced }: { mode: BreachMode; contain: ContainState; reduced: boolean }) {
-  const now = useNow(reduced ? 1000 : 97, mode.kind === "live");
-  if (mode.kind === "calm") return null;
-  if (mode.kind === "live") {
-    return (
-      <div className="banner live" role="alert">
-        <i className="dot breach" aria-hidden="true" />
-        Unreceipted transfer — containing…
-        <span className="mono num">{stopwatch(elapsedMs(contain, now))} s</span>
-      </div>
-    );
-  }
+export function KpiStrip({ kpis }: { kpis: Kpi[] }) {
   return (
-    <div className="banner contained" role="status">
-      ✓ Contained in <span className="mono num">{mode.seconds.toFixed(2)} s</span>
-    </div>
+    <ul className="cc-kpis" aria-label="Key figures">
+      {kpis.map((k) => (
+        <li key={k.key} className={`kpi${k.tone ? ` k-${k.tone}` : ""}`} title={k.sub ? `${k.label}: ${k.value} (${k.sub})` : undefined}>
+          <span className="kpi-label">{k.label}</span>
+          <span className="kpi-value mono num">{k.value}</span>
+          {k.sub && <span className="kpi-sub">{k.sub}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ------------------------------------------------------------------ story
+
+export function StoryPanel({ story, up, busy, run, error, onRun }: { story: StoryState; up: boolean; busy: boolean; run: RunView | null; error: string | null; onRun: (k: RunKind) => void }) {
+  return (
+    <>
+      <div className="card-head">
+        <h2 id="story-h">
+          The <span className="accent">story</span>
+        </h2>
+        <span className="eyebrow">{up ? "live on testnet" : "demo runner off"}</span>
+      </div>
+      <ol className="stepper">
+        {STORY.map((s) => {
+          const tone = stepTone(story, s.id);
+          return (
+            <li key={s.id} className={`step t-${tone}`}>
+              <button type="button" className={`step-btn${s.primary ? " primary" : ""}`} disabled={!up || busy} onClick={() => onRun(s.kind)} aria-current={tone === "active" ? "step" : undefined}>
+                <span className="step-n" aria-hidden="true">
+                  {tone === "done" ? "✓" : s.n}
+                </span>
+                <span className="step-text">
+                  <b>{s.label}</b>
+                  <small>{tone === "active" && story.running ? "running…" : tone === "failed" ? "failed, see log" : s.sub}</small>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      <button type="button" className="btn ghost small reset-btn" disabled={!up || busy} onClick={() => onRun("reset")}>
+        ↺ Reset demo
+      </button>
+      {!up && (
+        <p className="dim small">
+          Start the buttons with <code>DEMO_MODE=1 npm run demo:runner</code>.
+        </p>
+      )}
+      {error && <p className="small warn">{error}</p>}
+      {run && (
+        <p className={`run-line small mono r-${run.status}`}>
+          {run.kind} · {run.status === "running" ? "running…" : run.status === "ok" ? "done" : "failed"}
+          {run.status === "failed" && run.lines?.length ? <span className="dim"> · {run.lines[run.lines.length - 1].slice(0, 90)}</span> : null}
+        </p>
+      )}
+    </>
   );
 }
 
@@ -285,10 +422,40 @@ export const CHAIN_BANNER = "Services run on the operator's machine. Showing the
 
 export function ChainBanner() {
   return (
-    <div className="banner chain" role="status">
-      <i className="dot up" aria-hidden="true" />
-      {CHAIN_BANNER}
-    </div>
+    <p className="chain-note small" role="status">
+      <i className="dot up" aria-hidden="true" /> {CHAIN_BANNER}
+    </p>
+  );
+}
+
+function ChainStory({ genuine, replay, onReplay }: { genuine: { incident: Incident; consensusAt: string } | null; replay: { done: boolean } | null; onReplay: () => void }) {
+  return (
+    <>
+      <div className="card-head">
+        <h2 id="story-h">
+          The <span className="accent">story</span>
+        </h2>
+        <span className="eyebrow">hosted · Mirror Node</span>
+      </div>
+      <ChainBanner />
+      {genuine ? (
+        <div className="replay-box">
+          <button type="button" className="btn" disabled={!!replay && !replay.done} onClick={onReplay}>
+            {replay?.done ? "Replay again" : "Replay latest incident"}
+          </button>
+          <span className="dim small">Replays the step times recorded on chain for the incident of {formatDate(genuine.consensusAt)}. Not a live event.</span>
+        </div>
+      ) : (
+        <p className="dim small">Reading the incidents topic…</p>
+      )}
+      <p className="dim small">
+        The demo buttons drive the operator's own services. To run it yourself, clone{" "}
+        <a href={GITHUB} target="_blank" rel="noreferrer">
+          the repo
+        </a>{" "}
+        and run, for example, <code>{RUN_BUTTONS.find((b) => b.kind === "attack")!.cmd}</code>.
+      </p>
+    </>
   );
 }
 
@@ -322,71 +489,115 @@ export function Pipeline({ s }: { s: PipelineState }) {
   );
 }
 
-// ------------------------------------------------------------------ treasury
+// ------------------------------------------------------------------ containment stopwatch
 
-function TreasuryCard({ relations, spentToday, capPerDay }: { relations: Relations; spentToday?: string; capPerDay?: string }) {
-  const t = relations[deploy.treasury];
-  const frozen = Object.entries(relations).filter(([, r]) => r.freeze === "FROZEN");
-  const name = (id: string) => (id === deploy.treasury ? "treasury" : id === deploy.attacker ? "thief (demo)" : (payeeName(id) ?? "receiver"));
+export function ContainPanel({ s, reduced, extra }: { s: ContainState; reduced: boolean; extra?: ReactNode }) {
+  const now = useNow(reduced ? 1000 : 47, s.phase === "running");
+  const ms = elapsedMs(s, now);
+  const stalled = s.phase === "running" && ms > 120_000;
+  const stateText = s.source === "replay" ? (s.phase === "running" ? "Replay · containing (recorded)" : "Replay · contained (recorded)") : s.phase === "running" ? (stalled ? "Breach · waiting for the watcher" : "Breach live · containing") : s.phase === "contained" ? "Contained" : "All movements have receipts";
+  const ms3 = milestones(s, deploy.treasury);
   return (
-    <section className="card-dark treasury" aria-labelledby="tr-h">
-      <div className="card-head">
-        <h2 id="tr-h">Treasury</h2>
-        <a className="dim mono small" href={hashscan.account(deploy.treasury)} target="_blank" rel="noreferrer">
-          {deploy.treasury}
-        </a>
+    <section className={`card-dark contain cc-watch ${s.phase}`} aria-labelledby="contain-h">
+      <div className={`watch ${s.phase}`} role="timer" aria-live="off">
+        <span className="state-line">
+          <i className={`dot ${s.phase === "running" ? "breach" : s.phase === "contained" ? "up" : ""}`} aria-hidden="true" />
+          <span id="contain-h">{stateText}</span>
+          {s.source === "hcs" && <span className="dim"> · last incident, from HCS</span>}
+          {s.source === "watcher" && <span className="dim"> · last incident</span>}
+          {s.source === "replay" && <span className="dim"> · replay · recorded on-chain data</span>}
+        </span>
+        <span className="digits mono num">
+          {stopwatch(ms)}
+          <small>s</small>
+        </span>
       </div>
-      <div className="big-balance mono num">
-        {t?.balance != null ? <BigAmount text={fmt(t.balance)} /> : "…"} <small>{sym}</small>
-      </div>
-      <div className={`state-line-lg ${t?.freeze === "FROZEN" ? "frozen" : "open"}`}>
-        <i className="dot" aria-hidden="true" />
-        {t ? (t.freeze === "FROZEN" ? "Frozen · two of three admins must reopen" : "Open · every send needs a receipt first") : "Reading Mirror Node…"}
-      </div>
-      {spentToday !== undefined && capPerDay !== undefined && (
-        <div className="cap">
-          <div className="cap-row small">
-            <span className="dim">Phase 2 cap · sent today</span>
-            <span className="mono num">
-              {fmt(spentToday)} / {fmt(capPerDay)}
-            </span>
-          </div>
-          <div className="meter" aria-hidden="true">
-            <i style={{ transform: `scaleX(${Math.min(1, Number(spentToday) / Math.max(1, Number(capPerDay)))})` }} />
-          </div>
-        </div>
-      )}
-      <div>
-        <span className="eyebrow">Frozen accounts</span>
-        {frozen.length === 0 ? (
-          <p className="dim small">None. Nothing is frozen right now.</p>
-        ) : (
-          <ul className="frozen-list">
-            {frozen.map(([id, r]) => (
-              <li key={id}>
-                <a className="mono" href={hashscan.account(id)} target="_blank" rel="noreferrer">
-                  {id}
-                </a>
-                <span className="dim small">
-                  {name(id)}
-                  {r.balance != null ? ` · ${fmt(r.balance)} ${sym}` : ""}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ol className="milestones">
+        {ms3.map((m) => (
+          <li key={m.key} className={m.ms === null ? "pending" : "landed"}>
+            <span className="ms-t mono num">{m.ms === null ? "–" : `${stopwatch(m.ms)} s`}</span>
+            <span className="ms-l">{m.label}</span>
+          </li>
+        ))}
+      </ol>
+      {extra}
     </section>
   );
 }
 
-function BigAmount({ text }: { text: string }) {
-  const [whole, frac] = text.split(".");
+// ------------------------------------------------------------------ proof (QR)
+
+const QR_SHOWN = 4;
+export function ProofPanel({ links }: { links: ProofLink[] }) {
+  const qr = links.slice(0, QR_SHOWN);
+  const rest = links.slice(QR_SHOWN);
   return (
-    <>
-      {whole}
-      {frac && <span className="frac">.{frac.slice(0, 2)}</span>}
-    </>
+    <section className="card-dark cc-proofs" aria-labelledby="proof-h">
+      <div className="card-head">
+        <h2 id="proof-h">
+          <span className="accent">Proof</span> on HashScan
+        </h2>
+        <span className="eyebrow">scan with your phone</span>
+      </div>
+      {links.length === 0 ? (
+        <p className="dim small">Run a step: its receipt, transfer, freeze and wipe show up here with QR codes.</p>
+      ) : (
+        <ul className="qr-grid">
+          {qr.map((l) => (
+            <li key={l.url}>
+              <a href={l.url} target="_blank" rel="noreferrer">
+                <QR text={l.url} label={l.label} />
+                <span className="qr-label">{l.label}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+      {rest.length > 0 && (
+        <p className="more-links small">
+          {rest.map((l) => (
+            <a key={l.url} href={l.url} target="_blank" rel="noreferrer">
+              {l.label}
+            </a>
+          ))}
+        </p>
+      )}
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------ before / after
+
+const BEFORE = ["Resolv USR", "StablR", "Gala Games"];
+export function BeforeAfter({ leveeS }: { leveeS: number | null }) {
+  const rows = INDUSTRY.filter((c) => BEFORE.includes(c.name));
+  return (
+    <section className="card-dark cc-before" aria-labelledby="ba-h">
+      <div className="card-head">
+        <h2 id="ba-h">Before / after</h2>
+        <span className="eyebrow">time to contain · log scale</span>
+      </div>
+      <ul className="ba-bars">
+        {rows.map((c) => (
+          <li key={c.name}>
+            <a className="ba-name" href={c.source} target="_blank" rel="noreferrer" title={`${c.what} (${c.sourceName})`}>
+              {c.name}
+            </a>
+            <span className="ba-track" aria-hidden="true">
+              <i style={{ width: `${Math.max(2, logPos(c.seconds) * 100)}%` }} />
+            </span>
+            <span className="ba-val mono">{c.name === "StablR" ? `${c.shown} to ack.` : c.shown}</span>
+          </li>
+        ))}
+        <li className="levee">
+          <span className="ba-name">Levee</span>
+          <span className="ba-track" aria-hidden="true">
+            <i style={{ width: leveeS === null ? 0 : `${Math.max(2, logPos(leveeS) * 100)}%` }} />
+          </span>
+          <span className="ba-val mono">{leveeS === null ? "run ②" : `${leveeS.toFixed(2)} s`}</span>
+        </li>
+      </ul>
+    </section>
   );
 }
 
@@ -412,7 +623,7 @@ function rowTime(r: FeedRow): string {
 
 export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; reachable: boolean; emptyText?: string }) {
   return (
-    <section className="card-dark feed" aria-labelledby="feed-h">
+    <section className="card-dark feed cc-feed" aria-labelledby="feed-h">
       <div className="card-head">
         <h2 id="feed-h">Every move</h2>
         <span className="eyebrow">newest first</span>
@@ -439,7 +650,6 @@ export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; rea
                   {r.status === "refused" && <span>{reason ?? "refused"}</span>}
                   {r.status === "breach" && <span>{isLiveBreach(r) ? "containing" : "frozen and clawed back"}</span>}
                   {r.status !== "refused" && reason && <span>{reason}</span>}
-                  {r.machine && <span>issuer app {r.machine}</span>}
                   {r.kind === "mint" && <span>mint</span>}
                   {r.receiptTxId && (
                     <a href={hashscan.tx(r.receiptTxId)} target="_blank" rel="noreferrer">
@@ -458,319 +668,5 @@ export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; rea
         })}
       </ol>
     </section>
-  );
-}
-
-// ------------------------------------------------------------------ containment stopwatch
-
-export function ContainPanel({ s, reduced, relations = {}, extra }: { s: ContainState; reduced: boolean; relations?: Relations; extra?: ReactNode }) {
-  const now = useNow(reduced ? 1000 : 47, s.phase === "running");
-  const ms = elapsedMs(s, now);
-  const stalled = s.phase === "running" && ms > 120_000;
-  const treasury = relations[deploy.treasury]?.freeze;
-  const receiver = s.breachTo ? relations[s.breachTo]?.freeze : undefined;
-
-  const stateText = s.source === "replay" ? (s.phase === "running" ? "Replay · containing (recorded)" : "Replay · contained (recorded)") : s.phase === "running" ? (stalled ? "Breach · waiting for the watcher" : "Breach live · containing") : s.phase === "contained" ? "Contained" : "All movements have receipts";
-  const planned = s.plannedSteps ?? Math.max(s.steps.length, 2);
-  const total = planned + 2; // detected + steps + published
-  const done = s.phase === "contained" ? total : (s.detectedMs !== undefined ? 1 : 0) + s.steps.length;
-  const frac = s.phase === "idle" ? 0 : Math.min(1, done / total);
-
-  return (
-    <section className={`card-dark contain ${s.phase}`} aria-labelledby="contain-h">
-      <div className="card-head">
-        <h2 id="contain-h">Containment</h2>
-        {s.source === "hcs" && <span className="eyebrow">last incident · from HCS</span>}
-        {s.source === "watcher" && <span className="eyebrow">last incident</span>}
-        {s.source === "replay" && <span className="eyebrow">replay · recorded on-chain data</span>}
-      </div>
-
-      <div className={`watch ${s.phase}`} role="timer" aria-live="off">
-        <span className="state-line">
-          <i className={`dot ${s.phase === "running" ? "breach" : s.phase === "contained" ? "up" : ""}`} aria-hidden="true" />
-          {stateText}
-        </span>
-        <span className="digits mono num">
-          {stopwatch(ms)}
-          <small>s</small>
-        </span>
-        <span className="dim small">from the theft reaching consensus to the last containment step</span>
-      </div>
-
-      {extra}
-
-      <div className="progress" aria-hidden="true">
-        <i style={{ transform: `scaleX(${frac})` }} />
-      </div>
-
-      {s.phase !== "idle" && (
-        <ol className="steps">
-          {s.breachTxId && (
-            <li className="row">
-              <span className="t mono num">0.00</span>
-              <span className="lbl">
-                {s.breachAmount ? `${fmt(s.breachAmount)} ${sym}` : "Tokens"} moved with no receipt{s.breachTo ? ` → ${s.breachTo}` : ""}
-                <a href={hashscan.tx(s.breachTxId)} target="_blank" rel="noreferrer">
-                  HashScan
-                </a>
-              </span>
-            </li>
-          )}
-          {s.detectedMs !== undefined && (
-            <li className="row">
-              <span className="t mono num">{stopwatch(s.detectedMs)}</span>
-              <span className="lbl">Check ✗ no receipt found</span>
-            </li>
-          )}
-          {s.steps.map((a) => (
-            <li className="row landed" key={`${a.step}|${a.account ?? ""}|${a.txId ?? a.atMs}`}>
-              <span className="t mono num">{stopwatch(a.atMs)}</span>
-              <span className={`lbl ${a.ok ? "" : "fail"}`}>
-                {stepLabel(a.step, a.account, a.amount, { treasury: deploy.treasury, fmt, symbol: sym })}
-                {!a.ok && " (failed)"}
-                {a.txId && (
-                  <a href={hashscan.tx(a.txId)} target="_blank" rel="noreferrer">
-                    HashScan
-                  </a>
-                )}
-              </span>
-            </li>
-          ))}
-          {s.phase === "running" && s.plannedSteps !== undefined && s.steps.length < s.plannedSteps && (
-            <li className="row">
-              <span className="t">…</span>
-              <span className="lbl dim">
-                {s.plannedSteps - s.steps.length} step{s.plannedSteps - s.steps.length > 1 ? "s" : ""} to go
-              </span>
-            </li>
-          )}
-          {s.phase === "contained" && (
-            <li className="row">
-              <span className="t">✓</span>
-              <span className="lbl">
-                Incident published
-                <a href={hashscan.topic(deploy.topics.incidents)} target="_blank" rel="noreferrer">
-                  topic {deploy.topics.incidents}
-                </a>
-              </span>
-            </li>
-          )}
-        </ol>
-      )}
-
-      <div className="reopen-box">
-        <span className="eyebrow">Reopen · 2 of 3 admins</span>
-        <span>
-          Treasury <b>{freezeWord(treasury)}</b>
-          {s.breachTo && (
-            <>
-              {" "}
-              · receiver {s.breachTo} <b>{freezeWord(receiver)}</b>
-            </>
-          )}
-        </span>
-        <span className="dim small">
-          {treasury === "FROZEN" ? "The contract can only close. Two of the three admins must sign to reopen." : treasury === "UNFROZEN" && s.phase === "contained" ? "Open again: two admins signed the reopen." : "Open. The contract closes it the moment tokens leave with no receipt."}
-        </span>
-      </div>
-    </section>
-  );
-}
-
-function freezeWord(f: string | undefined): string {
-  return f === "FROZEN" ? "frozen" : f === "UNFROZEN" ? "open" : f === "NOT_APPLICABLE" ? "n/a" : "…";
-}
-
-// ------------------------------------------------------------------ Phase 2: machine health (Arkiv)
-
-const R = 17;
-export const ADDON_KEY = "levee.addon.machineHealth";
-function readOpen(): boolean {
-  try {
-    return window.localStorage.getItem(ADDON_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function saveOpen(open: boolean) {
-  try {
-    window.localStorage.setItem(ADDON_KEY, open ? "1" : "0");
-  } catch {
-    /* storage blocked: the toggle still works for this visit */
-  }
-}
-
-export function PassesStrip({ passes, reachable, reduced, chain = false }: { passes: PassView[]; reachable: boolean; reduced: boolean; chain?: boolean }) {
-  const [open, setOpen] = useState(readOpen);
-  const now = useNow(reduced ? 1000 : 250, open);
-  const sorted = [...passes].sort((a, b) => a.machine.localeCompare(b.machine));
-  const toggle = () => {
-    const next = !open;
-    saveOpen(next);
-    setOpen(next);
-  };
-  return (
-    <section className={`passes addon${open ? " open" : ""}`} aria-labelledby="passes-h">
-      <div className="passes-head">
-        <h2 id="passes-h">
-          <button type="button" className="addon-toggle" aria-expanded={open} aria-controls="passes-body" onClick={toggle}>
-            <span className="addon-caret" aria-hidden="true">
-              ▸
-            </span>
-            Phase 2: machine health (Arkiv)
-          </button>
-        </h2>
-        <span className="eyebrow">stricter rules · optional, not needed for the main rule</span>
-        <a className="small" href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
-          Arkiv explorer
-        </a>
-      </div>
-      {open && (
-        <div id="passes-body" className="addon-body">
-          <p className="dim small">
-            With this rule on, Levee only writes a receipt for a treasury service that holds a health pass on Arkiv. The pass expires in {PASS_SECONDS / 60} minutes unless the machine renews it.
-            {chain && " The health check runs on the operator's machine, so live countdowns are not shown here."}
-            {!chain && !reachable && " The health check is off. Start it with npm run checker."}
-          </p>
-          {!chain && reachable && sorted.length === 0 && <p className="dim small">No machines enrolled yet.</p>}
-          <ul className="pass-chips">
-            {sorted.map((p) => {
-              const left = passLeftMs(p, now);
-              const live = left > 0;
-              const g = ring(left, PASS_SECONDS * 1000, R);
-              return (
-                <li key={p.machine} className={`pass-chip ${live ? (g.frac < RING_LOW ? "low" : "live") : "dead"}`}>
-                  <svg className="ring" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
-                    <circle cx="20" cy="20" r={R} className="ring-bg" />
-                    <circle cx="20" cy="20" r={R} className="ring-fg" strokeDasharray={g.circumference} strokeDashoffset={g.offset} transform="rotate(-90 20 20)" />
-                  </svg>
-                  <span className="pass-text">
-                    <span className="mono name">{p.machine}</span>
-                    <span className="small dim">{live ? `healthy · ${countdown(left)} left` : (p.reason ?? "no health pass · no receipt")}</span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ------------------------------------------------------------------ demo panel
-
-// Requests must be signed with the machine's key, so the CLI (not a raw curl) is the copyable command.
-const payCmd = `npm run request -- --machine payouts-server --to ${deploy.payees[0] ?? "0.0.x"} --amount 500`;
-const cliFor = (k: RunKind, cmd: string) => (k === "pay" ? payCmd : cmd);
-
-export function DemoPanel({ chain = false }: { chain?: boolean }) {
-  const runner = usePoll<{ ok: boolean; busy: RunView | null }>(chain ? "" : serviceUrl("runner", "/health"), 10_000, 3000);
-  const [run, setRun] = useState<RunView | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const running = run?.status === "running" || (!!runner.data?.busy && runner.data.busy.id !== run?.id);
-
-  useEffect(() => {
-    if (!run || run.status !== "running") return;
-    let alive = true;
-    const t = setInterval(async () => {
-      const r = await getRun(run.id);
-      if (alive && r) setRun(r);
-    }, 700);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [run?.id, run?.status]);
-
-  const go = async (kind: RunKind) => {
-    setError(null);
-    const r = await startRun(kind);
-    if (r.ok) setRun({ ...r.run, lines: [] });
-    else setError(r.error);
-  };
-
-  const up = runner.ok && !chain;
-  return (
-    <section className="demo-panel card-dark" aria-labelledby="demo-h">
-      <div className="card-head">
-        <h2 id="demo-h">
-          Run the <span className="accent">demo</span>
-        </h2>
-        <span className="eyebrow">{up ? "demo runner · testnet" : "from the repo root"}</span>
-      </div>
-      {up ? (
-        <>
-          <div className="demo-buttons">
-            {RUN_BUTTONS.map((b) => (
-              <button key={b.kind} type="button" className={`btn ${b.primary ? "" : "ghost"}`} disabled={running} onClick={() => go(b.kind)}>
-                {b.label}
-              </button>
-            ))}
-          </div>
-          {error && <p className="small warn">{error}</p>}
-          {run && (
-            <div className={`run-log ${run.status}`}>
-              <div className="run-head small">
-                <span className="mono">
-                  {run.kind} · {run.status === "running" ? "running…" : run.status === "ok" ? "done" : "failed"}
-                </span>
-                {run.links.map((u) => (
-                  <a key={u} className="mono" href={u} target="_blank" rel="noreferrer">
-                    {linkLabel(u)}
-                  </a>
-                ))}
-              </div>
-              <pre aria-live="polite">{(run.lines ?? []).slice(-14).join("\n") || "starting…"}</pre>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          {chain ? (
-            <p className="dim small">
-              The demo buttons drive the operator's own services, so they are not available here. To run it yourself, clone{" "}
-              <a href={GITHUB} target="_blank" rel="noreferrer">
-                the repo
-              </a>{" "}
-              and, with npm run gate, watcher and checker up, run from its root:
-            </p>
-          ) : (
-            <p className="dim small">
-              Start the buttons with <code>DEMO_MODE=1 npm run demo:runner</code>, or run these with npm run gate, watcher and checker up:
-            </p>
-          )}
-          <div className="cmds">
-            {RUN_BUTTONS.map((b) => (
-              <Cmd key={b.kind} label={b.label} cmd={cliFor(b.kind, b.cmd)} />
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-function Cmd({ label, cmd }: { label: string; cmd: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(cmd);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard blocked: the text is selectable */
-    }
-  };
-  return (
-    <div className="cmd">
-      <code>
-        <span className="label">{label}</span>
-        {cmd}
-      </code>
-      <button type="button" className="btn ghost small" onClick={copy} aria-label={`Copy: ${cmd}`}>
-        {copied ? "Copied" : "Copy"}
-      </button>
-    </div>
   );
 }
