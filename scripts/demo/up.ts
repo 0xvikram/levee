@@ -1,7 +1,7 @@
 // Bring the Levee demo up: checker (real Arkiv) -> agents -> watcher (WATCHER_SINCE=now) -> gate.
 // Each service runs detached in its own process group; logs in state/logs/<name>.log, pids in
 // state/demo.pids.json (scripts/demo/down.sh stops them). Usage:
-//   npx tsx scripts/demo/up.ts [--memory] [--no-laptop] [--restart]
+//   npx tsx scripts/demo/up.ts [--memory] [--no-laptop] [--restart] [--allow-sleep]
 // Env passes through (e.g. CAP_PER_DAY=200000 for the normal-load run, HEARTBEAT_SECONDS).
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -79,6 +79,15 @@ async function main() {
   if (running.length) spawnSync(path.join(ROOT, "scripts/demo/down.sh"), { stdio: "inherit" });
   for (const k of Object.keys(pids)) delete pids[k];
 
+  // Keep the Mac awake while the demo runs: idle sleep paused every service mid-way through the
+  // 300-transfer run (docs/LIVE_RUN.md). caffeinate is in its own process group, so down.sh stops it.
+  if (process.platform === "darwin" && !has("allow-sleep")) {
+    const c = spawn("caffeinate", ["-i", "-m", "-s"], { detached: true, stdio: "ignore" });
+    c.unref();
+    pids.caffeinate = c.pid!;
+    fs.writeFileSync(PIDS, JSON.stringify(pids, null, 2));
+    console.log(`  caffeinate (no idle sleep while the demo runs) pid ${c.pid}`);
+  }
   console.log(`Levee demo up (caps: ${env.capPerTransfer} RUPC per transfer, ${env.capPerDay} RUPC per day)`);
   start("checker", ["src/checker/server.ts", ...(has("memory") ? ["--memory"] : [])]);
   await waitFor("checker answering", async () => (await getJson(`${CHECKER}/passes`)).status === 200, 30, "checker");
