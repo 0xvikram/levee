@@ -31,15 +31,18 @@ const GAS: Record<ContainmentStep["step"], number> = {
 const bytes32 = (hex: string) => Uint8Array.from(Buffer.from(hex.replace(/^0x/, ""), "hex"));
 
 /** Controller ABI arguments for one step (exported for tests). */
-export function controllerArgs(step: ContainmentStep, incidentId: string): { fn: string; params: ContractFunctionParameters } {
+export function controllerArgs(step: ContainmentStep, incidentId: string, evm?: string): { fn: string; params: ContractFunctionParameters } {
   const p = new ContractFunctionParameters();
   const id = bytes32(incidentId);
+  // Studio rejects the long-zero address of an account that has an EVM alias (INVALID_ACCOUNT_ID),
+  // so callers pass the account's real EVM address (see resolveEvm); long-zero is only a fallback.
+  const addr = () => evm ?? longZero(step.account!);
   switch (step.step) {
     case "freezeAccount":
-      return { fn: "freezeAccount", params: p.addAddress(longZero(step.account!)).addBytes32(id) };
+      return { fn: "freezeAccount", params: p.addAddress(addr()).addBytes32(id) };
     case "wipeAndFreeze":
     case "wipeFrozen":
-      return { fn: step.step, params: p.addAddress(longZero(step.account!)).addInt64(Long.fromString(step.amount!)).addBytes32(id) };
+      return { fn: step.step, params: p.addAddress(addr()).addInt64(Long.fromString(step.amount!)).addBytes32(id) };
     case "burnSupply":
       return { fn: "burnSupply", params: p.addInt64(Long.fromString(step.amount!)).addBytes32(id) };
     case "pauseToken":
@@ -47,9 +50,30 @@ export function controllerArgs(step: ContainmentStep, incidentId: string): { fn:
   }
 }
 
+const evmCache = new Map<string, string>();
+/** The account's real EVM address from the Mirror Node (alias if it has one, else long-zero). */
+export async function resolveEvm(accountId: string, mirrorUrl = env.mirrorUrl): Promise<string> {
+  const hit = evmCache.get(accountId);
+  if (hit) return hit;
+  try {
+    const r = await fetch(`${mirrorUrl}/api/v1/accounts/${accountId}`);
+    if (r.ok) {
+      const j = (await r.json()) as { evm_address?: string };
+      if (j.evm_address) {
+        evmCache.set(accountId, j.evm_address);
+        return j.evm_address;
+      }
+    }
+  } catch {
+    /* fall through to long-zero */
+  }
+  return longZero(accountId);
+}
+
 function controllerCaller(client: Client, controllerId: string): ControllerCall {
   return async (step, incidentId) => {
-    const { fn, params } = controllerArgs(step, incidentId);
+    const evm = step.account ? await resolveEvm(step.account) : undefined;
+    const { fn, params } = controllerArgs(step, incidentId, evm);
     const resp = await new ContractExecuteTransaction()
       .setContractId(ContractId.fromString(controllerId))
       .setGas(GAS[step.step])

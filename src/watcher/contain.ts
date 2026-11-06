@@ -181,6 +181,7 @@ export function buildIncident(o: {
       ...(r.txId ? { txId: r.txId } : {}),
       ok: r.ok,
       atMs: r.atMs,
+      ...(r.error ? { error: r.error } : {}), // kept so a failed step can be diagnosed
     })),
     detectedMs: o.detectedAtMs - t0,
     ...(last !== undefined ? { containedMs: last } : {}),
