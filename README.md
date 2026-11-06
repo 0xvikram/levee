@@ -168,6 +168,19 @@ Arkiv (secondary track) stores one pass per machine as an Arkiv entity (`levee.p
 - Who else can use it: [arkiv/reach.md](arkiv/reach.md)
 - Friction log: [arkiv/friction.md](arkiv/friction.md)
 
+**Wallet that writes the entities (the checker):** `0x929adc87e7acf502cff59a7dbb021517be1b876d` on Arkiv Rabdi testnet ([explorer](https://rabdi.explorer.arkiv.network/address/0x929adc87e7acf502cff59a7dbb021517be1b876d)).
+
+**A query you can run (read-only, no keys):**
+
+```bash
+npx tsx scripts/arkiv-query.ts
+# passes owned by 0x929adc87…: 1
+# {"$key":"0x…","$owner":"0x929aDc87…","$expiresAt":"…","machine":"payouts-server","role":"payouts",…}
+# payouts-server live pass: yes
+```
+
+It runs `select().from(levee.pass.v1).ownedBy(<checker wallet>)` and `where(eq("machine", "payouts-server"))` with `@arkiv-network/sdk` against the public Rabdi endpoint (set `ARKIV_ACCESS_KEY` only if you hit its rate limit). A pass disappears about 3 minutes after the machine's last good heartbeat, so "no" means the demo machine is offline, not an error.
+
 ## Live on testnet
 
 All IDs are on Hedera testnet, deployed 6 Nov 2026 (also in [dashboard/src/lib/config.ts](dashboard/src/lib/config.ts)).
