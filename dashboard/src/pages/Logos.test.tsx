@@ -20,9 +20,10 @@ describe("/logos", () => {
 });
 
 describe("SiteLogo", () => {
-  it("renders the current ▲ mark and the word by default", () => {
+  it("renders the chosen chevron mark and the word", () => {
     const { container } = render(<SiteLogo />);
-    expect(container.textContent).toBe("▲ Levee");
-    expect(container.querySelector("svg")).toBeNull();
+    expect(container.textContent).toContain("Levee");
+    expect(container.textContent).not.toContain("▲");
+    expect(container.querySelector("svg")).not.toBeNull();
   });
 });

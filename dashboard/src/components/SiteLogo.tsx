@@ -4,7 +4,7 @@ import { LOGOS, type LogoId } from "./logos";
  * The logo in both navs (landing and /live). To switch to one of the /logos options,
  * change this one line to its id: "embankment" | "chevron" | "monogram" | "sluice".
  */
-const CURRENT = "triangle" as LogoId | "triangle";
+const CURRENT = "chevron" as LogoId | "triangle";
 
 export function SiteLogo({ word = "Levee" }: { word?: string }) {
   const option = LOGOS.find((l) => l.id === CURRENT);
