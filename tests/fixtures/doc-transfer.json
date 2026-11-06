@@ -1,0 +1,113 @@
+{
+  "_note": "Hand-written from Mirror Node REST docs (GET /api/v1/transactions?account.id=0.0.6000). Replace/compare with real mirror-transfer.json.",
+  "transactions": [
+    {
+      "bytes": null,
+      "charged_tx_fee": 1001234,
+      "consensus_timestamp": "1762400010.123456789",
+      "entity_id": null,
+      "max_fee": "200000000",
+      "memo_base64": "",
+      "name": "CRYPTOTRANSFER",
+      "nft_transfers": [],
+      "node": "0.0.4",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.6000", "amount": -500000, "is_approval": false },
+        { "token_id": "0.0.5001", "account": "0.0.6001", "amount": 500000, "is_approval": false }
+      ],
+      "transaction_hash": "q1vKqk7wlvkyH3n0V9pZ8b0ZqT2sKzF0m0m6m9mJ8sYk5QnEY1hD3s7a9m3p2Q1x",
+      "transaction_id": "0.0.6000-1762400005-000000123",
+      "transfers": [
+        { "account": "0.0.4", "amount": 45000, "is_approval": false },
+        { "account": "0.0.98", "amount": 956234, "is_approval": false },
+        { "account": "0.0.6000", "amount": -1001234, "is_approval": false }
+      ],
+      "valid_duration_seconds": "120",
+      "valid_start_timestamp": "1762400005.000000123"
+    },
+    {
+      "bytes": null,
+      "charged_tx_fee": 1001234,
+      "consensus_timestamp": "1762400030.000000001",
+      "entity_id": null,
+      "max_fee": "200000000",
+      "memo_base64": "",
+      "name": "CRYPTOTRANSFER",
+      "nft_transfers": [],
+      "node": "0.0.5",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "staking_reward_transfers": [],
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.6000", "amount": -90000000000, "is_approval": false },
+        { "token_id": "0.0.5001", "account": "0.0.6666", "amount": 90000000000, "is_approval": false }
+      ],
+      "transaction_hash": "x",
+      "transaction_id": "0.0.6000-1762400025-000000999",
+      "transfers": [],
+      "valid_duration_seconds": "120",
+      "valid_start_timestamp": "1762400025.000000999"
+    },
+    {
+      "consensus_timestamp": "1762400040.000000001",
+      "name": "CRYPTOTRANSFER",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "INSUFFICIENT_TOKEN_BALANCE",
+      "scheduled": false,
+      "token_transfers": [],
+      "transaction_id": "0.0.6000-1762400035-000000001",
+      "transfers": []
+    },
+    {
+      "consensus_timestamp": "1762400050.000000001",
+      "name": "CRYPTOTRANSFER",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.6001", "amount": -100, "is_approval": false },
+        { "token_id": "0.0.5001", "account": "0.0.6000", "amount": 100, "is_approval": false }
+      ],
+      "transaction_id": "0.0.6001-1762400045-000000001",
+      "transfers": []
+    },
+    {
+      "consensus_timestamp": "1762400060.000000001",
+      "name": "CRYPTOTRANSFER",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [
+        { "token_id": "0.0.7777", "account": "0.0.6000", "amount": -5, "is_approval": false },
+        { "token_id": "0.0.7777", "account": "0.0.6666", "amount": 5, "is_approval": false }
+      ],
+      "transaction_id": "0.0.6000-1762400055-000000001",
+      "transfers": []
+    },
+    {
+      "consensus_timestamp": "1762400070.000000001",
+      "name": "CRYPTOTRANSFER",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.6000", "amount": -7000, "is_approval": true },
+        { "token_id": "0.0.5001", "account": "0.0.6666", "amount": 7000, "is_approval": false }
+      ],
+      "transaction_id": "0.0.6666-1762400065-000000001",
+      "transfers": []
+    }
+  ],
+  "links": { "next": null }
+}

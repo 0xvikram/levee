@@ -1,0 +1,51 @@
+{
+  "_note": "Hand-written from Mirror Node REST docs (GET /api/v1/transactions/{id}) for a Stablecoin Studio cash-in: parent CONTRACTCALL to the proxy (nonce 0), child TOKENMINT to the token treasury (= proxy), child CRYPTOTRANSFER proxy -> beneficiary. Replace/compare with real mirror-cashin.json.",
+  "transactions": [
+    {
+      "consensus_timestamp": "1762400100.000000005",
+      "entity_id": "0.0.5000",
+      "name": "CONTRACTCALL",
+      "nonce": 0,
+      "parent_consensus_timestamp": null,
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [],
+      "transaction_id": "0.0.6000-1762400095-000000042",
+      "transfers": [
+        { "account": "0.0.6000", "amount": -2100000, "is_approval": false },
+        { "account": "0.0.98", "amount": 2100000, "is_approval": false }
+      ],
+      "valid_start_timestamp": "1762400095.000000042"
+    },
+    {
+      "consensus_timestamp": "1762400100.000000006",
+      "entity_id": "0.0.5001",
+      "name": "TOKENMINT",
+      "nonce": 1,
+      "parent_consensus_timestamp": "1762400100.000000005",
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.5000", "amount": 2500000, "is_approval": false }
+      ],
+      "transaction_id": "0.0.6000-1762400095-000000042",
+      "transfers": []
+    },
+    {
+      "consensus_timestamp": "1762400100.000000007",
+      "entity_id": null,
+      "name": "CRYPTOTRANSFER",
+      "nonce": 2,
+      "parent_consensus_timestamp": "1762400100.000000005",
+      "result": "SUCCESS",
+      "scheduled": false,
+      "token_transfers": [
+        { "token_id": "0.0.5001", "account": "0.0.5000", "amount": -2500000, "is_approval": false },
+        { "token_id": "0.0.5001", "account": "0.0.6001", "amount": 2500000, "is_approval": false }
+      ],
+      "transaction_id": "0.0.6000-1762400095-000000042",
+      "transfers": []
+    }
+  ],
+  "links": { "next": null }
+}
