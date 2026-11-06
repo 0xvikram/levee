@@ -68,7 +68,7 @@ Normal-path cost: 0.004 HBAR (gate, receipt) + 0.016 HBAR (treasury, transfer).
 |---|---|---|---|---|---|
 | 100 | 6 (then 94 `execute-failed`) | 5 | **1 (no-receipt)** | 427 s | 2.27 |
 
-Transfer #5 ([tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793937268-268749224), 415.19 RUPC to payee0) was flagged `no-receipt` 2.0 s after consensus and contained in 6.2 s (treasury frozen, payee0 wiped + frozen). Its receipt existed: seq 7, consensus `1793937276.028`, **0.88 s before** the transfer (`1793937276.906`). The watcher reads movements first and receipts second, which is correct only if both reads see the same Mirror state. They don't: the public Mirror Node REST API is served by several replicas, and the topic-messages request landed on one that had not yet ingested the record file the transactions request had already seen. Every later request then failed with `ACCOUNT_FROZEN_FOR_TOKEN` (the receipts were written, the transfers were refused by the network).
+Transfer #5 ([tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793937268-268749224), 415.19 RUPC to payee0) was flagged `no-receipt` 2.0 s after consensus and contained in 6.2 s (treasury frozen, payee0 wiped + frozen). Its receipt existed: seq 7, consensus `1793937276.028`, **0.88 s before** the transfer (`1793937276.906`). The watcher reads movements first and receipts second, which is correct only if both reads see the same Mirror state. They don't. We first put this down to Mirror replicas disagreeing; the later probe (`scripts/demo/mirror-lag.ts`) found the real cause: the public Mirror Node sits behind a CDN that answers with `cache-control: public, max-age=1`, so an unchanged URL (the receipts query) can return an answer about 1 s old while the movements query is fresh. Fixed for good in commit `4f53393` (section 4). Every later request then failed with `ACCOUNT_FROZEN_FOR_TOKEN` (the receipts were written, the transfers were refused by the network).
 
 Fix (commit `2627532`, tests in `tests/watcher/watcher.test.ts`): a movement whose only fault is "no receipt yet" waits up to `WATCHER_RECEIPT_GRACE_MS` (default 3000 ms, from first sight) for the receipt to be served, and is judged at once when the receipts read already contains any message with a later consensus time (then the read is provably complete for that moment). Nothing else changes: the receipt still has to have reached consensus *before* the movement, so a receipt written after a theft is still `receipt-after-movement`. The price is up to 3 s more detection time for a real theft when the receipts topic is quiet (see section 3). Treasury and payee0 were reopened 2-of-3 ([propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793937812-233962327), [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793937811-620431195); payee0 [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793937816-300565636), [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793937818-321896526)).
 
@@ -88,7 +88,7 @@ Fix (commit `2627532`, tests in `tests/watcher/watcher.test.ts`): a movement who
 
 `CAP_PER_DAY=300000`, seed 3. Gate latency p50 3.47 s / max 5.45 s; watcher `matched` after the gate's reply p50 2.2 s, p95 3.7 s, max 4.9 s. [first](https://hashscan.io/testnet/transaction/0.0.11333495-1793938292-519560107) · [last approved](https://hashscan.io/testnet/transaction/0.0.11333495-1793938965-422941710).
 
-**Three of the 193 matched only because of the receipt grace** (`lateReceiptMatches: 3`): without the fix this run would have raised three false alarms, so the replica race is real and recurring (about 1 in 65 transfers here, 1 in 100 in run A).
+**Three of the 193 matched only because of the receipt grace** (`lateReceiptMatches: 3`): without the fix this run would have raised three false alarms, so the stale-read race is real and recurring (about 1 in 65 transfers here, 1 in 100 in run A). Its cause is the CDN cache, see section 4.
 
 The run did not reach 300 because **the Mac went into idle sleep** at 04:22:54 UTC (`pmset -g log`: "Entering Sleep state due to 'Idle Sleep'") and stayed asleep until ~04:48. All services paused. The remaining 107 requests were refused `no-pass: no heartbeat for 537 s, pass expired (machine offline or asleep, not a breach)`, which is the designed behaviour: a sleeping machine loses its pass and that is reported as offline, never as a breach. After wake the watcher withheld heartbeats until its ticks were fresh again (fail closed), then recovered by itself; the agent re-created its Arkiv pass. `up.sh` now runs `caffeinate -i -m -s` for the life of the demo (opt out with `--allow-sleep`). The 300 run was not repeated (the main session asked for no further runs from this agent).
 
@@ -116,6 +116,44 @@ Compared with the first drain before the fix (10,000 RUPC; detected 4.19 s, trea
 | attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793940643-925485422) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793940645-297104239) |
 
 All seven transactions above returned `SUCCESS` on the Mirror Node (checked 6 Nov 2026).
+
+## 4. After the detection fix: fresh Mirror reads + coverage proof
+
+Commit `4f53393`. The watcher makes every polling URL unique (cache-busted `timestamp=lte:` parameter) so the CDN in front of the public Mirror Node (`max-age=1`) cannot serve it an old answer, and reads one ascending listing of every transaction touching the watched accounts or the gate. Every receipt is a gate-paid submit to the receipts topic, so an answer that holds the movement and no gate submit before it proves the movement has no receipt: breach at once instead of after the 3 s grace. The grace stays as the backstop. Run by the main session, 6 Nov 2026.
+
+### Stolen-key drain, 1,000 RUPC
+
+| step | watcher clock (from theft consensus) | consensus (from theft consensus) | link |
+|---|---|---|---|
+| theft: treasury → attacker `0.0.11333494`, 1,000 RUPC | 0 | consensus `1793942679.469` | [tx](https://hashscan.io/testnet/transaction/0.0.11333495-1793942673-449451952) |
+| detected (`no-receipt`) | 2.865 s | | |
+| treasury frozen (`freezeAccount`) | 4.845 s | 4.17 s | [tx](https://hashscan.io/testnet/transaction/0.0.11333487-1793942676-864043046) |
+| attacker wiped + frozen (`wipeAndFreeze`, 1,000 RUPC) | 6.861 s | 5.62 s | [tx](https://hashscan.io/testnet/transaction/0.0.11333487-1793942678-498951813) |
+| incident published | | seq 5, consensus `1793942686.777` | [topic 0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500) |
+
+Watcher-clock values are the incident's `detectedMs` and `actions[].atMs`; consensus values are from the Mirror Node for the same tx ids. Containment fees: freeze 0.096 HBAR, wipe + freeze 0.138 HBAR (`charged_tx_fee`). Detection is 4 s faster than the grace-only run in section 3 and 1.3 s faster than the first run.
+
+2-of-3 reopen afterwards:
+
+| account | propose (admin0) | approve (admin1) |
+|---|---|---|
+| treasury `0.0.11333495` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793942707-749023249) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793942710-022256943) |
+| attacker `0.0.11333494` | [tx](https://hashscan.io/testnet/transaction/0.0.11333483-1793942713-763876883) | [tx](https://hashscan.io/testnet/transaction/0.0.11333484-1793942712-224380819) |
+
+All seven transactions returned `SUCCESS` on the Mirror Node (checked 6 Nov 2026).
+
+### Run D: N = 100 (seed 5): PASS
+
+| N | approved | matched | breaches | incidents | late-receipt saves |
+|---|---|---|---|---|---|
+| 100 | 100 | **100** | **0** | 0 | 0 |
+
+Watcher `matched` after the gate's reply: p50 1.58 s, max 2.92 s. False-alarm-free payments since the fixes: 393 (runs B, C, D).
+
+### Mirror measurements
+
+- Ingest lag (consensus to first fresh REST sight): p50 1.7 s, p99 2.8 s.
+- gRPC `TopicMessageQuery` delivers about 0.3 s earlier than fresh REST polling, but a stream cannot prove coverage on a quiet topic (no message means either nothing happened or nothing arrived yet), so it was not adopted (`scripts/demo/mirror-stream-lag.ts`).
 
 ## Budget
 

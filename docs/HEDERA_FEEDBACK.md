@@ -20,11 +20,11 @@ Notes for the Hedera and Stablecoin Studio teams, written while building Levee o
 - **Workaround.** Commit `7a09320`: the watcher resolves each account's real EVM address from the Mirror Node (alias if it has one, else long-zero) before any Studio call (`src/watcher/index.ts`, `resolveEvm`). The threshold-key treasury has no alias, so it keeps its long-zero address.
 - **Suggestion.** Accept the long-zero address for aliased accounts in the HTS system contract, or document clearly that it is rejected and return a more specific error.
 
-## 4. Mirror Node replicas disagree for about a second
+## 4. The public Mirror Node's CDN cache can serve a ~1 s old answer
 
-- **What happened.** In false-alarm run A, the watcher read a treasury transfer, then read the receipts topic and did not find the receipt. The receipt had reached consensus 0.88 s before the transfer. The two REST requests landed on different replicas, and the second one had not ingested the record file yet. Containment froze the treasury: one false alarm in 100 payouts. In run C, 3 of 193 matches needed a wait for the same reason (docs/LIVE_RUN.md §2).
-- **Workaround.** Commit `2627532`: a movement whose only fault is "no receipt yet" waits up to 3 s (`WATCHER_RECEIPT_GRACE_MS`) and is judged at once if the receipts read already contains a later message. This adds up to 3 s to detection when the topic is quiet.
-- **Suggestion.** Return the replica's latest ingested consensus timestamp as a response header on every REST call (or support a "consistent as of timestamp T" parameter), so clients can tell when two reads are comparable.
+- **What happened.** In false-alarm run A, the watcher read a treasury transfer, then read the receipts topic and did not find the receipt. The receipt had reached consensus 0.88 s before the transfer. We first blamed replicas disagreeing; a probe (`scripts/demo/mirror-lag.ts`) showed the real cause: the public REST API sits behind a CDN and answers `cache-control: public, max-age=1`, so a repeated URL (our receipts query) can return a cached answer about 1 s old while a fresh URL is current. Containment froze the treasury: one false alarm in 100 payouts. In run C, 3 of 193 matches needed a wait for the same reason (docs/LIVE_RUN.md §2).
+- **Workaround.** Commit `2627532` added a 3 s receipt grace. Commit `4f53393` fixed the cause: every polling URL is made unique (cache-busted), and one ascending listing of every transaction touching the watched accounts or the gate proves when no receipt can still be unread, so a theft is judged at once (detection 2.87 s, 0 false alarms in 393 payments since; docs/LIVE_RUN.md §4).
+- **Suggestion.** Document the CDN `max-age` on the public Mirror Node REST API, and return the latest ingested consensus timestamp as a response header (or support a "consistent as of timestamp T" parameter), so clients can tell whether an answer is fresh and whether two reads are comparable.
 
 ## 5. A frozen account cannot be wiped
 
