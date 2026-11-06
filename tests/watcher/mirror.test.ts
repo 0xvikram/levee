@@ -246,7 +246,8 @@ describe("MirrorClient", () => {
     const m = new MirrorClient({ baseUrl: "https://mirror.test", fetch: f, sleep });
     const out = await m.topicMessagesSince("0.0.10", 4);
     expect(out[0].text).toBe("hi");
-    expect(calls[0]).toContain("/api/v1/topics/0.0.10/messages?sequencenumber=gt:4&order=asc");
+    // gte:N+1, because the Mirror Node returns 400 for sequencenumber=gt:0
+    expect(calls[0]).toContain("/api/v1/topics/0.0.10/messages?sequencenumber=gte:5&order=asc");
   });
 
   it("reads freeze status and balance of an account", async () => {

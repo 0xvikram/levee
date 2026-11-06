@@ -305,7 +305,8 @@ export class MirrorClient {
 
   /** Topic messages with sequence number > `afterSeq`, oldest first, decoded. */
   async topicMessagesSince(topicId: string, afterSeq: number, limit = 100): Promise<TopicMessage[]> {
-    const q = `/api/v1/topics/${topicId}/messages?sequencenumber=gt:${afterSeq}&order=asc&limit=${limit}`;
+    // The Mirror Node rejects sequencenumber=gt:0 (HTTP 400); gte:N+1 is the same filter and is accepted.
+    const q = `/api/v1/topics/${topicId}/messages?sequencenumber=gte:${afterSeq + 1}&order=asc&limit=${limit}`;
     return decodeTopicMessages(await this.paged<MirrorTopicMessage>(q, "messages"));
   }
 
