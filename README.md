@@ -102,10 +102,12 @@ In the code, the issuer's payout service is a machine (for example `payouts-serv
 
 Three parts make phase 1, plus the phase-2 add-ons. Each one only does one job.
 
-1. **Gate (receipt before movement).** The payout service asks the gate to send, for example, 500 RUPC to Asha Pay (`npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500`). The request is signed with that machine's enrolled key (EIP-191 over canonical JSON `{machine,to,amount,kind,nonce,sentAt}`). The gate first checks who is asking: the machine is enrolled, the signature recovers to its enrolled key, `sentAt` is within 60 s, the nonce is new, and the machine's role is allowed (`GATE_ALLOWED_ROLES`, default `finance,payouts`). Then it checks the phase-2 rules (live pass, per-transfer cap, daily cap, known recipient) and a fresh watcher heartbeat. If all pass, it fixes the transaction id, writes an `approved` receipt with that id to an HCS topic, waits for consensus, and only then adds its signature to the treasury's 2-of-3 KeyList. Anything else is refused with a reason and nothing moves.
+1. **Gate (receipt before movement).** The payout service asks the gate to send, for example, 500 RUPC to Asha Pay (`npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500`). The request is signed with that machine's enrolled key (EIP-191 over canonical JSON `{machine,to,amount,kind,nonce,sentAt}`). The gate first checks who is asking: the machine is enrolled, the signature recovers to its enrolled key, `sentAt` is within 60 s, the nonce is new, and the machine's role is allowed (`GATE_ALLOWED_ROLES`, default `finance,payouts`). Then it checks the phase-2 rules (live pass, per-transfer cap, daily cap, known recipient) and a fresh watcher heartbeat. If all pass, it schedules the transfer on Hedera signed with its own key (one of the treasury's 2-of-3), writes an `approved` receipt naming that scheduled transaction to an HCS topic and waits for consensus; a separate issuer-signer service then adds the second signature (see Scheduled Transactions below). Anything else is refused with a reason and nothing moves.
 2. **Watcher (match every movement).** The watcher reads every RUPC movement on the Mirror Node and matches it by transaction id to a receipt that reached consensus before it. A movement with no receipt, a receipt that came after it, a reused or mismatched receipt, a cap break, an unknown recipient, or a new allowance on the treasury is a breach.
 3. **ContainmentController (close only).** On a breach the watcher calls a small contract that holds the Studio freeze, wipe, burn and pause roles. It freezes the treasury (only when tokens left it), wipes and freezes an unknown receiver, only freezes a known partner (admins decide), burns unauthorised supply left in the token treasury (unit-tested, not run live), and optionally pauses the token. The watcher can only close things. Unfreeze, unpause and changing the watcher need 2 of the 3 admins. The incident (breach, each step, its tx id and timing) is published to an HCS topic.
 4. **Phase 2: Leash (health pass on Arkiv).** The payout service's machine runs an agent that sends a signed heartbeat every 60 s with 7 read-only health checks (macOS). The checker keeps a pass for the machine on Arkiv that expires 180 s after the last good heartbeat. A failing check deletes the pass at once; a machine that goes offline just loses it. The same machine key signs its payment requests, so a gate request is only accepted from the machine whose pass it is. Enrolment (`POST /enrol`) is locked by a per-run `ENROL_TOKEN`. See [docs/LEASH.md](docs/LEASH.md).
+
+**Scheduled Transactions.** Normal sends use Hedera Scheduled Transactions: the gate schedules the transfer with its key and writes the receipt naming that schedule; a separate issuer-signer service adds the second signature only after it independently finds the receipt on Hedera. In order: the gate creates the schedule signed with the gate key only, writes the receipt naming the scheduled transaction id and the schedule id, and tells the issuer signer (`src/signer/`, its own process, holding only the treasury-signer key) the schedule id. The signer reads the schedule and the receipts topic from the Mirror Node, checks that a receipt from the gate names exactly that transfer (token, amount, recipient) and that the caps and recipient list still pass, and only then sends `ScheduleSign`; Hedera executes the transfer with that second signature. The schedule can't execute before the signer signs, so the receipt still reaches consensus before the money moves. A schedule with no receipt is refused and expires unexecuted. The executed transfer keeps the schedule's transaction id, so the watcher matches it unchanged. Mints are unchanged (the gate account holds the cash-in role). Live run: [docs/LIVE_RUN.md section 7](docs/LIVE_RUN.md#7-scheduled-transactions-the-gate-and-the-issuer-signer-each-add-one-signature).
 
 ```mermaid
 flowchart LR
@@ -115,8 +117,11 @@ flowchart LR
   A1 -- signed POST /request --> G[gate]
   G -- enrolled key + role? pass live? --> C
   G -- watcher heartbeat fresh? --> HB[(HCS heartbeats topic)]
-  G -- 1. approved receipt, wait for consensus --> RT[(HCS receipts topic)]
-  G -- 2. sign 2 of 3, execute --> T[treasury 2-of-3 KeyList]
+  G -- 1b. approved receipt, wait for consensus --> RT[(HCS receipts topic)]
+  G -- 1. schedule transfer, gate key --> SCH[(Hedera schedule)]
+  G -- schedule id --> S[issuer signer]
+  S -- 2. finds receipt on Mirror, ScheduleSign --> SCH
+  SCH -- 2 of 3 signed, executes --> T[treasury 2-of-3 KeyList]
   T -- RUPC transfer --> P[Asha Pay / Ravi Exchange]
 
   MN[Mirror Node REST] --> W[watcher]
@@ -136,8 +141,9 @@ flowchart LR
 | Stablecoin Studio v4 | RUPC is a real Studio token from the testnet factory `0.0.7353542`; cash-in, freeze, wipe, burn, pause go through the Studio proxy and its role system | [src/setup/token.ts](src/setup/token.ts), [src/setup/studio.ts](src/setup/studio.ts) |
 | HTS keys and Studio roles | The controller holds FREEZE, WIPE, BURN and PAUSE roles and never DEFAULT_ADMIN. The gate holds the cash-in role with an unlimited supplier allowance, so legitimate mints are gated too | [src/setup/controller.ts](src/setup/controller.ts) |
 | HCS topics with submit keys | 3 topics. receipts: submit key = gate key. incidents and heartbeats: submit key = watcher key. No admin key, so nobody can change the submit key or delete a topic | [src/setup/topics.ts](src/setup/topics.ts), [src/shared/hcs.ts](src/shared/hcs.ts) |
-| KeyList threshold account | The company treasury key is a 2-of-3 KeyList {treasurySigner, gate, cold}. Every normal treasury transfer needs the gate's signature, and the gate only signs after its receipt is on HCS | [src/setup/accounts.ts](src/setup/accounts.ts) |
-| Transaction freezing (fixed tx id) | The gate freezes the transfer (SDK `freezeWith`) before writing the receipt, so the receipt names the exact tx id that will appear on chain | [src/gate/server.ts](src/gate/server.ts) |
+| KeyList threshold account | The company treasury key is a 2-of-3 KeyList {treasurySigner, gate, cold}. Every normal treasury transfer needs the gate's signature and the issuer signer's, held by two separate processes | [src/setup/accounts.ts](src/setup/accounts.ts) |
+| Scheduled Transactions | The gate `ScheduleCreate`s each transfer with its key; the issuer signer `ScheduleSign`s it only after finding the matching receipt on the Mirror Node; Hedera executes on the second signature. Unsigned schedules expire (HIP-423 expiration time) | [src/gate/server.ts](src/gate/server.ts), [src/signer/](src/signer/) |
+| Fixed transaction id | The gate fixes the ScheduleCreate's tx id (SDK `freezeWith`) before writing the receipt; the scheduled transfer executes under that id, so the receipt names the exact tx id that appears on chain | [src/gate/server.ts](src/gate/server.ts) |
 | Mirror Node REST | Token movements per account, topic messages, freeze status, block lag (watcher fails closed above 20 s lag), free gas estimates and contract calls | [src/shared/mirror.ts](src/shared/mirror.ts), [src/watcher/watcher.ts](src/watcher/watcher.ts) |
 | Smart contract (Hedera EVM) | `ContainmentController.sol`: close-only actions for the watcher, 2-of-3 proposals for anything that opens | [contracts/ContainmentController.sol](contracts/ContainmentController.sol) |
 | JSON-RPC relay | Controller deploy through Hashio (EthereumTransaction, gas only) | [src/setup/controller.ts](src/setup/controller.ts) |
@@ -245,11 +251,13 @@ npm ci
 cp .env.example .env          # OPERATOR_ID, OPERATOR_KEY, ARKIV_PRIVATE_KEY, ARKIV_ACCESS_KEY, caps
 npm run setup                 # accounts -> topics -> Studio token -> controller (skips what exists)
 npm run setup:status          # what is left + operator balance
+npm run setup:signer          # fee account for the issuer signer (key = the existing treasury-signer key)
 npm run t1 && npm run t2 && npm run t3 && npm run t4   # live role, wipe-order, pause, timing tests
 
-scripts/demo/up.sh            # checker (Arkiv) -> agents -> watcher -> gate; keeps the Mac awake
+scripts/demo/up.sh            # checker (Arkiv) -> agents -> watcher -> issuer signer -> gate; keeps the Mac awake
 npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500   # one signed payment (run from the repo root)
 npx tsx scripts/demo/normal-path.ts          # 1 approved transfer + 3 refusals
+npx tsx scripts/demo/schedule-no-receipt.ts  # a gate-key schedule with no receipt: the issuer signer refuses, it expires
 npx tsx scripts/demo/normal-load.ts 100      # false-alarm test: asserts matched == N, breaches == 0
 npx tsx scripts/attack.ts 1000               # stolen 2-of-3 keys drain 1,000 RUPC around the gate
 npx tsx scripts/attack-mint.ts 5000          # stolen minting key mints 5,000 RUPC to the attacker
@@ -279,8 +287,8 @@ Worked example, labelled as a projection, not traction: an issuer sending 1,000 
 - **Dedicated Mirror Node.** The public Mirror Node has a CDN cache (`max-age=1`), ingest lag (p50 1.7 s, p99 2.8 s measured) and rate limits. Production should use a paid or self-hosted Mirror Node. We measured the Mirror gRPC topic subscription at about 0.3 s earlier than fresh REST, but a stream cannot prove that nothing was missed on a quiet topic, so it was not adopted (`scripts/demo/mirror-stream-lag.ts`).
 - **Keys in KMS or HSM.** Gate, watcher, admin, treasury and machine keys are files in `state/` for the demo. On mainnet they belong in a KMS/HSM with per-key policies; the cold treasury key stays offline. The watcher key matters most: until the controller has an on-chain partner guard, it can wipe any receiver.
 - **Audit.** `ContainmentController.sol` has not been audited.
-- **Gate throughput.** One gate is serial and measured at ≈ 0.27 payouts/s (p50 3.66 s each, most of it HCS consensus and transfer execution). To scale: run several gates, each with its own pre-assigned daily budget and destination set, or batch several payouts into one receipt and one multi-party transfer. The watcher is read-only and not the bottleneck.
-- **Fees.** ≈ 0.020 HBAR per payout and ≈ 0.23 HBAR per containment on testnet. HCS and HTS fees are fixed in USD on Hedera, so the cost per payout does not swing with token price.
+- **Gate throughput.** One gate is serial up to the receipt; a payout took p50 3.66 s before Scheduled Transactions and p50 8.4 s with them (5-transfer run; most of the extra is the issuer signer waiting for the receipt to be served by the Mirror Node, then its ScheduleSign). To scale: run several gates, each with its own pre-assigned daily budget and destination set, or batch several payouts into one receipt and one multi-party transfer. The watcher is read-only and not the bottleneck.
+- **Fees.** ≈ 0.18 HBAR per payout with Scheduled Transactions (ScheduleCreate's fixed fee is most of it; ≈ 0.020 before) and ≈ 0.23 HBAR per containment on testnet. HCS and HTS fees are fixed in USD on Hedera, so the cost per payout does not swing with token price.
 
 ## Known limits
 
@@ -295,7 +303,7 @@ Worked example, labelled as a projection, not traction: an issuer sending 1,000 
 - While the watcher is down the gate signs nothing, but a theft that skips the gate in that window is not contained automatically: on restart the watcher reports the day's past breaches without acting on them (`src/watcher/index.ts`).
 - Run C did not reach 300 transfers (the Mac slept). The 300 run was not repeated.
 - One token, one treasury, one gate per deployment. Only Studio tokens the issuer controls; it cannot touch USDC.
-- In the demo the gate process also loads the issuer's treasury-signer key, so it signs with key 1 (treasury signer) and key 2 (gate) of the 2-of-3 from one process (`src/gate/server.ts`). In a real setup the issuer's service keeps its own key and Levee holds only the gate key.
+- The gate and the issuer signer are separate processes with separate keys (the gate never loads the treasury-signer key), but in the demo both run on the same Mac and their keys sit in the same `state/keys.json`. In a real setup the issuer runs the signer on its own infrastructure. Someone holding the gate key can still write a receipt and get a payment signed, but only to a known recipient within the caps, as with the gate itself.
 - Payments with a valid receipt are trusted: an approved payment to the wrong recipient is not caught.
 
 ## Roadmap

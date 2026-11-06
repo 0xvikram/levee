@@ -5,12 +5,12 @@ Everything below ran live on Hedera testnet with the real Arkiv Rabdi pass store
 ## Bring the demo up / down
 
 ```
-scripts/demo/up.sh                       # checker (Arkiv) -> agents -> watcher (WATCHER_SINCE=now) -> gate
+scripts/demo/up.sh                       # checker (Arkiv) -> agents -> watcher (WATCHER_SINCE=now) -> issuer signer -> gate
 CAP_PER_DAY=300000 scripts/demo/up.sh    # same, with a raised daily cap (used for the load runs)
 scripts/demo/down.sh                     # stops every service started by up.sh
 ```
 
-`up.sh` enrols `payouts-server` (profile server) and `laptop-vikram` (profile laptop) on first run, starts one heartbeat loop per machine, waits until the watcher `/health` is ok, the gate answers and `payouts-server` holds a live Arkiv pass, then prints the URLs. Logs: `state/logs/{checker,watcher,gate,agent-payouts-server,agent-laptop-vikram}.log`. Flags: `--memory` (checker without Arkiv), `--no-laptop`, `--restart`.
+`up.sh` enrols `payouts-server` (profile server) and `laptop-vikram` (profile laptop) on first run, starts one heartbeat loop per machine, waits until the watcher `/health` is ok, the gate answers and `payouts-server` holds a live Arkiv pass, then prints the URLs. Logs: `state/logs/{checker,watcher,signer,gate,agent-payouts-server,agent-laptop-vikram}.log`. The issuer signer needs its fee account once: `npm run setup:signer` (section 7). Flags: `--memory` (checker without Arkiv), `--no-laptop`, `--restart`.
 
 Then:
 
@@ -194,6 +194,33 @@ Commits `e110c2a` (gate) and `7560843` (demo). Every `POST /request` must carry 
 | `POST /enrol` on the checker without the token | 401 | `bad enrol token` | |
 
 Both linked transactions return `SUCCESS` on the Mirror Node (checked 6 Nov 2026). The unsigned refusal and the 401 on `/enrol` were re-checked against the running services the same evening. Refusals move no money and write no receipt. This signed payment is not included in the 393 false-alarm-free payments of runs B, C and D.
+
+## 7. Scheduled Transactions: the gate and the issuer signer each add one signature
+
+Since this change a normal send is a Hedera Scheduled Transaction (`src/gate/server.ts`, `src/signer/`). The gate process holds only the gate key (key 2 of the treasury's 2-of-3) and the receipts-topic submit key; it creates the schedule signed with its key, then writes the receipt. A separate **issuer signer** process (`127.0.0.1:8715`) holds only the treasury-signer key (key 1). Told the schedule id by the gate (and also polling the Mirror Node for schedules the gate created), it reads the schedule and the receipts topic from the Mirror Node itself, checks the receipt names exactly that scheduled transfer and that the rules pass, and only then sends `ScheduleSign`. Hedera executes the transfer with that second signature. Mints are unchanged (the cash-in role sits with the gate account).
+
+**Transaction id finding.** The executed transfer carries the `ScheduleCreate`'s transaction id with the scheduled flag. On the Mirror Node both rows have the same `transaction_id`; only the `CRYPTOTRANSFER` has `scheduled: true`. The gate fixes the ScheduleCreate's id before anything is written and puts it in the receipt, so the watcher matched every scheduled transfer with no watcher change. Saved as a test fixture: `tests/fixtures/mirror-scheduled-transfer.json` (`tests/watcher/scheduled.test.ts`).
+
+Setup (once): `npm run setup:signer` created the issuer signer's fee account [`0.0.11340800`](https://hashscan.io/testnet/account/0.0.11340800) with 1 HBAR ([tx](https://hashscan.io/testnet/transaction/0.0.11333301-1793977040-189666689)). Its key is the existing treasury-signer key, so one signature both pays for the ScheduleSign and adds key 1 to the schedule. The gate was restarted on the new code and the signer started; the watcher was not restarted. Run on 6 Nov 2026 (`CAP_PER_DAY=300000`).
+
+**(a) Signed send, 500 RUPC to Asha Pay** (`npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500`): HTTP 200 in 8.9 s, watcher `matched`, no breach.
+
+| step | consensus | link |
+|---|---|---|
+| ScheduleCreate by the gate (gate key only), schedule `0.0.11340805` | 1793977088.911 | [schedule](https://hashscan.io/testnet/schedule/0.0.11340805) |
+| receipt, seq 499, names tx `0.0.11333489-1793977084-654477314` and schedule `0.0.11340805` | 1793977089.865 | [receipt](https://hashscan.io/testnet/transaction/0.0.11333489-1793977081-963853491) |
+| ScheduleSign by the issuer signer | | [sign](https://hashscan.io/testnet/transaction/0.0.11340800-1793977089-430366632) |
+| transfer executed (`scheduled: true`, 500 RUPC treasury → Asha Pay) | 1793977095.028 | [transfer](https://hashscan.io/testnet/transaction/0.0.11333489-1793977084-654477314) |
+
+Gate timings: ScheduleCreate 980 ms, receipt 918 ms, issuer signer 6,254 ms (its Mirror check 4,196 ms, mostly waiting for the receipt to be served; ScheduleSign + receipt 2,038 ms), total 8,865 ms. Before this change the same request took ≈ 4.0 s (section 1).
+
+**(b) The signer refuses a schedule with no receipt** (`npx tsx scripts/demo/schedule-no-receipt.ts 120`): plays someone holding the gate key who skips the gate. It created schedule [`0.0.11340812`](https://hashscan.io/testnet/schedule/0.0.11340812) (500 RUPC to Asha Pay, known recipient, under the caps) signed with the gate key, wrote no receipt and did not tell the signer. The signer found it on its own Mirror poll, kept looking for a receipt for 60 s, then refused: `no-receipt: no receipt for 0.0.11333489-1793977165-847801863 on the receipts topic`. The schedule expired at 1793977290 with `executed_timestamp: null` and no scheduled execution on the Mirror Node. PASS.
+
+**(c) False-alarm test, 5 transfers** (`npx tsx scripts/demo/normal-load.ts 5 --seed 7`): 5 approved, 5 matched, 0 breaches, 0 incidents, 0 late-receipt matches. 2,301 RUPC. Gate reply p50 8.4 s / max 20.2 s (the max is one 9.9 s Mirror heartbeat read during a Mirror 502 spell, not the schedule); per-step p50: ScheduleCreate 1.2 s, receipt 1.4 s, issuer signer 4.3 s (Mirror check 3.1 s, ScheduleSign 1.5 s). Watcher `matched` after the gate reply: p50 3.4 s, max 4.5 s. Schedules `0.0.11340963`, `…967`, `…969`, `…971`, `…973`; [first](https://hashscan.io/testnet/transaction/0.0.11333489-1793977524-410453095) · [last](https://hashscan.io/testnet/transaction/0.0.11333489-1793977562-312667072). **Only 5, not 20**: a scheduled send costs ≈ 0.18 HBAR (below), so 20 would have cost ≈ 3.5 HBAR, more than this session's 3 HBAR budget.
+
+**(d) Theft still contained** (`npx tsx scripts/attack.ts 1000`, the stolen treasury-signer + cold keys, no gate, no schedule): [theft](https://hashscan.io/testnet/transaction/0.0.11333495-1793977349-162435196) 1,000 RUPC treasury → attacker. Detected 10.0 s, contained 14.3 s (watcher clock): [freeze treasury](https://hashscan.io/testnet/transaction/0.0.11333487-1793977363-118897369), [wipe + freeze attacker](https://hashscan.io/testnet/transaction/0.0.11333487-1793977362-913017047). Reopened 2-of-3 with `npx tsx scripts/reopen.ts treasury attacker`: treasury [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793977396-653739059) / [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793977400-515062880); the attacker's first approve failed `INSUFFICIENT_PAYER_BALANCE` (admin1 at 0.998 HBAR), so admin1 was topped up 2 HBAR and the attacker reopened: [propose](https://hashscan.io/testnet/transaction/0.0.11333483-1793977449-579918609) / [approve](https://hashscan.io/testnet/transaction/0.0.11333484-1793977450-018840517). At the end treasury, attacker, Asha Pay and Ravi Exchange were `UNFROZEN` and RUPC `UNPAUSED` (Mirror Node).
+
+**Fees** (Mirror `charged_tx_fee`): ScheduleCreate 0.1465, receipt 0.0041, scheduled transfer 0.0132 (paid by the gate), ScheduleSign 0.0147 (paid by the issuer signer): ≈ 0.18 HBAR per send, against ≈ 0.020 before. Almost all of it is the ScheduleCreate's fixed fee. One-off: the signer account cost 0.73 HBAR to create. Whole section ≈ 2.82 HBAR in network fees: account 0.73, sends (a) + (c) 1.05, refusal test (b) 0.15, theft + containment + reopen 0.81, watcher heartbeats 0.06; plus transfers between our own accounts (1 HBAR into the signer account, 2 HBAR to admin1).
 
 ## Budget
 

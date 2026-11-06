@@ -1,16 +1,19 @@
 # Levee HTTP + SSE API
 
-Three local services. All JSON. Amounts are **strings in the token's smallest unit** (RUPC has 6 decimals: `"500000000"` = 500 RUPC). Account ids are `0.0.x`; transaction ids use the Mirror spelling `0.0.x-<sec>-<nanos9>`; consensus times are `"<sec>.<nanos9>"`.
+Four local services. All JSON. Amounts are **strings in the token's smallest unit** (RUPC has 6 decimals: `"500000000"` = 500 RUPC). Account ids are `0.0.x`; transaction ids use the Mirror spelling `0.0.x-<sec>-<nanos9>`; consensus times are `"<sec>.<nanos9>"`.
 
 | service | default port | env |
 |---|---|---|
 | gate | 8710 | `GATE_PORT` |
 | watcher | 8711 | `WATCHER_PORT` |
 | checker | 8712 | `CHECKER_PORT` |
+| issuer signer | 8715 (127.0.0.1 only) | `SIGNER_PORT`; the gate finds it at `SIGNER_URL` (default `http://127.0.0.1:8715`) |
 
-All three `/events` endpoints are Server-Sent Events with `Access-Control-Allow-Origin: *`. Comment lines (`: connected`, `: ping`, `: ka`) are keep-alives. The watcher's `/state` also sends CORS `*`; the other JSON endpoints do not (proxy them, or read them server side).
+All four `/events` endpoints are Server-Sent Events with `Access-Control-Allow-Origin: *`. Comment lines (`: connected`, `: ping`, `: ka`) are keep-alives. The watcher's `/state` also sends CORS `*`; the other JSON endpoints do not (proxy them, or read them server side).
 
-**Breaking change in this revision: gate requests must be signed.** `POST /request` now needs `nonce`, `sentAt` and `signature` from the requesting machine's enrolled key; an unsigned body is refused `403 bad-signature`. New 403 reasons: `unknown-machine`, `bad-signature`, `stale-request`, `replayed-request`, `wrong-role`. New checker endpoint `GET /machine/:name`. New `timings.authMs`. Use `npm run request` instead of `curl`.
+**Change in this revision: transfers are Hedera Scheduled Transactions with two separate signers.** The gate creates a schedule signed with its own key, writes the receipt, then the issuer signer (a separate process holding only the treasury-signer key) adds the second signature after it finds the receipt on Hedera. Gate transfer replies and `decision` events gain `scheduleId`, `scheduledTxId` (= `txId`), `signTxId`; the receipt gains `scheduleId`; `timings` gain `scheduleMs`, `signerMs`, `signerVerifyMs`, `signerSignMs` and lose `executeMs` for transfers (mints keep it); new failure statuses `502 schedule-failed`, `502 signer-refused`, `504 signer-unavailable`. `txId` keeps its meaning: the id the money movement has on the Mirror Node. Mints are unchanged.
+
+**Earlier breaking change: gate requests must be signed.** `POST /request` now needs `nonce`, `sentAt` and `signature` from the requesting machine's enrolled key; an unsigned body is refused `403 bad-signature`. New 403 reasons: `unknown-machine`, `bad-signature`, `stale-request`, `replayed-request`, `wrong-role`. New checker endpoint `GET /machine/:name`. New `timings.authMs`. Use `npm run request` instead of `curl`.
 
 **Earlier shape changes** (all additive, nothing removed or renamed):
 
@@ -48,14 +51,27 @@ npm run request -- --machine payouts-server --to 0.0.11333490 --amount 500
 
 A raw `curl` with an unsigned body is refused `403 bad-signature`.
 
-Order: parse (400) → who is asking (`src/gate/auth.ts`: the machine is enrolled at the checker, `GET /machine/:name`; the signature recovers to its enrolled key; `sentAt` within 60 s of the gate clock; `(machine, nonce)` not seen before; enrolled role in `GATE_ALLOWED_ROLES`, default `finance,payouts`) → pass check → rules (per-transfer cap, daily cap, known destination) → watcher heartbeat younger than 120 s → freeze tx (id fixed) → receipt to HCS, wait for consensus → sign + execute. Requests are processed one at a time. If the checker cannot be asked, the request is refused `unknown-machine` (fails closed).
+Order: parse (400) → who is asking (`src/gate/auth.ts`: the machine is enrolled at the checker, `GET /machine/:name`; the signature recovers to its enrolled key; `sentAt` within 60 s of the gate clock; `(machine, nonce)` not seen before; enrolled role in `GATE_ALLOWED_ROLES`, default `finance,payouts`) → pass check → rules (per-transfer cap, daily cap, known destination) → watcher heartbeat younger than 120 s → then, for a **transfer**:
+
+1. `ScheduleCreate` of the fixed `TransferTransaction` treasury → `to`, signed and paid by the gate key only (key 2 of the treasury's 2-of-3; payer of the scheduled transfer = the gate), expiring after `SCHEDULE_TTL_S` (default 300 s), `waitForExpiry = false` so it executes as soon as the last signature lands.
+2. Receipt to HCS naming the scheduled transaction id and the schedule id; wait for consensus.
+3. `POST {SIGNER_URL}/schedule {scheduleId}` and wait (up to `SIGNER_WAIT_S`, default 75 s) for the issuer signer: it re-checks everything on the Mirror Node and signs with the treasury-signer key (key 1), which makes Hedera execute the transfer.
+
+For a **mint** (unchanged): freeze the cash-in call (id fixed) → receipt → sign with the gate key (the account holding the cash-in role) and execute.
+
+Steps up to the receipt are processed one request at a time; waiting for the issuer signer is not.
+
+**Transaction id.** A scheduled transfer executes under the `ScheduleCreate`'s transaction id with the scheduled flag (SDK `0.0.gate@sec.nanos?scheduled`). The Mirror Node lists it under the same `transaction_id` (`0.0.gate-sec-nanos`) as the `SCHEDULECREATE`, with `scheduled: true` on the `CRYPTOTRANSFER` (fixture `tests/fixtures/mirror-scheduled-transfer.json`). The gate fixes that id before anything is written, puts it in the receipt as `txId`, and the watcher matches it without change. If the checker cannot be asked, the request is refused `unknown-machine` (fails closed).
 
 | status | body |
 |---|---|
-| 200 | `{ ok: true, receipt: Receipt & { sequence }, receiptTxId, txId, timings }` |
+| 200 | transfer: `{ ok: true, receipt: Receipt & { sequence }, txId, scheduleId, scheduledTxId, receiptTxId, receiptSequence, signTxId, executedStatus: "SUCCESS", timings }`; mint: `{ ok: true, receipt: Receipt & { sequence }, receiptTxId, txId, timings }` |
 | 400 | `{ ok: false, reason: "bad-request", detail }` |
 | 403 | `{ ok: false, reason, detail }`, see the reasons below |
-| 502 | `{ ok: false, reason: "execute-failed", detail, txId, receipt, timings }` (receipt was written, execution failed) |
+| 502 | `{ ok: false, reason: "schedule-failed", detail, txId, timings }`: the ScheduleCreate failed; no receipt was written |
+| 502 | `{ ok: false, reason: "signer-refused", detail, txId, scheduleId, scheduledTxId, receiptTxId, receiptSequence, receipt, signer, timings }`: the receipt was written, the issuer signer refused (`signer` = its decision); the schedule expires unexecuted |
+| 504 | same shape, `reason: "signer-unavailable"`: the issuer signer did not answer. Its own poll may still judge (and sign) the schedule before it expires |
+| 502 | mint: `{ ok: false, reason: "execute-failed", detail, txId, receipt, timings }` (receipt was written, execution failed) |
 | 500 | `{ ok: false, reason: "internal", detail }` |
 
 403 reasons. Check order: unsigned (`bad-signature`) → `unknown-machine` → wrong key (`bad-signature`) → `stale-request` → `replayed-request` → `wrong-role` → `no-pass` → caps and recipient → `no-watcher`.
@@ -73,12 +89,12 @@ Order: parse (400) → who is asking (`src/gate/auth.ts`: the machine is enrolle
 | `unknown-destination` | `to` is not a known recipient |
 | `no-watcher` | no watcher heartbeat on HCS in the last 120 s |
 
-`Receipt` = `{ v: 1, type: "receipt", txId, token, from, to, amount, kind, machine, approvedAt }`.
-`timings` (ms since the request arrived unless noted): `authMs`, `passMs`, `heartbeatMs`, `receiptMs` (duration of the HCS submit), `executeMs` (duration of sign+execute), `totalMs`.
+`Receipt` = `{ v: 1, type: "receipt", txId, token, from, to, amount, kind, machine, approvedAt, scheduleId? }` (`scheduleId` on transfers).
+`timings` (ms since the request arrived unless noted): `authMs`, `passMs`, `heartbeatMs`, `scheduleMs` (duration of the ScheduleCreate), `receiptMs` (duration of the HCS submit), `signerMs` (duration of the call to the issuer signer), `signerVerifyMs` / `signerSignMs` (the signer's own Mirror check and ScheduleSign), `executeMs` (mint only: sign + execute), `totalMs`.
 
 ### `GET /health`
 
-`{ ok: true, service: "gate", served, treasury, token, sseClients, capPerTransfer, capPerDay, spentToday, knownDestinations }` — caps and `spentToday` (UTC day, reserved when a receipt is written) are smallest-unit strings.
+`{ ok: true, service: "gate", served, treasury, token, sseClients, capPerTransfer, capPerDay, spentToday, knownDestinations, signing }` — caps and `spentToday` (UTC day, reserved when a receipt is written) are smallest-unit strings.
 
 ### `GET /events` (SSE)
 
@@ -86,11 +102,49 @@ Replays the last 50 frames on connect. Frames have `id:` and `event: decision`:
 
 ```json
 { "at": "ISO", "machine": "payouts-server", "to": "0.0.x", "amount": "500000000", "kind": "transfer",
-  "ok": true, "txId": "0.0.x-…", "receiptTxId": "0.0.x-…", "receiptSequence": 12,
-  "timings": { "passMs": 0, "heartbeatMs": 0, "receiptMs": 0, "executeMs": 0, "totalMs": 0 } }
+  "ok": true, "txId": "0.0.x-…", "scheduleId": "0.0.x", "scheduledTxId": "0.0.x-…", "receiptTxId": "0.0.x-…", "receiptSequence": 12,
+  "signTxId": "0.0.x-…", "timings": { "passMs": 0, "heartbeatMs": 0, "scheduleMs": 0, "receiptMs": 0, "signerMs": 0, "totalMs": 0 } }
 ```
 
-Refusals (including the signature, role and replay refusals): `ok: false, reason, detail, timings` (no txId). Execute failures: `ok: false, reason: "execute-failed", detail, txId, timings`.
+Mints: `txId`, `receiptTxId`, `receiptSequence`, `timings.executeMs` (no schedule fields). Refusals (including the signature, role and replay refusals): `ok: false, reason, detail, timings` (no txId). Failures after approval: `ok: false, reason: "schedule-failed" | "signer-refused" | "signer-unavailable" | "execute-failed", detail, txId, timings` (plus the schedule and receipt fields once they exist).
+
+---
+
+## Issuer signer (`127.0.0.1:8715`)
+
+`npm run signer` (`src/signer/server.ts`). A separate process that loads **only** the issuer's treasury-signer key (key 1 of the treasury's 2-of-3). It pays for its ScheduleSign from its own account `issuerSigner` in `state/deploy.json`, whose key is that same treasury-signer key (created once with `npm run setup:signer`). Binds to 127.0.0.1. Env: `SIGNER_PORT` (8715), `SIGNER_RECEIPT_WAIT_S` (60), `SIGNER_POLL_S` (10; 0 = notifications only).
+
+It signs a schedule only if all of these hold, read from the Mirror Node (`src/signer/verify.ts`):
+
+1. the schedule was created by the gate account, is not deleted, not executed, not expired;
+2. its body is one plain token transfer of RUPC: treasury −amount, recipient +amount, nothing else (no HBAR, NFTs, allowances, aliases, other transaction types);
+3. a receipt for exactly that scheduled transaction id is on the receipts topic, paid by the gate, with the same token, from, to, amount, `kind: "transfer"` and (if present) schedule id;
+4. the gate's rules still pass: per-transfer cap, daily cap (every receipt that UTC day before this one), known recipients.
+
+"No receipt yet" is re-checked every 0.75 s for up to `SIGNER_RECEIPT_WAIT_S`, then refused for good; every other failure is refused at once. A decision is final for the life of the process (a refused schedule is never signed later by it). Besides the gate's notification it polls `GET /api/v1/schedules?account.id=<gate>` every `SIGNER_POLL_S`, so a schedule the gate never announced (for example made with a stolen gate key) is still judged, and refused if it has no receipt.
+
+### `POST /schedule`
+
+Body `{ "scheduleId": "0.0.x" }` (400 otherwise). Waits for the decision.
+
+| status | body |
+|---|---|
+| 200 | `{ ok: true, scheduleId, scheduledTxId, transfer: { token, from, to, amount }, receiptSequence, receiptConsensusAt, signTxId, status: "SUCCESS", executedStatus: "SUCCESS", verifyMs, signMs, at }` |
+| 409 | `{ ok: false, scheduleId, scheduledTxId?, reason, detail, at, verifyMs }` |
+
+Refusal reasons: `schedule-not-found`, `not-from-gate`, `deleted`, `already-executed`, `expired`, `not-a-plain-transfer`, `wrong-token`, `not-from-treasury`, `no-receipt`, `receipt-not-from-gate`, `receipt-mismatch`, `over-transfer-cap`, `over-daily-cap`, `unknown-destination`, `sign-failed`.
+
+### `GET /decisions`
+
+`{ ok: true, decisions: [...] }`: the last 50 decisions, same shape as `POST /schedule` replies.
+
+### `GET /health`
+
+`{ ok: true, service: "issuer signer", gate, treasury, token, receiptsTopic, receiptsRead, signed, refused, pending, sseClients }`.
+
+### `GET /events` (SSE)
+
+Replays the last 50 frames. `event: signed` and `event: refused`, data = the decision.
 
 ---
 
