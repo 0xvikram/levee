@@ -90,6 +90,16 @@ const PAIRS: [string, string, string][] = [
   ["yellow accent on the tonal band", C.yellow, over(N.ink, 0.22, N.cobalt)],
   // product window mock (cobalt-deep panels)
   ["cream-dim on cobalt-deep (window mock labels)", CREAM_DIM(N.deep), N.deep],
+  // patchwork (from /logos): cobalt-deep cards, yellow pill labels, cream patch panels in cobalt ink
+  ["cobalt-ink on a cream patch", N.ink, N.cream],
+  ["ink-dim (cobalt-ink at 74%) captions on a cream patch", over(N.ink, 0.74, N.cream), N.cream],
+  ["cream-faint card caption on cobalt-deep", CREAM_FAINT(N.deep), N.deep],
+  ["cream-faint section caption on cobalt", CREAM_FAINT(N.cobalt), N.cobalt],
+  ["cobalt-ink pill text on yellow", N.ink, C.yellow],
+  ["yellow Levee label on its cobalt-ink band (problem chart)", C.yellow, N.ink],
+  ["cream-dim Levee caption on its cobalt-ink band", CREAM_DIM(N.ink), N.ink],
+  ["yellow on cobalt (window mock side panel)", C.yellow, N.cobalt],
+  ["cream on cobalt-deep (window mock KPI tiles)", N.cream, N.deep],
 ];
 
 /** Non-text marks (bars) need 3:1 against the ground (WCAG 1.4.11), and Levee must stand apart from the rest. */
@@ -97,6 +107,11 @@ const MARKS: [string, string, string][] = [
   // landing problem chart (cobalt glass card): industry bars cream-dim, Levee bar yellow
   ["cream-dim industry bar on glass", CREAM_DIM(GLASS), GLASS],
   ["yellow Levee bar on glass", C.yellow, GLASS],
+  // patchwork problem chart: industry bars cobalt-ink at 60% on the cream patch, Levee's yellow bar on its cobalt-ink band
+  ["ink industry bar (60%) on a cream patch", over(N.ink, 0.6, N.cream), N.cream],
+  ["yellow Levee bar on its cobalt-ink band", C.yellow, N.ink],
+  ["cobalt-ink treasury line on the cream window mock", N.ink, N.cream],
+  ["cobalt-ink ring around the yellow button on the cream plan", N.ink, N.cream],
   // /live command centre (moss cards): chart lines, event marks, before/after bars
   ["yellow treasury line / Levee bar on moss", C.yellow, C.moss],
   ["olive-lit supply line on moss", C.oliveLit, C.moss],

@@ -63,6 +63,18 @@ describe("Landing structure", () => {
     expect(art.querySelector("img")).toHaveAttribute("src", "/media/engraving/hero.jpg");
   });
 
+  it("styles the sections as the /logos patchwork: cobalt-deep cards holding cream patches", () => {
+    const { container } = render(<Landing />);
+    const main = container.querySelector("main")!;
+    expect(main.querySelector("#problem .lp-card .lp-chart.lp-patch")).not.toBeNull();
+    expect(main.querySelector("#problem .lp-pill")!.textContent).toBe("01 · The problem");
+    expect(main.querySelectorAll("#proof .lp-stats li.lp-patch")).toHaveLength(5);
+    expect(main.querySelectorAll("#fit .lp-card .lp-patch.lp-checks")).toHaveLength(2);
+    expect(main.querySelectorAll("#faq .lp-card details > p.lp-patch")).toHaveLength(5);
+    expect(main.querySelector(".lp-glass")).toBeNull();
+    expect(container.querySelector(".lp-strip .lp-card .lp-pill")!.textContent).toBe("Built on Hedera");
+  });
+
   it("puts the sections in the agreed order, each with a pill eyebrow", () => {
     const { container } = render(<Landing />);
     const ids = [...container.querySelectorAll("main > section")].map((s) => s.id);
@@ -145,9 +157,17 @@ describe("how it works", () => {
     expect(cards[1].textContent).toMatch(/No receipt = theft, caught in ~3 s/);
     expect(cards[2].textContent).toMatch(/Frozen and taken back in ~6 s · 2 of 3 to unlock/);
   });
-  it("uses no imagery: colour, glass and type only", () => {
+  it("uses no imagery: colour and type, each card a pill, a cream patch with a cobalt glyph, and a sentence", () => {
     const { container } = render(<HowSection m={live} />);
     expect(container.querySelector("img, video, canvas, .dither")).toBeNull();
+    const cards = [...container.querySelectorAll(".lp-step")];
+    expect(cards.map((c) => c.querySelector(".lp-pill")!.textContent)).toEqual(["A Receipt", "B Watch", "C Contain"]);
+    for (const c of cards) {
+      expect(c.classList.contains("lp-card")).toBe(true);
+      expect(c.querySelector(".lp-patch svg.lp-glyph")).not.toBeNull();
+    }
+    expect(cards[1].querySelector(".lp-step-fig")!.textContent).toBe("~3 s");
+    expect(cards[2].querySelector(".lp-step-fig")!.textContent).toBe("~6 s");
   });
 });
 
@@ -185,6 +205,8 @@ describe("pricing", () => {
     const plans = [...container.querySelectorAll(".lp-plan")];
     expect(plans.map((p) => p.querySelector("h3")!.textContent)).toEqual(["Watch", "Issuer", "Institutional"]);
     expect(plans.map((p) => p.querySelector(".lp-btn")!.classList.contains("primary"))).toEqual([false, true, false]);
+    // patchwork: the middle plan is the cream card, the side plans cobalt-deep cards
+    expect(plans.map((p) => (p.classList.contains("lp-patch") ? "cream" : p.classList.contains("lp-card") ? "deep" : "?"))).toEqual(["deep", "cream", "deep"]);
     expect(container.textContent).toMatch(/\$300\/mo on mainnet/);
     expect(container.textContent).toMatch(/\$1,500/);
     expect(container.querySelector("form")).toBeNull();
@@ -198,6 +220,11 @@ describe("FAQ", () => {
     const { container } = render(<FaqSection />);
     expect(container.querySelectorAll("details")).toHaveLength(5);
     expect(screen.getByText("Can it protect USDC?")).toBeInTheDocument();
+    // every question is a native summary (keyboard and no-JS friendly); each answer sits in a cream patch
+    for (const d of container.querySelectorAll("details")) {
+      expect(d.firstElementChild!.tagName).toBe("SUMMARY");
+      expect(d.querySelector("p.lp-patch")).not.toBeNull();
+    }
   });
 });
 

@@ -3,6 +3,7 @@ import "./landing.css";
 import { DitherImage } from "../components/DitherImage";
 import { Link } from "../components/router";
 import { SiteLogo } from "../components/SiteLogo";
+import { ChevronMark } from "../components/logos";
 import { ARKIV_EXPLORER, DOCS, GITHUB, MIRROR, deploy, hashscan } from "../lib/config";
 import { FACTS, INDUSTRY, TICKS, logPos } from "../lib/numbers";
 import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
@@ -98,7 +99,7 @@ export function Landing() {
 // ---------------------------------------------------------------- product window
 
 /**
- * Browser-style window showing the product. Until the new demo video lands it is a cobalt glass mock
+ * Browser-style window showing the product. Until the new demo video lands it is a mock
  * of the incident view, filled with the measured (or live) numbers. With `video` (or DEMO_VIDEO =
  * true) it plays the recorded demo instead: sources are attached only once the window is near the
  * screen, it plays muted on a loop while visible and pauses when scrolled away; the poster still sits
@@ -246,23 +247,38 @@ function WindowMock({ m }: { m: Showcase }) {
 
 const SERVICES = ["Stablecoin Studio", "Consensus Service", "Scheduled Transactions", "Threshold keys", "Smart contract (verified)", "Mirror Node", "Arkiv"];
 
+/** A cobalt-deep card: yellow pill label, then each service as a small cream patch. */
 export function HederaStrip() {
   return (
     <section className="lp-strip" aria-label="Built on Hedera">
-      <span className="lp-strip-label">Built on Hedera</span>
-      <ul>
-        {SERVICES.map((s) => (
-          <li key={s}>{s}</li>
-        ))}
-      </ul>
+      <div className="lp-card lp-strip-card">
+        <span className="lp-pill">Built on Hedera</span>
+        <ul>
+          {SERVICES.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
 
 // ---------------------------------------------------------------- shared bits
 
+/** Yellow pill label (mono, cobalt-ink on yellow), as on the /logos review cards. */
 function Pill({ children }: { children: ReactNode }) {
   return <span className="lp-pill">{children}</span>;
+}
+
+/** Card header row: pill, title, and a mono caption pushed right. */
+function CardHead({ pill, title, id, caption, as: H = "h2" }: { pill: ReactNode; title: ReactNode; id?: string; caption?: ReactNode; as?: "h2" | "h3" }) {
+  return (
+    <div className="lp-card-head">
+      <Pill>{pill}</Pill>
+      <H id={id}>{title}</H>
+      {caption && <span className="lp-cap">{caption}</span>}
+    </div>
+  );
 }
 
 function Src({ href, children }: { href: string; children: ReactNode }) {
@@ -279,19 +295,26 @@ function ProblemSection({ m }: { m: Showcase }) {
   return (
     <section className="lp-section" id="problem" aria-labelledby="problem-h">
       <div className="lp-inner">
-        <div className="lp-head" data-rise>
-          <Pill>The problem</Pill>
-          <h2 id="problem-h">
-            Hacks take <span className="accent">hours</span> to stop.
-          </h2>
+        <div className="lp-card" data-rise>
+          <CardHead
+            pill="01 · The problem"
+            id="problem-h"
+            title={
+              <>
+                Hacks take <span className="accent">hours</span> to stop.
+              </>
+            }
+            caption="log scale"
+          />
           <p className="lp-lede serif">By the time a team is awake and on a call, the stolen tokens are swapped and bridged away.</p>
+          <CompareChart leveeS={m.wipedS} leveeTx={m.wipeTx} live={m.live} />
         </div>
-        <CompareChart leveeS={m.wipedS} leveeTx={m.wipeTx} live={m.live} />
       </div>
     </section>
   );
 }
 
+/** The time-to-contain bars on a cream patch, drawn in cobalt ink; Levee's row is a cobalt band with a yellow bar. */
 export function CompareChart({ leveeS, leveeTx, live = false }: { leveeS: number; leveeTx: string; live?: boolean }) {
   const rows = [
     ...INDUSTRY.map((c) => ({ key: c.name, name: c.name, when: c.when, shown: c.shown, what: c.what, pos: logPos(c.seconds), href: c.source, srcName: c.sourceName, levee: false })),
@@ -308,10 +331,10 @@ export function CompareChart({ leveeS, leveeTx, live = false }: { leveeS: number
     },
   ];
   return (
-    <figure className="lp-chart lp-glass" data-rise>
+    <figure className="lp-chart lp-patch">
       <figcaption>
-        <span className="lp-chart-title">Time to contain, log scale</span>
-        <span className="lp-muted small">As each team or the press reported it. Each step right is ten times longer.</span>
+        <span className="lp-chart-title">Time to contain</span>
+        <span className="lp-ink-dim small">As each team or the press reported it. Each step right is ten times longer.</span>
       </figcaption>
       <ul className="lp-bars">
         {rows.map((r) => (
@@ -345,28 +368,92 @@ export function CompareChart({ leveeS, leveeTx, live = false }: { leveeS: number
 
 // ---------------------------------------------------------------- 2. how it works
 
+/** Three wave lines, the water the watcher reads (from the chevron mark). */
+function Waves() {
+  return (
+    <svg className="lp-glyph" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <path d="M4.5 10 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
+        <path d="M4.5 17 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
+        <path d="M4.5 24 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
+      </g>
+    </svg>
+  );
+}
+
+/** A closed lock: the treasury frozen. */
+function Lock() {
+  return (
+    <svg className="lp-glyph" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <path d="M10 14 V10 a6 6 0 0 1 12 0 V14" fill="none" stroke="currentColor" strokeWidth="3" />
+      <rect x="6" y="14" width="20" height="14" rx="2.5" fill="currentColor" />
+      <rect x="14.75" y="18.5" width="2.5" height="5" rx="1.25" className="lp-glyph-cut" />
+    </svg>
+  );
+}
+
 export function HowSection({ m }: { m: Showcase }) {
   const steps = [
-    { tag: "Receipt", title: "Every payment gets a receipt on Hedera", text: "Your payout service asks Levee first. Levee writes a receipt to a Hedera topic, then co-signs the payment." },
-    { tag: "Watch", title: `No receipt = theft, caught in ${about(m.detectionS)}`, text: "The watcher reads every movement from the Mirror Node. Anything that leaves without a receipt is a theft, whoever signed it." },
-    { tag: "Contain", title: `Frozen and taken back in ${about(m.wipedS)} · 2 of 3 to unlock`, text: "A close-only contract freezes the treasury and wipes the thief. Only 2 of 3 admins, signing together, can reopen." },
+    {
+      letter: "A",
+      tag: "Receipt",
+      cap: "before signing",
+      glyph: <ChevronMark className="lp-glyph" />,
+      figure: "1 receipt",
+      figCap: "per payment, on a Hedera topic",
+      title: "Every payment gets a receipt on Hedera",
+      text: "Your payout service asks Levee first. Levee writes a receipt to a Hedera topic, then co-signs the payment.",
+    },
+    {
+      letter: "B",
+      tag: "Watch",
+      cap: "mirror node",
+      glyph: <Waves />,
+      figure: about(m.detectionS),
+      figCap: "theft to detected",
+      title: `No receipt = theft, caught in ${about(m.detectionS)}`,
+      text: "The watcher reads every movement from the Mirror Node. Anything that leaves without a receipt is a theft, whoever signed it.",
+    },
+    {
+      letter: "C",
+      tag: "Contain",
+      cap: "2 of 3 to reopen",
+      glyph: <Lock />,
+      figure: about(m.wipedS),
+      figCap: "frozen and taken back",
+      title: `Frozen and taken back in ${about(m.wipedS)} · 2 of 3 to unlock`,
+      text: "A close-only contract freezes the treasury and wipes the thief. Only 2 of 3 admins, signing together, can reopen.",
+    },
   ];
   return (
-    <section className="lp-section tone" id="how" aria-labelledby="how-h">
+    <section className="lp-section" id="how" aria-labelledby="how-h">
       <div className="lp-inner">
-        <div className="lp-head" data-rise>
-          <Pill>How it works</Pill>
-          <h2 id="how-h">
-            One rule: no receipt, no <span className="accent">movement</span>.
-          </h2>
+        <div className="lp-sec-head" data-rise>
+          <CardHead
+            pill="02 · How it works"
+            id="how-h"
+            title={
+              <>
+                One rule: no receipt, no <span className="accent">movement</span>.
+              </>
+            }
+            caption="three parts"
+          />
         </div>
         <ol className="lp-steps">
-          {steps.map((s, i) => (
-            <li key={i} className="lp-glass lp-step" data-rise>
-              <span className="lp-step-top" aria-hidden="true">
-                <span className="lp-step-n mono">{String(i + 1).padStart(2, "0")}</span>
-                <span className="lp-step-tag mono">{s.tag}</span>
-              </span>
+          {steps.map((s) => (
+            <li key={s.letter} className="lp-card lp-step" data-rise>
+              <div className="lp-card-head">
+                <span className="lp-pill">
+                  <b>{s.letter}</b> {s.tag}
+                </span>
+                <span className="lp-cap">{s.cap}</span>
+              </div>
+              <figure className="lp-patch lp-step-panel" aria-hidden="true">
+                {s.glyph}
+                <b className="lp-step-fig mono">{s.figure}</b>
+                <figcaption>{s.figCap}</figcaption>
+              </figure>
               <h3>{s.title}</h3>
               <p className="lp-muted">{s.text}</p>
             </li>
@@ -390,24 +477,27 @@ export function ProofSection({ m }: { m: Showcase }) {
   return (
     <section className="lp-section" id="proof" aria-labelledby="proof-h">
       <div className="lp-inner">
-        <div className="lp-head" data-rise>
-          <Pill>Proof</Pill>
-          <h2 id="proof-h">
-            Measured on Hedera, not <span className="accent">promised</span>.
-          </h2>
-          <p className="lp-lede">
-            {m.live ? "Read live from the incidents topic" : "The measured run"} · {m.date}
-          </p>
+        <div className="lp-card" data-rise>
+          <CardHead
+            pill="03 · Proof"
+            id="proof-h"
+            title={
+              <>
+                Measured on Hedera, not <span className="accent">promised</span>.
+              </>
+            }
+            caption={`${m.live ? "Read live from the incidents topic" : "The measured run"} · ${m.date}`}
+          />
+          <ul className="lp-stats">
+            {stats.map((s) => (
+              <li key={s.label} className="lp-patch">
+                <b className="num">{s.value}</b>
+                <span>{s.label}</span>
+                <Src href={s.href}>{s.src}</Src>
+              </li>
+            ))}
+          </ul>
         </div>
-        <ul className="lp-stats" data-rise>
-          {stats.map((s) => (
-            <li key={s.label}>
-              <b className="num">{s.value}</b>
-              <span>{s.label}</span>
-              <Src href={s.href}>{s.src}</Src>
-            </li>
-          ))}
-        </ul>
       </div>
     </section>
   );
@@ -417,35 +507,35 @@ export function ProofSection({ m }: { m: Showcase }) {
 
 function FitSection() {
   return (
-    <section className="lp-section tone" id="fit" aria-labelledby="fit-h">
+    <section className="lp-section" id="fit" aria-labelledby="fit-h">
       <div className="lp-inner">
-        <div className="lp-head" data-rise>
-          <Pill>Who it's for</Pill>
-          <h2 id="fit-h">
-            Built for issuers, <span className="accent">only</span>.
-          </h2>
+        <div className="lp-sec-head" data-rise>
+          <CardHead
+            pill="04 · Who it's for"
+            id="fit-h"
+            title={
+              <>
+                Built for issuers, <span className="accent">only</span>.
+              </>
+            }
+            caption="Stablecoin Studio tokens"
+          />
         </div>
         <div className="lp-fit">
-          <article className="lp-glass lp-fit-card" data-rise>
-            <span className="lp-mark yes" aria-hidden="true">
-              ✓
-            </span>
-            <h3>For issuers of their own Stablecoin Studio token</h3>
-            <ul>
+          <article className="lp-card lp-fit-card" data-rise>
+            <CardHead as="h3" pill="✓ For" title="Issuers of their own Stablecoin Studio token" />
+            <ul className="lp-patch lp-checks yes">
               <li>You hold the token's freeze and wipe keys</li>
               <li>Your treasury pays known partners and distributors</li>
               <li>You want stolen keys and rogue insiders undone, on chain</li>
             </ul>
           </article>
-          <article className="lp-glass lp-fit-card" data-rise>
-            <span className="lp-mark no" aria-hidden="true">
-              ✕
-            </span>
-            <h3>Not for USDC or tokens you didn't issue</h3>
-            <ul>
+          <article className="lp-card lp-fit-card" data-rise>
+            <CardHead as="h3" pill="✕ Not for" title="USDC or tokens you didn't issue" />
+            <ul className="lp-patch lp-checks no">
               <li>Taking tokens back needs the token's own wipe key</li>
               <li>Only the issuer holds it: nobody but Circle can wipe USDC</li>
-              <li>
+              <li className="link">
                 <a href={SCOPE} target="_blank" rel="noreferrer">
                   Full scope and limits
                 </a>
@@ -493,6 +583,7 @@ const PLANS = [
   },
 ];
 
+/** Side plans are cobalt-deep cards; the middle (Issuer) plan is a cream card in cobalt ink with the yellow button. */
 export function PricingSection() {
   return (
     <section className="lp-section lp-pricing" id="pricing" aria-labelledby="pricing-h">
@@ -508,13 +599,13 @@ export function PricingSection() {
         </div>
         <ul className="lp-plans">
           {PLANS.map((p) => (
-            <li key={p.name} className={`lp-glass lp-plan${p.primary ? " featured" : ""}`} data-rise>
+            <li key={p.name} className={`lp-plan${p.primary ? " featured lp-patch" : " lp-card"}`} data-rise>
               <h3>{p.name}</h3>
               <p className="lp-price">
                 <b className="num">{p.price}</b>
                 {p.per && <span>{p.per}</span>}
               </p>
-              <p className="lp-muted small">{p.note}</p>
+              <p className="lp-plan-note">{p.note}</p>
               <ul>
                 {p.features.map((f) => (
                   <li key={f}>{f}</li>
@@ -557,23 +648,35 @@ const FAQ: { q: string; a: string }[] = [
   },
 ];
 
+/** One cobalt-deep card; each question a row, its answer opening in a cream patch (native details/summary). */
 export function FaqSection() {
   return (
-    <section className="lp-section tone" id="faq" aria-labelledby="faq-h">
+    <section className="lp-section" id="faq" aria-labelledby="faq-h">
       <div className="lp-inner lp-faq-inner">
-        <div className="lp-head" data-rise>
-          <Pill>FAQ</Pill>
-          <h2 id="faq-h">
-            Straight <span className="accent">answers</span>.
-          </h2>
-        </div>
-        <div className="lp-faq" data-rise>
-          {FAQ.map((f) => (
-            <details key={f.q}>
-              <summary>{f.q}</summary>
-              <p>{f.a}</p>
-            </details>
-          ))}
+        <div className="lp-card" data-rise>
+          <CardHead
+            pill="06 · FAQ"
+            id="faq-h"
+            title={
+              <>
+                Straight <span className="accent">answers</span>.
+              </>
+            }
+            caption={`${FAQ.length} questions`}
+          />
+          <div className="lp-faq">
+            {FAQ.map((f, i) => (
+              <details key={f.q}>
+                <summary>
+                  <span className="lp-faq-n mono" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span>{f.q}</span>
+                </summary>
+                <p className="lp-patch">{f.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </div>
     </section>
