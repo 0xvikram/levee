@@ -81,6 +81,28 @@ export const MIRROR = (env.VITE_MIRROR_URL as string | undefined) ?? `https://${
 export const GITHUB = "https://github.com/0xvikram/levee";
 export const ARKIV_EXPLORER = "https://rabdi.explorer.arkiv.network";
 
+// ---------------------------------------------------------------- docs (Mintlify, docs-site/)
+// TODO(mintlify): once the Mintlify site is connected, set DOCS_URL to its address
+// (e.g. "https://levee.mintlify.app") and DOCS_ON_MINTLIFY to true. Every docs link on the
+// landing page (nav, hero, pricing, footer) is built from these two lines.
+export const DOCS_ON_MINTLIFY = false;
+export const DOCS_URL = "https://github.com/0xvikram/levee/tree/build/docs-site";
+
+/** Link to one docs page by its path in docs-site/ without the extension, e.g. "quickstart". */
+export function docsLink(page: string): string {
+  return DOCS_ON_MINTLIFY ? `${DOCS_URL}/${page}` : `${DOCS_URL.replace("/tree/", "/blob/")}/${page}.mdx`;
+}
+
+export const DOCS = {
+  home: DOCS_URL,
+  quickstart: docsLink("quickstart"),
+  api: docsLink("api-reference/overview"),
+  security: docsLink("security/threat-model"),
+  setup: docsLink("integrate/configuration"),
+  pricing: docsLink("product/pricing"),
+  contact: docsLink("product/contact"),
+} as const;
+
 const hs = `https://hashscan.io/${deploy.network}`;
 export const hashscan = {
   tx: (txId: string) => `${hs}/transaction/${txId}`,

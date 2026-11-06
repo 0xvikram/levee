@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./landing.css";
-import { HeroMedia } from "../components/HeroMedia";
+import { DitherImage } from "../components/DitherImage";
 import { Link } from "../components/router";
-import { ARKIV_EXPLORER, GITHUB, MIRROR, deploy, hashscan } from "../lib/config";
+import { ARKIV_EXPLORER, DOCS, GITHUB, MIRROR, deploy, hashscan } from "../lib/config";
 import { FACTS, INDUSTRY, TICKS, logPos } from "../lib/numbers";
-import { useShowcase, type Showcase } from "../lib/incident";
+import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
 import { usePrefersReducedMotion, useRiseIn } from "../lib/hooks";
 
-const DOCS = `${GITHUB}/tree/build/docs-site`;
-const API_DOCS = `${GITHUB}/tree/build/docs-site/api-reference`;
-const QUICKSTART = `${GITHUB}/blob/build/docs-site/quickstart.mdx`;
 const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
+/** The product window plays the recorded demo when true; until the new video lands it shows a cobalt mock with the live numbers. */
+export const DEMO_VIDEO = false;
+/** Media lives only in the hero and the footer. The hero engraving's own sampled sky is the dither's dark tone and the hero ground. */
+const ART = {
+  hero: { src: "/media/engraving/hero.jpg", sky: "#203C91" },
+  footer: "/media/footer-engraving.jpg",
+};
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
 const ROOT_TESTS = 351;
 
@@ -32,22 +36,23 @@ export function Landing() {
         Skip to content
       </a>
       <header className="lp-hero">
-        <HeroMedia parallax />
+        <DitherImage className="lp-hero-art" src={ART.hero.src} dark={ART.hero.sky} priority posY={1} cell={1.5} />
+        <div className="lp-hero-scrim" aria-hidden="true" />
         <div className="lp-nav">
           <Link to="/" className="lp-logo">
-            ▲ Levee
+            <span aria-hidden="true">▲</span> Levee
           </Link>
           <nav aria-label="Main">
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
-            <a href={DOCS} target="_blank" rel="noreferrer">
+            <a href={DOCS.home} target="_blank" rel="noreferrer">
               Docs
             </a>
-            <Link to="/live" className="lp-btn primary small">
-              Watch it live
-            </Link>
           </nav>
+          <Link to="/live" className="lp-btn primary small lp-nav-cta">
+            Watch it live
+          </Link>
         </div>
 
         <div className="lp-hero-copy">
@@ -62,7 +67,7 @@ export function Landing() {
             <Link to="/live" className="lp-btn primary">
               Watch it live
             </Link>
-            <a className="lp-btn ghost" href={DOCS} target="_blank" rel="noreferrer">
+            <a className="lp-btn ghost" href={DOCS.home} target="_blank" rel="noreferrer">
               Read the docs
             </a>
           </div>
@@ -70,7 +75,7 @@ export function Landing() {
       </header>
 
       <div className="lp-window-wrap">
-        <ProductWindow />
+        <ProductWindow m={m} />
       </div>
 
       <HederaStrip />
@@ -92,12 +97,13 @@ export function Landing() {
 // ---------------------------------------------------------------- product window
 
 /**
- * Browser-style window that plays the recorded demo. Sources are attached only once the window is
- * near the screen, it plays muted on a loop while visible and pauses when scrolled away. Layers:
- * gradient → poster still → video, so a missing file just leaves the layer below showing.
- * Reduced motion: the still only. The whole window is a link to /live.
+ * Browser-style window showing the product. Until the new demo video lands it is a cobalt glass mock
+ * of the incident view, filled with the measured (or live) numbers. With `video` (or DEMO_VIDEO =
+ * true) it plays the recorded demo instead: sources are attached only once the window is near the
+ * screen, it plays muted on a loop while visible and pauses when scrolled away; the poster still sits
+ * under it, and the mock comes back if neither can load. Reduced motion: the still only. Links to /live.
  */
-export function ProductWindow() {
+export function ProductWindow({ m = FALLBACK_SHOWCASE, video = DEMO_VIDEO }: { m?: Showcase; video?: boolean } = {}) {
   const reduced = usePrefersReducedMotion();
   const box = useRef<HTMLDivElement>(null);
   const vid = useRef<HTMLVideoElement>(null);
@@ -107,6 +113,7 @@ export function ProductWindow() {
   const [videoOk, setVideoOk] = useState(true);
 
   useEffect(() => {
+    if (!video) return;
     const el = box.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
@@ -123,9 +130,9 @@ export function ProductWindow() {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [video]);
 
-  const showVideo = near && !reduced && videoOk;
+  const showVideo = video && near && !reduced && videoOk;
   useEffect(() => {
     const v = vid.current;
     if (!v) return;
@@ -134,36 +141,103 @@ export function ProductWindow() {
     else v.pause?.();
   }, [visible, showVideo]);
 
+  const media = video && (posterOk || showVideo);
   return (
     <div className="lp-window-shell" ref={box}>
-    <Link to="/live" className="lp-window" aria-label="Open the live demo: a theft frozen and taken back on Hedera testnet" data-testid="product-window">
-      <span className="lp-window-bar" aria-hidden="true">
-        <span className="lp-dots">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span className="lp-window-title">levee · live</span>
-        <span className="lp-window-open">Open ↗</span>
-      </span>
-      <span className="lp-window-body" aria-hidden="true">
-        {posterOk && <img src="/media/demo-poster.jpg" alt="" decoding="async" loading="lazy" onError={() => setPosterOk(false)} />}
-        {showVideo && (
-          <video ref={vid} muted autoPlay loop playsInline preload="metadata" poster={posterOk ? "/media/demo-poster.jpg" : undefined} onError={(e) => e.target === e.currentTarget && setVideoOk(false)}>
-            <source src="/media/demo.webm" type="video/webm" />
-            {/* a failed <source> fires error on itself (React bubbles it to the video's onError, hence the target check); only the last one means none could play */}
-            <source src="/media/demo.mp4" type="video/mp4" onError={() => setVideoOk(false)} />
-          </video>
-        )}
-        {!posterOk && !showVideo && (
-          <span className="lp-window-empty">
-            <b>levee · live</b>
-            <span>Watch a theft frozen and taken back</span>
+      <Link to="/live" className="lp-window" aria-label="Open the live demo: a theft frozen and taken back on Hedera testnet" data-testid="product-window">
+        <span className="lp-window-bar" aria-hidden="true">
+          <span className="lp-dots">
+            <i />
+            <i />
+            <i />
           </span>
-        )}
-      </span>
-    </Link>
+          <span className="lp-window-title">levee · live</span>
+          <span className="lp-window-open">Open ↗</span>
+        </span>
+        <span className={`lp-window-body${media ? "" : " mock"}`} aria-hidden="true">
+          {video && posterOk && <img src="/media/demo-poster.jpg" alt="" decoding="async" onError={() => setPosterOk(false)} />}
+          {showVideo && (
+            <video ref={vid} muted autoPlay loop playsInline preload="metadata" poster={posterOk ? "/media/demo-poster.jpg" : undefined} onError={(e) => e.target === e.currentTarget && setVideoOk(false)}>
+              <source src="/media/demo.webm" type="video/webm" />
+              {/* a failed <source> fires error on itself (React bubbles it to the video's onError, hence the target check); only the last one means none could play */}
+              <source src="/media/demo.mp4" type="video/mp4" onError={() => setVideoOk(false)} />
+            </video>
+          )}
+          {!media && <WindowMock m={m} />}
+        </span>
+      </Link>
     </div>
+  );
+}
+
+/** The incident view, drawn from the numbers: headline time, the four steps, the treasury line, the event log. */
+function WindowMock({ m }: { m: Showcase }) {
+  const span = Math.max(m.wipedS, 1) * 1.4;
+  const x = (t: number) => 60 + (t / span) * 500;
+  const theftX = x(0);
+  const wipeX = x(m.wipedS);
+  // treasury balance: flat, the theft drops it, the wipe brings it back
+  const path = `M0 30 H${theftX.toFixed(1)} L${(theftX + 6).toFixed(1)} 92 H${wipeX.toFixed(1)} L${(wipeX + 6).toFixed(1)} 30 H600`;
+  const events = [
+    { t: 0, text: `${m.wipedAmount} RUPC left the treasury · no receipt` },
+    { t: m.detectionS, text: "theft detected by the watcher" },
+    { t: m.treasuryFrozenS, text: "treasury frozen" },
+    { t: m.wipedS, text: "thief wiped and frozen · tokens back" },
+  ];
+  const kpis: [string, string][] = [
+    [sec(m.detectionS), "detected"],
+    [sec(m.treasuryFrozenS), "treasury frozen"],
+    [sec(m.wipedS), "taken back"],
+    ["0", "false alarms"],
+  ];
+  return (
+    <span className="lp-mock">
+      <span className="lp-mock-main">
+        <span className="lp-mock-state mono">
+          <i /> Contained · Hedera {deploy.network}
+        </span>
+        <span className="lp-mock-big">
+          <b className="num">{sec(m.wipedS)}</b>
+          <small>theft to tokens back</small>
+        </span>
+        <span className="lp-mock-pipe mono">
+          {["Request", "Receipt", "Transfer", "Check"].map((p) => (
+            <span key={p}>
+              <i />
+              {p}
+            </span>
+          ))}
+        </span>
+        <span className="lp-mock-chart">
+          <span className="lp-mock-label mono">Treasury balance</span>
+          <svg viewBox="0 0 600 120" preserveAspectRatio="none" focusable="false">
+            {[30, 60, 92].map((y) => (
+              <line key={y} x1="0" x2="600" y1={y} y2={y} className="grid" vectorEffect="non-scaling-stroke" />
+            ))}
+            <path d={path} className="line" vectorEffect="non-scaling-stroke" />
+            <line x1={wipeX + 3} x2={wipeX + 3} y1="6" y2="114" className="mark" vectorEffect="non-scaling-stroke" />
+          </svg>
+        </span>
+      </span>
+      <span className="lp-mock-side">
+        <span className="lp-mock-kpis">
+          {kpis.map(([v, l]) => (
+            <span key={l}>
+              <b className="num mono">{v}</b>
+              {l}
+            </span>
+          ))}
+        </span>
+        <span className="lp-mock-log mono">
+          {events.map((e) => (
+            <span key={e.text}>
+              <b>+{e.t.toFixed(2)} s</b>
+              {e.text}
+            </span>
+          ))}
+        </span>
+      </span>
+    </span>
   );
 }
 
@@ -209,7 +283,7 @@ function ProblemSection({ m }: { m: Showcase }) {
           <h2 id="problem-h">
             Hacks take <span className="accent">hours</span> to stop.
           </h2>
-          <p className="lp-lede">By the time a team is awake and on a call, the stolen tokens are swapped and bridged away.</p>
+          <p className="lp-lede serif">By the time a team is awake and on a call, the stolen tokens are swapped and bridged away.</p>
         </div>
         <CompareChart leveeS={m.wipedS} leveeTx={m.wipeTx} live={m.live} />
       </div>
@@ -270,20 +344,14 @@ export function CompareChart({ leveeS, leveeTx, live = false }: { leveeS: number
 
 // ---------------------------------------------------------------- 2. how it works
 
-function Engraving({ n }: { n: number }) {
-  const [ok, setOk] = useState(true);
-  if (!ok) return null;
-  return <img className="lp-card-art" src={`/media/section-engraving-${n}.jpg`} alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setOk(false)} />;
-}
-
 export function HowSection({ m }: { m: Showcase }) {
   const steps = [
-    { title: "Every payment gets a receipt on Hedera", text: "Your payout service asks Levee first. Levee writes a receipt to a Hedera topic, then co-signs the payment." },
-    { title: `No receipt = theft, caught in ${about(m.detectionS)}`, text: "The watcher reads every movement from the Mirror Node. Anything that leaves without a receipt is a theft, whoever signed it." },
-    { title: `Frozen and taken back in ${about(m.wipedS)} · 2 of 3 to unlock`, text: "A close-only contract freezes the treasury and wipes the thief. Only 2 of 3 admins, signing together, can reopen." },
+    { tag: "Receipt", title: "Every payment gets a receipt on Hedera", text: "Your payout service asks Levee first. Levee writes a receipt to a Hedera topic, then co-signs the payment." },
+    { tag: "Watch", title: `No receipt = theft, caught in ${about(m.detectionS)}`, text: "The watcher reads every movement from the Mirror Node. Anything that leaves without a receipt is a theft, whoever signed it." },
+    { tag: "Contain", title: `Frozen and taken back in ${about(m.wipedS)} · 2 of 3 to unlock`, text: "A close-only contract freezes the treasury and wipes the thief. Only 2 of 3 admins, signing together, can reopen." },
   ];
   return (
-    <section className="lp-section" id="how" aria-labelledby="how-h">
+    <section className="lp-section tone" id="how" aria-labelledby="how-h">
       <div className="lp-inner">
         <div className="lp-head" data-rise>
           <Pill>How it works</Pill>
@@ -294,9 +362,9 @@ export function HowSection({ m }: { m: Showcase }) {
         <ol className="lp-steps">
           {steps.map((s, i) => (
             <li key={i} className="lp-glass lp-step" data-rise>
-              <Engraving n={i + 1} />
-              <span className="lp-step-n mono" aria-hidden="true">
-                {String(i + 1).padStart(2, "0")}
+              <span className="lp-step-top" aria-hidden="true">
+                <span className="lp-step-n mono">{String(i + 1).padStart(2, "0")}</span>
+                <span className="lp-step-tag mono">{s.tag}</span>
               </span>
               <h3>{s.title}</h3>
               <p className="lp-muted">{s.text}</p>
@@ -348,7 +416,7 @@ export function ProofSection({ m }: { m: Showcase }) {
 
 function FitSection() {
   return (
-    <section className="lp-section" id="fit" aria-labelledby="fit-h">
+    <section className="lp-section tone" id="fit" aria-labelledby="fit-h">
       <div className="lp-inner">
         <div className="lp-head" data-rise>
           <Pill>Who it's for</Pill>
@@ -399,7 +467,7 @@ const PLANS = [
     note: "$300/mo on mainnet",
     features: ["Receipts and the watcher", "Freeze on a breach (freeze only)", "Every incident logged on Hedera"],
     cta: "Start on testnet",
-    href: QUICKSTART,
+    href: DOCS.quickstart,
     primary: false,
   },
   {
@@ -409,7 +477,7 @@ const PLANS = [
     note: "Up to 3 tokens",
     features: ["Freeze and wipe: tokens taken back", "2 of 3 admins to reopen", "Close-only contract on your token"],
     cta: "Read the setup guide",
-    href: DOCS,
+    href: DOCS.setup,
     primary: true,
   },
   {
@@ -418,8 +486,8 @@ const PLANS = [
     per: "",
     note: "More tokens, your rules",
     features: ["Stricter rules: caps, known recipients", "Deployment agreed together", "Mainnet checklist review"],
-    cta: "Open an issue on GitHub",
-    href: `${GITHUB}/issues`,
+    cta: "Talk to us",
+    href: DOCS.contact,
     primary: false,
   },
 ];
@@ -490,7 +558,7 @@ const FAQ: { q: string; a: string }[] = [
 
 export function FaqSection() {
   return (
-    <section className="lp-section" id="faq" aria-labelledby="faq-h">
+    <section className="lp-section tone" id="faq" aria-labelledby="faq-h">
       <div className="lp-inner lp-faq-inner">
         <div className="lp-head" data-rise>
           <Pill>FAQ</Pill>
@@ -513,15 +581,15 @@ export function FaqSection() {
 
 // ---------------------------------------------------------------- 7. footer
 
+/** Parley-style footer: brand and link columns over the engraving's empty sky, the coastline at the bottom. */
 export function Footer() {
   const [imgOk, setImgOk] = useState(true);
   return (
     <footer className="lp-footer">
-      {imgOk && <img className="lp-footer-art" src="/media/footer-engraving.jpg" alt="" aria-hidden="true" loading="lazy" decoding="async" onError={() => setImgOk(false)} />}
       <div className="lp-footer-inner">
         <div className="lp-footer-brand">
           <span className="lp-footer-word">Levee</span>
-          <p>
+          <p className="serif">
             No receipt, no <span className="accent">movement</span>.
           </p>
         </div>
@@ -534,14 +602,20 @@ export function Footer() {
           </div>
           <div>
             <h2 className="lp-footer-h">Developers</h2>
-            <a href={DOCS} target="_blank" rel="noreferrer">
+            <a href={DOCS.home} target="_blank" rel="noreferrer">
               Docs
+            </a>
+            <a href={DOCS.quickstart} target="_blank" rel="noreferrer">
+              Quickstart
+            </a>
+            <a href={DOCS.api} target="_blank" rel="noreferrer">
+              API reference
+            </a>
+            <a href={DOCS.security} target="_blank" rel="noreferrer">
+              Security
             </a>
             <a href={GITHUB} target="_blank" rel="noreferrer">
               GitHub
-            </a>
-            <a href={API_DOCS} target="_blank" rel="noreferrer">
-              API
             </a>
           </div>
           <div>
@@ -567,6 +641,9 @@ export function Footer() {
           <span>Built at ETHGlobal Mumbai 2026 · Hedera {deploy.network}</span>
           <span>Independent project, not affiliated with Hedera.</span>
         </div>
+      </div>
+      <div className={`lp-footer-art${imgOk ? "" : " missing"}`} aria-hidden="true">
+        {imgOk && <img src={ART.footer} alt="" loading="lazy" decoding="async" onError={() => setImgOk(false)} />}
       </div>
     </footer>
   );

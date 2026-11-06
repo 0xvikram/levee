@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { CompareChart, FaqSection, Footer, HederaStrip, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
 import { FALLBACK_SHOWCASE } from "../lib/incident";
 import { FACTS, INDUSTRY } from "../lib/numbers";
-import { deploy } from "../lib/config";
+import { DOCS, DOCS_URL, deploy } from "../lib/config";
 
 // The landing reads the incidents topic from the Mirror Node; keep tests offline (fallback run).
 beforeEach(() => {
@@ -26,7 +26,41 @@ describe("Landing structure", () => {
     expect(screen.getByText("For stablecoin issuers on Hedera. No receipt, no movement.")).toBeInTheDocument();
     const hero = container.querySelector(".lp-hero-copy")!;
     expect(within(hero as HTMLElement).getByRole("link", { name: "Watch it live" })).toHaveAttribute("href", "/live");
-    expect(within(hero as HTMLElement).getByRole("link", { name: "Read the docs" }).getAttribute("href")).toMatch(/github\.com\/0xvikram\/levee\/tree\/build\/docs-site/);
+    expect(within(hero as HTMLElement).getByRole("link", { name: "Read the docs" })).toHaveAttribute("href", DOCS_URL);
+  });
+
+  it("has a slim nav: logo, centre links including Docs, and the Watch it live pill", () => {
+    const { container } = render(<Landing />);
+    const nav = container.querySelector(".lp-nav")!;
+    expect(nav.querySelector(".lp-logo")).toHaveAttribute("href", "/");
+    const links = within(nav.querySelector("nav") as HTMLElement).getAllByRole("link");
+    expect(links.map((a) => a.textContent)).toEqual(["How it works", "Pricing", "FAQ", "Docs"]);
+    expect(links[3]).toHaveAttribute("href", DOCS_URL);
+    expect(nav.querySelector(".lp-nav-cta")).toHaveAttribute("href", "/live");
+  });
+
+  it("keeps media to the hero and the footer only", () => {
+    const { container } = render(<Landing />);
+    expect(container.querySelector("main")!.querySelectorAll("img, video, canvas, .dither")).toHaveLength(0);
+    expect(container.querySelector(".lp-window-wrap")!.querySelectorAll("img, video")).toHaveLength(0);
+  });
+
+  it("falls back to the cobalt halftone when the hero engraving is missing", () => {
+    const { container } = render(<Landing />);
+    const art = container.querySelector(".lp-hero .dither")!;
+    fireEvent.error(art.querySelector("img")!);
+    expect(art).toHaveAttribute("data-state", "fallback");
+    expect(art.querySelector("img")).toBeNull();
+  });
+
+  it("puts the hero engraving behind the copy as dithered art (decorative, with its own sky colour)", () => {
+    const { container } = render(<Landing />);
+    const art = container.querySelector(".lp-hero .dither") as HTMLElement;
+    expect(art).not.toBeNull();
+    expect(art).toHaveAttribute("aria-hidden", "true");
+    expect(art.style.getPropertyValue("--dither-dark")).toBe("#203C91");
+    // jsdom has no 2D canvas, so the still image is shown, which is also the reduced-motion path
+    expect(art.querySelector("img")).toHaveAttribute("src", "/media/engraving/hero.jpg");
   });
 
   it("puts the sections in the agreed order, each with a pill eyebrow", () => {
@@ -53,8 +87,20 @@ describe("Landing structure", () => {
 });
 
 describe("product window", () => {
-  it("is a link to /live titled levee · live, with a poster that degrades to a placeholder", () => {
-    const { container } = render(<ProductWindow />);
+  it("is a link to /live titled levee · live, with a cobalt mock of the incident view (no media)", () => {
+    const { container } = render(<ProductWindow m={live} />);
+    const a = screen.getByTestId("product-window");
+    expect(a).toHaveAttribute("href", "/live");
+    expect(a.textContent).toContain("levee · live");
+    expect(container.querySelector("img, video")).toBeNull();
+    const mock = container.querySelector(".lp-mock")!;
+    expect(mock.textContent).toContain("5.62 s");
+    expect(mock.textContent).toContain("2.51 s");
+    expect(mock.textContent).toMatch(/Request.*Receipt.*Transfer.*Check/);
+  });
+
+  it("with video on, shows the poster that degrades to the mock", () => {
+    const { container } = render(<ProductWindow video />);
     const a = screen.getByTestId("product-window");
     expect(a).toHaveAttribute("href", "/live");
     expect(a.textContent).toContain("levee · live");
@@ -65,9 +111,9 @@ describe("product window", () => {
     expect(container.querySelector(".lp-window-body img")).toBeNull();
   });
 
-  it("attaches the demo video (webm then mp4, muted, looping, inline) once near the screen", () => {
+  it("with video on, attaches the demo (webm then mp4, muted, looping, inline) once near the screen", () => {
     // jsdom has no IntersectionObserver, so the window counts as on screen at once
-    const { container } = render(<ProductWindow />);
+    const { container } = render(<ProductWindow video />);
     const v = container.querySelector("video")!;
     expect(v).not.toBeNull();
     expect(v.muted).toBe(true);
@@ -98,6 +144,10 @@ describe("how it works", () => {
     expect(cards[0].textContent).toMatch(/Every payment gets a receipt on Hedera/);
     expect(cards[1].textContent).toMatch(/No receipt = theft, caught in ~3 s/);
     expect(cards[2].textContent).toMatch(/Frozen and taken back in ~6 s · 2 of 3 to unlock/);
+  });
+  it("uses no imagery: colour, glass and type only", () => {
+    const { container } = render(<HowSection m={live} />);
+    expect(container.querySelector("img, video, canvas, .dither")).toBeNull();
   });
 });
 
@@ -138,7 +188,8 @@ describe("pricing", () => {
     expect(container.textContent).toMatch(/\$300\/mo on mainnet/);
     expect(container.textContent).toMatch(/\$1,500/);
     expect(container.querySelector("form")).toBeNull();
-    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")).toMatch(/^https:\/\/github\.com\/0xvikram\/levee/);
+    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")!.startsWith(DOCS_URL.replace("/tree/", "/blob/")) || p.querySelector(".lp-btn")!.getAttribute("href") === DOCS_URL).toBe(true);
+    expect(plans.map((p) => p.querySelector(".lp-btn")!.getAttribute("href"))).toEqual([DOCS.quickstart, DOCS.setup, DOCS.contact]);
   });
 });
 
@@ -159,9 +210,26 @@ describe("footer", () => {
     expect(hrefs).toContain(`https://hashscan.io/testnet/contract/${deploy.controller}`);
     expect(hrefs).toContain(`https://hashscan.io/testnet/topic/${deploy.topics.incidents}`);
     expect(screen.getByText("Independent project, not affiliated with Hedera.")).toBeInTheDocument();
-    const img = container.querySelector(".lp-footer-art")!;
+    const dev = [...container.querySelectorAll(".lp-footer-cols > div")][1];
+    expect([...dev.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")])).toEqual([
+      ["Docs", DOCS_URL],
+      ["Quickstart", DOCS.quickstart],
+      ["API reference", DOCS.api],
+      ["Security", DOCS.security],
+      ["GitHub", "https://github.com/0xvikram/levee"],
+    ]);
+    const img = container.querySelector(".lp-footer-art img")!;
     expect(img).toHaveAttribute("src", "/media/footer-engraving.jpg");
     fireEvent.error(img);
-    expect(container.querySelector(".lp-footer-art")).toBeNull();
+    expect(container.querySelector(".lp-footer-art img")).toBeNull();
+    expect(container.querySelector(".lp-footer-art.missing")).not.toBeNull();
+  });
+});
+
+describe("docs links", () => {
+  it("are all built from DOCS_URL (one line to swap for Mintlify)", () => {
+    for (const v of Object.values(DOCS)) expect(v === DOCS_URL || v.startsWith(DOCS_URL.replace("/tree/", "/blob/"))).toBe(true);
+    expect(DOCS.quickstart).toMatch(/docs-site\/quickstart\.mdx$/);
+    expect(DOCS.api).toMatch(/docs-site\/api-reference\/overview\.mdx$/);
   });
 });

@@ -19,20 +19,18 @@ function over(fg: string, alpha: number, bg: string): string {
 
 const C = { sky: "#EFE6D2", haze: "#E6D8B4", white: "#FFFFFF", ink: "#1B1A17", moss: "#2E3722", smoke: "#6B665C", yellow: "#F2E34C", olive: "#5F6B3B", oliveLit: "#B6C383", amber: "#D9B25C", breachLit: "#F08C74", breach: "#C8432B" };
 
-/** Landing (dusk) tokens: navy grounds, cream text, yellow the only accent. Gold #7A5A00 is retired. */
-const N = { navy950: "#060A1C", navy900: "#0A1130", navy800: "#111B45", cream: "#F3ECDD", blurWord: "#4C68FF" };
-/** Frosted glass card: cream at 7% over the deepest ground (the lightest a card gets). */
-const GLASS = over(N.cream, 0.07, N.navy950);
-const CREAM_DIM = (bg: string) => over(N.cream, 0.72, bg);
-const CREAM_FAINT = (bg: string) => over(N.cream, 0.6, bg);
-/** Hero copy sits on the video under the navy tint (about 60% navy at the headline). Assumed brightest dusk frame: pale horizon #A9B8E8. */
-const HERO_DUSK = over(N.navy950, 0.6, "#A9B8E8");
-/** While only the older warm hero exists, the heavier "legacy" tint (about 87% navy) covers its brightest cream frame. */
-const HERO_LEGACY = over(N.navy950, 0.87, "#F6ECC6");
-/** Footer columns sit below the engraving on an 88% navy scrim; worst case is white paper behind it. */
-const FOOTER_SCRIM = over(N.navy950, 0.88, C.white);
-/** Pricing: the blurred word (ultramarine at 32%) behind the heading. */
-const BLUR_WORD = over(N.blurWord, 0.32, N.navy950);
+/** Landing (Parley v3) tokens: cobalt grounds, cream text, yellow a small accent only. Gold #7A5A00 is retired. */
+const N = { cobalt: "#1A3892", deep: "#142C82", ink: "#0E1F5E", sky: "#1F3F88", cream: "#F3EBD6", heroSky: "#203C91" };
+/** Cobalt glass card: cream at 9% (the top of its gradient, the lightest it gets) over the page ground. */
+const GLASS = over(N.cream, 0.09, N.cobalt);
+const CREAM_DIM = (bg: string) => over(N.cream, 0.74, bg);
+const CREAM_FAINT = (bg: string) => over(N.cream, 0.64, bg);
+/** Hero copy: the scrim is the hero's own sky at 85%; worst case is a cream engraved pixel right behind a letter. */
+const HERO_SCRIM = over(N.heroSky, 0.85, N.cream);
+/** Fixed nav: cobalt-ink glass at 72%; worst case is cream art behind it. */
+const NAV_GLASS = over(N.ink, 0.72, N.cream);
+/** Page grain: cream at <= 5% over the ground (soft-light is gentler than this plain mix). */
+const GRAIN = over(N.cream, 0.05, N.cobalt);
 
 /** screen blend of the footer cursor light's brightest stop (sun #F6ECC6 at 0.2) over ink */
 const LIT_INK = (() => {
@@ -65,31 +63,38 @@ const PAIRS: [string, string, string][] = [
   ["yellow ticker figure on ink under cursor light", C.yellow, LIT_INK],
   ["olive-lit live tag on ink under cursor light", C.oliveLit, LIT_INK],
   ["sky ticker link on ink under cursor light", C.sky, LIT_INK],
-  // landing (/): dusk theme
-  ["cream on navy-950", N.cream, N.navy950],
-  ["cream on navy-900", N.cream, N.navy900],
-  ["cream on navy-800", N.cream, N.navy800],
+  // landing (/): Parley v3 cobalt
+  ["cream on cobalt (page ground)", N.cream, N.cobalt],
+  ["cream on cobalt-deep", N.cream, N.deep],
+  ["cream on cobalt-ink (window bar)", N.cream, N.ink],
+  ["cream on cobalt-sky (footer)", N.cream, N.sky],
   ["cream on glass card", N.cream, GLASS],
-  ["cream-dim on navy-950", CREAM_DIM(N.navy950), N.navy950],
-  ["cream-dim on navy-800 (window bar)", CREAM_DIM(N.navy800), N.navy800],
+  ["cream on the page grain", N.cream, GRAIN],
+  ["cream-dim on cobalt", CREAM_DIM(N.cobalt), N.cobalt],
+  ["cream-dim on cobalt-ink (window bar)", CREAM_DIM(N.ink), N.ink],
   ["cream-dim on glass card", CREAM_DIM(GLASS), GLASS],
-  ["cream-faint Built on Hedera row on navy-950", CREAM_FAINT(N.navy950), N.navy950],
-  ["yellow accent word on navy-950", C.yellow, N.navy950],
-  ["yellow accent on navy-800", C.yellow, N.navy800],
+  ["cream-dim footer heading on cobalt-sky", CREAM_DIM(N.sky), N.sky],
+  ["cream-faint Built on Hedera row on cobalt", CREAM_FAINT(N.cobalt), N.cobalt],
+  ["yellow accent word on cobalt", C.yellow, N.cobalt],
+  ["yellow accent on cobalt-deep", C.yellow, N.deep],
   ["yellow on glass card (Levee bar label, step numbers)", C.yellow, GLASS],
-  ["yellow pill text on its 8% yellow fill", C.yellow, over(C.yellow, 0.08, N.navy950)],
-  ["navy-950 on yellow (primary button, fit mark)", N.navy950, C.yellow],
-  ["cream hero copy on the dusk video under the tint", N.cream, HERO_DUSK],
-  ["yellow hero accent on the dusk video under the tint", C.yellow, HERO_DUSK],
-  ["cream hero copy on the older hero under the legacy tint", N.cream, HERO_LEGACY],
-  ["cream footer link on the scrim over white paper", N.cream, FOOTER_SCRIM],
-  ["cream-dim footer heading on the scrim over white paper", CREAM_DIM(FOOTER_SCRIM), FOOTER_SCRIM],
-  ["cream heading over the blurred Pricing word", N.cream, BLUR_WORD],
+  ["yellow pill text on its 8% yellow fill", C.yellow, over(C.yellow, 0.08, N.cobalt)],
+  ["cobalt-ink on yellow (primary button, fit mark)", N.ink, C.yellow],
+  ["cream hero copy on the scrim over a cream pixel", N.cream, HERO_SCRIM],
+  ["yellow hero accent on the scrim over a cream pixel", C.yellow, HERO_SCRIM],
+  ["cream nav link on the nav glass over a cream pixel", N.cream, NAV_GLASS],
+  ["cream heading over the blurred Pricing word", N.cream, over(N.cream, 0.09, N.cobalt)],
+  // tonal section band: cobalt-ink at 22% over the ground, and a glass card on it
+  ["cream on the tonal band", N.cream, over(N.ink, 0.22, N.cobalt)],
+  ["cream-dim on a glass card on the tonal band", CREAM_DIM(over(N.cream, 0.09, over(N.ink, 0.22, N.cobalt))), over(N.cream, 0.09, over(N.ink, 0.22, N.cobalt))],
+  ["yellow accent on the tonal band", C.yellow, over(N.ink, 0.22, N.cobalt)],
+  // product window mock (cobalt-deep panels)
+  ["cream-dim on cobalt-deep (window mock labels)", CREAM_DIM(N.deep), N.deep],
 ];
 
 /** Non-text marks (bars) need 3:1 against the ground (WCAG 1.4.11), and Levee must stand apart from the rest. */
 const MARKS: [string, string, string][] = [
-  // landing problem chart (glass card): industry bars cream-dim, Levee bar yellow
+  // landing problem chart (cobalt glass card): industry bars cream-dim, Levee bar yellow
   ["cream-dim industry bar on glass", CREAM_DIM(GLASS), GLASS],
   ["yellow Levee bar on glass", C.yellow, GLASS],
   // /live command centre (moss cards): chart lines, event marks, before/after bars
@@ -125,5 +130,31 @@ describe("landing has no gold or brown accent", () => {
       expect(css).not.toContain("#7a5a00");
       expect(css).not.toContain("var(--gold)");
     }
+  });
+});
+
+describe("landing palette is cobalt + cream + yellow only", () => {
+  it("landing.css uses no colour outside the Parley v3 palette (black appears only inside masks)", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const css = fs.readFileSync(path.resolve(__dirname, "../../pages/landing.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").toLowerCase();
+    const allowed = new Set([
+      "26,56,146", // cobalt #1a3892
+      "20,44,130", // cobalt-deep #142c82
+      "14,31,94", // cobalt-ink #0e1f5e
+      "31,63,136", // cobalt-sky #1f3f88
+      "32,60,145", // hero sky #203c91
+      "243,235,214", // cream #f3ebd6
+      "242,227,76", // yellow #f2e34c
+      "0,0,0", // mask alpha only
+    ]);
+    const hex = (h: string) => {
+      const x = h.length === 4 ? h.slice(1).split("").map((c) => c + c).join("") : h.slice(1);
+      return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)).join(",");
+    };
+    const found = [...css.matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/g)].map((m) => hex(m[0]));
+    found.push(...[...css.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)].map((m) => `${m[1]},${m[2]},${m[3]}`));
+    expect(found.length).toBeGreaterThan(10);
+    for (const c of found) expect(allowed, `unexpected colour rgb(${c})`).toContain(c);
   });
 });

@@ -11,7 +11,7 @@
      amber #D9B25C on ink                                    "refused at gate" on dark (neutral, not red)
      breach-lit #F08C74 on ink                               live-breach text on dark (#C8432B is fills only)
      white on breach #C8432B                                 live-breach tag / banner text
-     landing (/): cream / cream-dim / cream-faint / yellow on navy grounds, navy-950 on yellow (pages/landing.css)
+     landing (/): cream / cream-dim / cream-faint / yellow on cobalt grounds, cobalt-ink on yellow (pages/landing.css)
      gold #7A5A00 is RETIRED: no gold or brown anywhere.
 */
 :root {
@@ -37,21 +37,24 @@
   --amber: #d9b25c;
   --breach-lit: #f08c74;
 
-  /* landing (dusk): navy / ultramarine grounds, cream text, yellow the only accent */
-  --navy-950: #060a1c;
-  --navy-900: #0a1130;
-  --navy-800: #111b45;
-  --ultramarine: #2438a8;
-  --cobalt: #1f3fbf;
-  --cream: #f3ecdd;
-  --cream-dim: rgba(243, 236, 221, 0.72);
-  --cream-faint: rgba(243, 236, 221, 0.6);
-  --dusk: linear-gradient(180deg, #0a1130 0%, #1b2a78 38%, #3a4fb0 62%, #111b45 86%, #060a1c 100%);
+  /* landing (Parley v3): cobalt grounds, cream text and engraving, yellow only as a small accent */
+  --cobalt: #1a3892;       /* page ground: between the engravings' sampled skies, so art edges vanish */
+  --cobalt-deep: #142c82;  /* darker surfaces: chip, plan cards, scrims */
+  --cobalt-ink: #0e1f5e;   /* window bar, nav glass, deepest surfaces */
+  --cobalt-sky: #1f3f88;   /* footer: the footer engraving's own sky, so the art meets it seamlessly */
+  /* media only in the hero (engraving sky #203c91, sampled) and the footer (cobalt-sky); sections are colour only */
+  --cream: #f3ebd6;        /* text and engraved lines */
+  --cream-2: #e9ddbe;      /* engraving shade */
+  --cream-dim: rgba(243, 235, 214, 0.74);
+  --cream-faint: rgba(243, 235, 214, 0.64);
 
   --f-head: "Inter Tight", "Helvetica Neue", Arial, sans-serif;
   --f-accent: "Instrument Serif", Georgia, serif;
   --f-body: "Inter", "Helvetica Neue", Arial, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  /* landing type (Sellora-grade): Inter Tight 500 display, Inter body, IBM Plex Mono labels, EB Garamond italic ledes */
+  --f-label: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --f-serif: "EB Garamond", Georgia, serif;
 
   --h1: clamp(2.6rem, 6.2vw, 5.4rem);
   --h2: clamp(2rem, 4vw, 3.4rem);
