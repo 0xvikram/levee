@@ -59,6 +59,6 @@ describe("stepLabel", () => {
   const ctx = { treasury: "0.0.11333495", fmt: (r: string) => (Number(r) / 1e6).toLocaleString("en-US"), symbol: "RUPC" };
   it("names the treasury freeze and the wipe", () => {
     expect(stepLabel("freezeAccount", "0.0.11333495", undefined, ctx)).toBe("Treasury frozen");
-    expect(stepLabel("wipeAndFreeze", "0.0.11333494", "10000000000", ctx)).toBe("10,000 RUPC wiped, receiver frozen");
+    expect(stepLabel("wipeAndFreeze", "0.0.11333494", "10000000000", ctx)).toBe("10,000 RUPC clawed back, receiver frozen");
   });
 });

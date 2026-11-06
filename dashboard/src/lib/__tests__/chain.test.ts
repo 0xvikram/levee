@@ -148,12 +148,12 @@ describe("genuine incident + replay", () => {
   it("pipeline goes red, captions say Replay, then settles at the recorded time", () => {
     const label = (step: string) => step;
     const p0 = replayPipeline(INCIDENT, 0, 100, label);
-    expect(p0.nodes.contain.tone).toBe("breach");
+    expect(p0.nodes.check.tone).toBe("breach");
     expect(p0.caption).toMatch(/^Replay · tokens left/);
-    expect(replayPipeline(INCIDENT, 0, 5000, label).caption).toBe("Replay · watcher saw the move with no receipt at 4.19 s");
+    expect(replayPipeline(INCIDENT, 0, 5000, label).caption).toBe("Replay · check ✗ no receipt found at 4.19 s");
     expect(replayPipeline(INCIDENT, 0, 7000, label).caption).toBe("Replay · freezeAccount at 6.44 s");
     const done = replayPipeline(INCIDENT, 0, Number.POSITIVE_INFINITY, label);
-    expect(done.nodes.contain.tone).toBe("settled");
+    expect(done.nodes.check.tone).toBe("settled");
     expect(done.caption).toBe("Replay · contained in 8.31 s, as recorded on chain");
   });
 });

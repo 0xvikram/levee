@@ -41,7 +41,7 @@ export function replayPipeline(i: Incident, startMs: number, elapsed: number, la
   const caption = last
     ? `Replay · ${label(last.step, last.account, last.amount)} at ${s(last.atMs)} s`
     : elapsed >= i.detectedMs
-      ? `Replay · watcher saw the move with no receipt at ${s(i.detectedMs)} s`
+      ? `Replay · check ✗ no receipt found at ${s(i.detectedMs)} s`
       : "Replay · tokens left the treasury with no receipt";
   return { ...breach, caption };
 }

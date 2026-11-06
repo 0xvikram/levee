@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FooterScene, useFooterFeed } from "../components/FooterScene";
 import { HeroMedia } from "../components/HeroMedia";
 import { Link, navigate } from "../components/router";
-import { GITHUB, deploy, hashscan, serviceUrl } from "../lib/config";
+import { ARKIV_EXPLORER, GITHUB, deploy, hashscan, payeeName, serviceUrl } from "../lib/config";
 import { useShowcase, type Showcase } from "../lib/incident";
 import { useCountUp, usePoll, usePrefersReducedMotion, useRiseIn, useSeenOnce } from "../lib/hooks";
 import type { WatcherSnapshot } from "../lib/types";
@@ -15,14 +15,17 @@ const INCIDENTS = [
 ];
 
 const stepsFor = (m: Showcase) => [
-  { t: 0, label: "Tokens leave the treasury with no receipt", tx: m.attackTx, link: "The theft" },
-  { t: m.detectionS, label: "The watcher finds no receipt for it", tx: null, link: null },
-  { t: m.treasuryFrozenS, label: "Treasury frozen by the close-only contract", tx: m.freezeTx, link: "The freeze" },
-  { t: m.wipedS, label: `${m.wipedAmount} ${deploy.token.symbol} wiped from the attacker, attacker frozen`, tx: m.wipeTx, link: "The wipe" },
+  { t: 0, label: "Stolen keys send tokens out, no receipt", tx: m.attackTx, link: "The theft" },
+  { t: m.detectionS, label: "The watcher finds no receipt ✗", tx: null, link: null },
+  { t: m.treasuryFrozenS, label: "The close-only contract freezes the treasury", tx: m.freezeTx, link: "The freeze" },
+  { t: m.wipedS, label: `${m.wipedAmount} ${deploy.token.symbol} clawed back, thief frozen, logged on Hedera`, tx: m.wipeTx, link: "The claw-back" },
 ];
 
 const DOCS = `${GITHUB}#readme`;
 const BRAND = `${GITHUB}/blob/build/brand.html`;
+const ARKIV_CODE = `${GITHUB}/tree/build/arkiv`;
+const PAYEE = deploy.payees[0] ?? "0.0.x";
+const PAYEE_NAME = payeeName(PAYEE) ?? "Asha";
 
 export function Landing() {
   useRiseIn();
@@ -58,7 +61,7 @@ export function Landing() {
           <h1>
             Stop a theft before it <span className="accent">spreads</span>
           </h1>
-          <p>No receipt, no movement. Anything that moves without one is frozen and undone in seconds.</p>
+          <p>One rule for a company treasury: every token that leaves needs a receipt on Hedera first. No receipt, and it is frozen and clawed back in seconds.</p>
           <form className="search" onSubmit={watch} role="search">
             <label htmlFor="token" className="sr-only">
               Hedera token ID
@@ -74,9 +77,10 @@ export function Landing() {
       <main>
         <ReceiptSection />
         <ContainSection m={showcase} />
+        <ReopenSection />
+        <AddOnsSection />
         <NumbersSection m={showcase} />
         <IncidentsSection />
-        <ReopenSection />
       </main>
 
       <Footer showcase={showcase} />
@@ -93,20 +97,22 @@ function ReceiptSection() {
     <section className="section" id="how">
       <div className="section-inner split">
         <div className="section-head" data-rise>
-          <span className="eyebrow">01 · The rule</span>
+          <span className="eyebrow">Step 1 · Pay ✓</span>
           <h2>
-            Every move needs a <span className="accent">receipt</span>
+            Every payout gets a <span className="accent">receipt</span> first
           </h2>
           <p className="muted">
-            Before the treasury sends a single token, the gate writes an approved receipt to a Hedera topic. It only signs for machines whose health heartbeats keep a live 180-second pass on Arkiv. A watcher reads every movement from the Mirror Node and matches it to its receipt.
+            A company pays people from a stablecoin treasury made with Hedera Stablecoin Studio. The payout app asks “pay {PAYEE_NAME} 500”. Levee writes a receipt on Hedera, then sends. The watcher finds the receipt: ✓.
           </p>
         </div>
-        <div ref={ref} className={`receipt-seq${seen ? " play" : ""}`} aria-label="A receipt, then the transfer it allows">
+        <div ref={ref} className={`receipt-seq${seen ? " play" : ""}`} aria-label="A receipt on Hedera, then the payout it allows">
           <article className="mini-card receipt-card">
-            <span className="eyebrow">Receipt · HCS topic {deploy.topics.receipts}</span>
-            <span className="mc-line mono">approved · payouts-server</span>
+            <span className="eyebrow">Receipt · on Hedera, topic {deploy.topics.receipts}</span>
+            <span className="mc-line mono">payout app · pay {PAYEE_NAME}</span>
             <span className="mc-big mono num">500 {deploy.token.symbol}</span>
-            <span className="mc-line mono">→ {deploy.payees[0] ?? "0.0.x"}</span>
+            <span className="mc-line mono">
+              → {PAYEE_NAME} · {PAYEE}
+            </span>
           </article>
           <span className="connector" aria-hidden="true">
             <i />
@@ -114,9 +120,11 @@ function ReceiptSection() {
           </span>
           <article className="mini-card transfer-card">
             <span className="eyebrow">Transfer · treasury {deploy.treasury}</span>
-            <span className="mc-line mono">matched to receipt</span>
+            <span className="mc-line mono">receipt found ✓</span>
             <span className="mc-big mono num">500 {deploy.token.symbol}</span>
-            <span className="mc-line mono">→ {deploy.payees[0] ?? "0.0.x"}</span>
+            <span className="mc-line mono">
+              → {PAYEE_NAME} · {PAYEE}
+            </span>
           </article>
         </div>
       </div>
@@ -133,11 +141,13 @@ function ContainSection({ m }: { m: Showcase }) {
     <section className="section dark" id="contain">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">02 · No receipt</span>
+          <span className="eyebrow">Step 2 · Theft</span>
           <h2>
-            What happens when it <span className="accent">doesn't</span>
+            No receipt? Frozen and clawed <span className="accent">back</span>
           </h2>
-          <p className="muted">A stolen 2-of-3 key pair sent {m.wipedAmount} {deploy.token.symbol} straight from the treasury on Hedera testnet, skipping the gate. This is what the chain recorded, timed from the theft reaching consensus.</p>
+          <p className="muted">
+            Stolen keys sent {m.wipedAmount} {deploy.token.symbol} straight out of the treasury, with no receipt. The close-only contract froze the treasury, clawed the tokens back and froze the thief. A real run on Hedera testnet, timed from the theft:
+          </p>
         </div>
         <ol ref={ref} className={`contain-steps${seen ? " play" : ""}`}>
           {stepsFor(m).map((s, i) => (
@@ -195,16 +205,16 @@ function NumbersSection({ m }: { m: Showcase }) {
     <section className="section" id="numbers">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">03 · {m.live ? "Latest run" : "Measured"} on Hedera testnet, {m.date}</span>
+          <span className="eyebrow">{m.live ? "Latest run" : "Measured"} on Hedera testnet, {m.date}</span>
           <h2>
-            Frozen and undone in <span className="accent">{m.wipedS.toFixed(2)} seconds</span>
+            Frozen and clawed back in <span className="accent">{m.wipedS.toFixed(2)} seconds</span>
           </h2>
         </div>
         <div ref={ref} className="figures">
           <Figure value={m.detectionS} decimals={2} unit="s" label="Theft detected" start={seen} />
           <Figure value={m.treasuryFrozenS} decimals={2} unit="s" label="Treasury frozen" start={seen} />
-          <Figure value={m.wipedS} decimals={2} unit="s" label="Stolen tokens wiped, attacker frozen" start={seen} />
-          <Figure value={m.wipedValue} decimals={m.wipedValue % 1 ? 2 : 0} unit={deploy.token.symbol} label="Taken back from the attacker" start={seen} />
+          <Figure value={m.wipedS} decimals={2} unit="s" label="Tokens clawed back, thief frozen" start={seen} />
+          <Figure value={m.wipedValue} decimals={m.wipedValue % 1 ? 2 : 0} unit={deploy.token.symbol} label="Clawed back from the thief" start={seen} />
         </div>
       </div>
     </section>
@@ -218,7 +228,7 @@ function IncidentsSection() {
     <section className="section haze-ground" id="problem">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">04 · Why seconds matter</span>
+          <span className="eyebrow">Why seconds matter</span>
           <h2>
             Others found out after the money <span className="accent">left</span>
           </h2>
@@ -260,11 +270,11 @@ function ReopenSection() {
     <section className="section" id="reopen">
       <div className="section-inner split">
         <div className="section-head" data-rise>
-          <span className="eyebrow">05 · Reopening</span>
+          <span className="eyebrow">Step 3 · Reopen</span>
           <h2>
-            The robot only closes doors. Two people reopen <span className="accent">them</span>
+            Only two of three admins can <span className="accent">reopen</span>
           </h2>
-          <p className="muted">The containment contract can freeze, wipe and publish. It cannot unfreeze. Reopening needs two of the three admins to sign, so a stolen watcher key can only ever lock things.</p>
+          <p className="muted">The contract can only close: freeze, claw back, log. It cannot unfreeze. Reopening needs 2 of the 3 admins signing together.</p>
           <div>
             <Link to="/live" className="btn">
               Watch it live
@@ -280,6 +290,47 @@ function ReopenSection() {
               <span className="small key-state">{i < 2 ? "signed" : "not needed"}</span>
             </a>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- f) add-on rules
+
+const ADDONS = [
+  { name: "Caps", text: "A daily limit on how much can leave." },
+  { name: "Known payees only", text: "Receipts only for accounts on the list." },
+  { name: "Machine health on Arkiv", text: "The payout machine keeps a health pass on Arkiv. It expires in 3 min unless renewed." },
+];
+
+function AddOnsSection() {
+  return (
+    <section className="section addons-section" id="add-ons">
+      <div className="section-inner">
+        <div className="addons" data-rise>
+          <div className="addons-head">
+            <span className="eyebrow">Add-on rules</span>
+            <p>
+              Optional. Add <span className="accent">one at a time</span>, on top of the one rule.
+            </p>
+          </div>
+          <ul className="addon-list">
+            {ADDONS.map((a) => (
+              <li key={a.name}>
+                <b>{a.name}</b>
+                <span className="muted small">{a.text}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="links addon-links">
+            <a href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
+              Arkiv explorer
+            </a>
+            <a href={ARKIV_CODE} target="_blank" rel="noreferrer">
+              The Arkiv add-on code
+            </a>
+          </p>
         </div>
       </div>
     </section>

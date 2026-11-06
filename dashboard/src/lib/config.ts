@@ -25,6 +25,14 @@ const FALLBACK: DeployIds = {
 const injected = typeof __LEVEE_DEPLOY__ !== "undefined" ? __LEVEE_DEPLOY__ : null;
 export const deploy: DeployIds = injected?.token?.tokenId ? { ...FALLBACK, ...injected } : FALLBACK;
 
+/** Display-only names for the demo payees (payees[0] is Asha, payees[1] is Ravi). Never sent anywhere. */
+const PAYEE_NAMES = ["Asha", "Ravi"];
+export function payeeName(id: string | undefined): string | null {
+  if (!id) return null;
+  const i = deploy.payees.indexOf(id);
+  return i >= 0 ? (PAYEE_NAMES[i] ?? `Payee ${i + 1}`) : null;
+}
+
 const env = import.meta.env;
 /** Service base URLs. Dev and `vite preview` proxy /api/* to the local services. */
 export const services = {

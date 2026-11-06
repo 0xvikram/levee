@@ -115,7 +115,7 @@ export function stepLabel(step: string, account: string | undefined, amount: str
       return account === ctx.treasury ? "Treasury frozen" : `Account ${account ?? ""} frozen`;
     case "wipeAndFreeze":
     case "wipeFrozen":
-      return `${amount ? ctx.fmt(amount) : ""} ${ctx.symbol} wiped, receiver frozen`.trim();
+      return `${amount ? ctx.fmt(amount) : ""} ${ctx.symbol} clawed back, receiver frozen`.trim();
     case "burnSupply":
       return `${amount ? ctx.fmt(amount) : ""} ${ctx.symbol} unapproved supply burned`.trim();
     case "pauseToken":

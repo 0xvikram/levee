@@ -15,8 +15,8 @@ export interface RunView {
 }
 
 export const RUN_BUTTONS: { kind: RunKind; label: string; cmd: string; primary?: boolean }[] = [
-  { kind: "pay", label: "Pay 500 RUPC (normal)", cmd: "npx tsx scripts/demo/normal-path.ts" },
-  { kind: "attack", label: "Steal 10,000 RUPC (attack)", cmd: "npx tsx scripts/attack.ts 10000", primary: true },
+  { kind: "pay", label: "Pay Asha 500", cmd: "npx tsx scripts/demo/normal-path.ts" },
+  { kind: "attack", label: "Simulate theft", cmd: "npx tsx scripts/attack.ts 10000", primary: true },
   { kind: "reopen", label: "Reopen (2 of 3)", cmd: "npx tsx scripts/reopen.ts treasury attacker" },
 ];
 

@@ -1,24 +1,21 @@
-// Pipeline row: Machine → Gate → Receipt (HCS) → Transfer → Watcher → Contain.
+// Pipeline row for the one rule: Request (payout app) → Receipt (Hedera) → Transfer → Check.
+// Check ends in ✓ (matched to its receipt) or ✗ (no receipt: the contract contains it).
 // Pure reducer from service events to node tones + the connector pulses to animate.
 // SSE replays history on (re)connect, so events older than FRESH_MS never light the row.
 
-export const NODES = ["machine", "gate", "receipt", "transfer", "watcher", "contain"] as const;
+export const NODES = ["request", "receipt", "transfer", "check"] as const;
 export type NodeId = (typeof NODES)[number];
 export const NODE_LABEL: Record<NodeId, string> = {
-  machine: "Machine",
-  gate: "Gate",
+  request: "Request",
   receipt: "Receipt",
   transfer: "Transfer",
-  watcher: "Watcher",
-  contain: "Contain",
+  check: "Check",
 };
 export const NODE_SUB: Record<NodeId, string> = {
-  machine: "Arkiv pass",
-  gate: "rules + caps",
-  receipt: "HCS topic",
-  transfer: "treasury",
-  watcher: "Mirror Node",
-  contain: "close-only",
+  request: "payout app",
+  receipt: "on Hedera",
+  transfer: "from treasury",
+  check: "✓ matched · ✗ contain",
 };
 
 /** idle · ok (olive) · refused (neutral amber, never red) · breach (red, live only) · settled (olive after a breach) */
@@ -62,23 +59,23 @@ function light(s: PipelineState, now: number, tones: Partial<Record<NodeId, Tone
 const fresh = (a: { eventMs: number; now: number }) => a.now - a.eventMs <= FRESH_MS;
 
 export function pipelineReducer(s: PipelineState, a: PipelineAction): PipelineState {
-  const breachLive = s.nodes.contain.tone === "breach";
+  const breachLive = s.nodes.check.tone === "breach";
   switch (a.type) {
     case "approved":
       if (!fresh(a) || breachLive) return s;
-      return light(s, a.now, { machine: "ok", gate: "ok", receipt: "ok", transfer: "ok" }, [0, 1, 2], "ok", "Receipt written to HCS, transfer signed", true);
+      return light(s, a.now, { request: "ok", receipt: "ok", transfer: "ok" }, [0, 1], "ok", "Receipt written on Hedera, then the payment was sent", true);
     case "refused":
       if (!fresh(a) || breachLive) return s;
-      return light(s, a.now, { machine: "ok", gate: "refused" }, [0], "refused", `Refused at the gate: ${a.reason}`, true);
+      return light(s, a.now, { request: "refused", receipt: "refused" }, [0], "refused", `Refused, no receipt written: ${a.reason}`, true);
     case "matched":
       if (!fresh(a) || breachLive) return s;
-      return light(s, a.now, { transfer: "ok", watcher: "ok" }, [3], "ok", "Watcher matched the move to its receipt");
+      return light(s, a.now, { transfer: "ok", check: "ok" }, [2], "ok", "Check ✓ the payment matched its receipt");
     case "breach":
       if (a.historic || !fresh(a)) return s;
-      return light(s, a.now, { transfer: "breach", watcher: "breach", contain: "breach" }, [3, 4], "breach", "No receipt: containing", true);
+      return light(s, a.now, { transfer: "breach", check: "breach" }, [2], "breach", "Check ✗ no receipt: freezing the treasury and clawing the tokens back", true);
     case "contained": {
       if (!breachLive) return s;
-      const next = light(s, a.now, { transfer: "settled", watcher: "settled", contain: "settled" }, [], "settled", `Contained in ${a.seconds.toFixed(2)} s`);
+      const next = light(s, a.now, { transfer: "settled", check: "settled" }, [], "settled", `Contained in ${a.seconds.toFixed(2)} s`);
       next.links = next.links.map((l) => (l.tone === "breach" ? { ...l, tone: "settled" } : l));
       return next;
     }

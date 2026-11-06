@@ -225,6 +225,16 @@ code { font-family: var(--f-mono); font-size: 0.88em; }
 .fig-val small { font-size: 0.32em; margin-left: 6px; color: var(--smoke); letter-spacing: 0; }
 .fig-label { color: var(--smoke); font-size: 0.95rem; }
 
+/* f) add-on rules: one compact strip, clearly optional */
+.section.addons-section { padding-top: 0; }
+.addons { border-top: 1px solid var(--line); padding-top: 28px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px 40px; align-items: start; }
+.addons-head { display: flex; flex-direction: column; gap: 8px; }
+.addons-head p { font-size: 1.15rem; line-height: 1.35; }
+.addon-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.addon-list li { border: 1px dashed var(--line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.addon-list b { font-weight: 600; font-size: 0.95rem; }
+.addon-links { grid-column: 2; }
+
 /* d) incidents */
 .incidents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .incident { background: var(--sky); border-radius: var(--r-card); padding: 22px; display: flex; flex-direction: column; gap: 10px; }
@@ -328,7 +338,7 @@ a.tb-item:hover { text-decoration: underline; }
 
 /* pipeline */
 .pipeline { margin: 0 var(--room-pad); padding: 18px 20px 14px; border-radius: var(--r-card); background: var(--moss); }
-.pipe-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, 1fr); }
+.pipe-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); }
 .pipe-node { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; min-width: 0; }
 .pipe-dot { position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ink); box-shadow: inset 0 0 0 2px var(--line-dark); transition: box-shadow 0.4s; }
 .pipe-dot i { width: 14px; height: 14px; border-radius: 50%; background: rgba(239, 230, 210, 0.22); transition: background-color 0.4s, transform 0.4s var(--ease); }
@@ -424,6 +434,13 @@ a.tb-item:hover { text-decoration: underline; }
 .ring-fg { fill: none; stroke: var(--olive-lit); stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
 .pass-chip.low .ring-fg { stroke: var(--amber); }
 .pass-chip.dead .ring-fg { stroke: transparent; }
+.passes.addon { border: 1px dashed var(--line-dark); border-radius: var(--r-card); padding: 12px 16px; }
+.passes.addon h2 { font-size: 1rem; margin: 0; }
+.addon-toggle { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; font: inherit; color: var(--sky); border-radius: 8px; }
+.addon-toggle:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; }
+.addon-caret { display: inline-block; transition: transform 0.2s var(--ease); }
+.passes.addon.open .addon-caret { transform: rotate(90deg); }
+.addon-body { display: flex; flex-direction: column; gap: 10px; }
 
 /* demo panel */
 .demo-panel { margin: 0 var(--room-pad); }
@@ -463,6 +480,9 @@ a.tb-item:hover { text-decoration: underline; }
   .figures { grid-template-columns: 1fr 1fr; gap: 16px; }
   .fig-val { font-size: clamp(2.1rem, 10vw, 2.8rem); }
   .incidents, .contain-steps { grid-template-columns: 1fr; }
+  .addons { grid-template-columns: 1fr; }
+  .addon-list { grid-template-columns: 1fr; }
+  .addon-links { grid-column: auto; }
   .keys { gap: 8px; }
   .key-card { padding: 14px 10px; }
   .key svg { width: 44px; height: 44px; }

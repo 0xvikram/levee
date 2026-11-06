@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Link } from "../components/router";
 import { breachModeReducer, calm, type BreachMode } from "../lib/breach";
-import { ARKIV_EXPLORER, GITHUB, deploy, eventsUrl, hashscan, serviceUrl, servicesReachable } from "../lib/config";
+import { ARKIV_EXPLORER, GITHUB, deploy, eventsUrl, hashscan, payeeName, serviceUrl, servicesReachable } from "../lib/config";
 import { decideMode, useChain } from "../lib/chain";
 import { formatDate } from "../lib/incident";
 import { replayContain, replayEndMs, replayPipeline } from "../lib/replay";
@@ -22,7 +22,7 @@ const fmt = (raw: string) => formatAmount(raw, deploy.token.decimals);
 const sym = deploy.token.symbol;
 type Relations = Record<string, TokenRelation>;
 const label = (step: string, account?: string, amount?: string) => stepLabel(step, account, amount, { treasury: deploy.treasury, fmt, symbol: sym });
-const CHAIN_PIPE: PipelineState = { ...initialPipeline, caption: "Chain view · press “Replay latest incident” to run its recorded steps through the pipeline" };
+const CHAIN_PIPE: PipelineState = { ...initialPipeline, caption: "Chain view · press “Replay latest incident” to run the recorded theft through Check ✗" };
 
 export function Live() {
   const reduced = usePrefersReducedMotion();
@@ -156,9 +156,9 @@ export function Live() {
 
   const st = (p: Parameters<typeof serviceStatus>[0], sse: Parameters<typeof serviceStatus>[1]): ServiceStatus => (local ? serviceStatus(p, sse) : "local");
   const health: [string, ServiceStatus][] = [
-    ["Gate", st(gHealth, gSse)],
+    ["Receipts", st(gHealth, gSse)],
     ["Watcher", st(wState, wSse)],
-    ["Checker", st(cPasses, cSse)],
+    ["Arkiv add-on", st(cPasses, cSse)],
   ];
   const replayButton = chainMode && genuine && (
     <div className="replay-box">
@@ -176,7 +176,7 @@ export function Live() {
       {chainMode ? <ChainBanner /> : <Banner mode={mode} contain={contain} reduced={reduced} />}
       {otherToken && (
         <p className="room-notice">
-          This demo watches {sym} ({deploy.token.tokenId}) on Hedera {deploy.network}. Watching {otherToken} needs its own gate and watcher.
+          This demo watches {sym} ({deploy.token.tokenId}) on Hedera {deploy.network}. Watching {otherToken} needs its own Levee setup.
         </p>
       )}
       <Pipeline s={shownPipe} />
@@ -185,8 +185,8 @@ export function Live() {
         <FeedPanel rows={shownRows} reachable={wState.reachable || wSse === "open"} emptyText={chainMode ? (chain ? "No treasury movements in the latest Mirror Node page." : "Reading the Mirror Node…") : undefined} />
         <ContainPanel s={shownContain} reduced={reduced} relations={relations} extra={replayButton || undefined} />
       </main>
-      <PassesStrip passes={chainMode ? [] : Object.values(passes)} reachable={cPasses.reachable || cSse === "open"} reduced={reduced} chain={chainMode} />
       <DemoPanel chain={chainMode} />
+      <PassesStrip passes={chainMode ? [] : Object.values(passes)} reachable={cPasses.reachable || cSse === "open"} reduced={reduced} chain={chainMode} />
     </div>
   );
 }
@@ -327,7 +327,7 @@ export function Pipeline({ s }: { s: PipelineState }) {
 function TreasuryCard({ relations, spentToday, capPerDay }: { relations: Relations; spentToday?: string; capPerDay?: string }) {
   const t = relations[deploy.treasury];
   const frozen = Object.entries(relations).filter(([, r]) => r.freeze === "FROZEN");
-  const name = (id: string) => (id === deploy.treasury ? "treasury" : id === deploy.attacker ? "attacker" : deploy.payees.includes(id) ? `payee ${deploy.payees.indexOf(id) + 1}` : "receiver");
+  const name = (id: string) => (id === deploy.treasury ? "treasury" : id === deploy.attacker ? "thief (demo)" : (payeeName(id) ?? "receiver"));
   return (
     <section className="card-dark treasury" aria-labelledby="tr-h">
       <div className="card-head">
@@ -341,12 +341,12 @@ function TreasuryCard({ relations, spentToday, capPerDay }: { relations: Relatio
       </div>
       <div className={`state-line-lg ${t?.freeze === "FROZEN" ? "frozen" : "open"}`}>
         <i className="dot" aria-hidden="true" />
-        {t ? (t.freeze === "FROZEN" ? "Frozen · two of three admins must reopen" : "Open · moves need a receipt") : "Reading Mirror Node…"}
+        {t ? (t.freeze === "FROZEN" ? "Frozen · two of three admins must reopen" : "Open · every payout needs a receipt first") : "Reading Mirror Node…"}
       </div>
       {spentToday !== undefined && capPerDay !== undefined && (
         <div className="cap">
           <div className="cap-row small">
-            <span className="dim">Approved today</span>
+            <span className="dim">Add-on cap · paid today</span>
             <span className="mono num">
               {fmt(spentToday)} / {fmt(capPerDay)}
             </span>
@@ -399,7 +399,7 @@ function rowTag(r: FeedRow): { cls: string; text: string; mark: string } {
     case "pending":
       return { cls: "pending", text: "receipt written", mark: "•" };
     case "refused":
-      return { cls: "refused", text: "refused at gate", mark: "–" };
+      return { cls: "refused", text: "refused · no receipt", mark: "–" };
     case "breach":
       return isLiveBreach(r) ? { cls: "breach", text: "no receipt ✗", mark: "✗" } : { cls: "done", text: r.historic ? "no receipt ✗ · earlier" : "no receipt ✗ · undone", mark: "✗" };
   }
@@ -430,16 +430,16 @@ export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; rea
               <div className="tl-body">
                 <div className="tl-top">
                   <span className="what mono">
-                    {fmt(r.amount)} {sym} → {r.to}
+                    {fmt(r.amount)} {sym} → {payeeName(r.to) ? `${payeeName(r.to)} · ${r.to}` : r.to}
                   </span>
                   <span className={`tag ${tag.cls}`}>{tag.text}</span>
                 </div>
                 <div className="tl-meta">
                   <span className="mono">{rowTime(r)}</span>
                   {r.status === "refused" && <span>{reason ?? "refused"}</span>}
-                  {r.status === "breach" && <span>{isLiveBreach(r) ? "containing" : "frozen and wiped"}</span>}
+                  {r.status === "breach" && <span>{isLiveBreach(r) ? "containing" : "frozen and clawed back"}</span>}
                   {r.status !== "refused" && reason && <span>{reason}</span>}
-                  {r.machine && <span>from {r.machine}</span>}
+                  {r.machine && <span>payout app {r.machine}</span>}
                   {r.kind === "mint" && <span>mint</span>}
                   {r.receiptTxId && (
                     <a href={hashscan.tx(r.receiptTxId)} target="_blank" rel="noreferrer">
@@ -519,7 +519,7 @@ export function ContainPanel({ s, reduced, relations = {}, extra }: { s: Contain
           {s.detectedMs !== undefined && (
             <li className="row">
               <span className="t mono num">{stopwatch(s.detectedMs)}</span>
-              <span className="lbl">Detected by the watcher</span>
+              <span className="lbl">Check ✗ no receipt found</span>
             </li>
           )}
           {s.steps.map((a) => (
@@ -570,7 +570,7 @@ export function ContainPanel({ s, reduced, relations = {}, extra }: { s: Contain
           )}
         </span>
         <span className="dim small">
-          {treasury === "FROZEN" ? "The contract can only close. Two of the three admins must sign to reopen." : treasury === "UNFROZEN" && s.phase === "contained" ? "Open again: two admins signed the reopen." : "Open. The watcher closes it the moment a movement has no receipt."}
+          {treasury === "FROZEN" ? "The contract can only close. Two of the three admins must sign to reopen." : treasury === "UNFROZEN" && s.phase === "contained" ? "Open again: two admins signed the reopen." : "Open. The contract closes it the moment tokens leave with no receipt."}
         </span>
       </div>
     </section>
@@ -581,48 +581,79 @@ function freezeWord(f: string | undefined): string {
   return f === "FROZEN" ? "frozen" : f === "UNFROZEN" ? "open" : f === "NOT_APPLICABLE" ? "n/a" : "…";
 }
 
-// ------------------------------------------------------------------ machine passes
+// ------------------------------------------------------------------ add-on: machine health (Arkiv)
 
 const R = 17;
+export const ADDON_KEY = "levee.addon.machineHealth";
+function readOpen(): boolean {
+  try {
+    return window.localStorage.getItem(ADDON_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveOpen(open: boolean) {
+  try {
+    window.localStorage.setItem(ADDON_KEY, open ? "1" : "0");
+  } catch {
+    /* storage blocked: the toggle still works for this visit */
+  }
+}
+
 export function PassesStrip({ passes, reachable, reduced, chain = false }: { passes: PassView[]; reachable: boolean; reduced: boolean; chain?: boolean }) {
-  const now = useNow(reduced ? 1000 : 250);
+  const [open, setOpen] = useState(readOpen);
+  const now = useNow(reduced ? 1000 : 250, open);
   const sorted = [...passes].sort((a, b) => a.machine.localeCompare(b.machine));
+  const toggle = () => {
+    const next = !open;
+    saveOpen(next);
+    setOpen(next);
+  };
   return (
-    <section className="passes" aria-labelledby="passes-h">
+    <section className={`passes addon${open ? " open" : ""}`} aria-labelledby="passes-h">
       <div className="passes-head">
-        <h2 id="passes-h">Machine passes</h2>
-        <span className="eyebrow">Arkiv · {PASS_SECONDS} s · renewed by heartbeats</span>
+        <h2 id="passes-h">
+          <button type="button" className="addon-toggle" aria-expanded={open} aria-controls="passes-body" onClick={toggle}>
+            <span className="addon-caret" aria-hidden="true">
+              ▸
+            </span>
+            Add-on: machine health (Arkiv)
+          </button>
+        </h2>
+        <span className="eyebrow">optional rule · not needed for the main rule</span>
+        <a className="small" href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
+          Arkiv explorer
+        </a>
       </div>
-      {(chain || !reachable) && sorted.length === 0 && (
-        <p className="dim small">
-          {chain ? "The checker runs on the operator's machine, so pass countdowns are not shown here. " : "Checker is off. Start it with npm run checker. "}
-          Machine passes live on Arkiv as entities that expire unless heartbeats renew them:{" "}
-          <a href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
-            Arkiv explorer
-          </a>
-          .
-        </p>
+      {open && (
+        <div id="passes-body" className="addon-body">
+          <p className="dim small">
+            With this add-on on, Levee only writes a receipt for a payout machine that holds a health pass on Arkiv. The pass expires in {PASS_SECONDS / 60} minutes unless the machine renews it.
+            {chain && " The health check runs on the operator's machine, so live countdowns are not shown here."}
+            {!chain && !reachable && " The health check is off. Start it with npm run checker."}
+          </p>
+          {!chain && reachable && sorted.length === 0 && <p className="dim small">No machines enrolled yet.</p>}
+          <ul className="pass-chips">
+            {sorted.map((p) => {
+              const left = passLeftMs(p, now);
+              const live = left > 0;
+              const g = ring(left, PASS_SECONDS * 1000, R);
+              return (
+                <li key={p.machine} className={`pass-chip ${live ? (g.frac < RING_LOW ? "low" : "live") : "dead"}`}>
+                  <svg className="ring" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
+                    <circle cx="20" cy="20" r={R} className="ring-bg" />
+                    <circle cx="20" cy="20" r={R} className="ring-fg" strokeDasharray={g.circumference} strokeDashoffset={g.offset} transform="rotate(-90 20 20)" />
+                  </svg>
+                  <span className="pass-text">
+                    <span className="mono name">{p.machine}</span>
+                    <span className="small dim">{live ? `healthy · ${countdown(left)} left` : (p.reason ?? "no health pass · no receipt")}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
-      {!chain && reachable && sorted.length === 0 && <p className="dim small">No machines enrolled yet.</p>}
-      <ul className="pass-chips">
-        {sorted.map((p) => {
-          const left = passLeftMs(p, now);
-          const live = left > 0;
-          const g = ring(left, PASS_SECONDS * 1000, R);
-          return (
-            <li key={p.machine} className={`pass-chip ${live ? (g.frac < RING_LOW ? "low" : "live") : "dead"}`}>
-              <svg className="ring" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true">
-                <circle cx="20" cy="20" r={R} className="ring-bg" />
-                <circle cx="20" cy="20" r={R} className="ring-fg" strokeDasharray={g.circumference} strokeDashoffset={g.offset} transform="rotate(-90 20 20)" />
-              </svg>
-              <span className="pass-text">
-                <span className="mono name">{p.machine}</span>
-                <span className="small dim">{live ? `live · ${countdown(left)} left · gate will sign` : (p.reason ?? "no live pass · gate refuses")}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }
@@ -697,7 +728,7 @@ export function DemoPanel({ chain = false }: { chain?: boolean }) {
         <>
           {chain ? (
             <p className="dim small">
-              The demo buttons drive the operator's own gate, watcher and checker, so they are not available here. To run it yourself, clone{" "}
+              The demo buttons drive the operator's own services, so they are not available here. To run it yourself, clone{" "}
               <a href={GITHUB} target="_blank" rel="noreferrer">
                 the repo
               </a>{" "}
