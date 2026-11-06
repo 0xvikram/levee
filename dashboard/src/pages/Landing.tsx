@@ -1,7 +1,8 @@
 import { useRef, useState, type FormEvent } from "react";
 import { HeroMedia } from "../components/HeroMedia";
 import { Link, navigate } from "../components/router";
-import { GITHUB, MEASURED, deploy, hashscan } from "../lib/config";
+import { GITHUB, deploy, hashscan } from "../lib/config";
+import { useShowcase, type Showcase } from "../lib/incident";
 import { useCountUp, useRiseIn, useSeenOnce } from "../lib/hooks";
 
 const INCIDENTS = [
@@ -11,11 +12,11 @@ const INCIDENTS = [
   { name: "Hedera", when: "Mar 2023", big: "~$600K", note: "taken, 11 hours to contain" },
 ];
 
-const STEPS = [
-  { t: 0, label: "Tokens leave the treasury with no receipt", tx: MEASURED.attackTx, link: "The theft" },
-  { t: MEASURED.detectionS, label: "The watcher finds no receipt for it", tx: null, link: null },
-  { t: MEASURED.treasuryFrozenS, label: "Treasury frozen by the close-only contract", tx: MEASURED.freezeTx, link: "The freeze" },
-  { t: MEASURED.wipedS, label: `${MEASURED.wipedAmount} ${deploy.token.symbol} wiped from the attacker, attacker frozen`, tx: MEASURED.wipeTx, link: "The wipe" },
+const stepsFor = (m: Showcase) => [
+  { t: 0, label: "Tokens leave the treasury with no receipt", tx: m.attackTx, link: "The theft" },
+  { t: m.detectionS, label: "The watcher finds no receipt for it", tx: null, link: null },
+  { t: m.treasuryFrozenS, label: "Treasury frozen by the close-only contract", tx: m.freezeTx, link: "The freeze" },
+  { t: m.wipedS, label: `${m.wipedAmount} ${deploy.token.symbol} wiped from the attacker, attacker frozen`, tx: m.wipeTx, link: "The wipe" },
 ];
 
 const DOCS = `${GITHUB}#readme`;
@@ -23,6 +24,7 @@ const BRAND = `${GITHUB}/blob/build/brand.html`;
 
 export function Landing() {
   useRiseIn();
+  const showcase = useShowcase();
   const [token, setToken] = useState("");
   const watch = (e: FormEvent) => {
     e.preventDefault();
@@ -69,8 +71,8 @@ export function Landing() {
 
       <main>
         <ReceiptSection />
-        <ContainSection />
-        <NumbersSection />
+        <ContainSection m={showcase} />
+        <NumbersSection m={showcase} />
         <IncidentsSection />
         <ReopenSection />
       </main>
@@ -122,7 +124,7 @@ function ReceiptSection() {
 
 // ---------------------------------------------------------------- b) containment
 
-function ContainSection() {
+function ContainSection({ m }: { m: Showcase }) {
   const ref = useRef<HTMLOListElement>(null);
   const seen = useSeenOnce(ref, 0.3);
   return (
@@ -133,10 +135,10 @@ function ContainSection() {
           <h2>
             What happens when it <span className="accent">doesn't</span>
           </h2>
-          <p className="muted">A stolen 2-of-3 key pair sent {MEASURED.wipedAmount} {deploy.token.symbol} straight from the treasury on Hedera testnet, skipping the gate. This is what the chain recorded, timed from the theft reaching consensus.</p>
+          <p className="muted">A stolen 2-of-3 key pair sent {m.wipedAmount} {deploy.token.symbol} straight from the treasury on Hedera testnet, skipping the gate. This is what the chain recorded, timed from the theft reaching consensus.</p>
         </div>
         <ol ref={ref} className={`contain-steps${seen ? " play" : ""}`}>
-          {STEPS.map((s, i) => (
+          {stepsFor(m).map((s, i) => (
             <li key={s.label} style={{ ["--i" as string]: i }}>
               <span className="cs-time mono num">
                 {s.t.toFixed(2)}
@@ -184,23 +186,23 @@ function Figure({ value, decimals, unit, label, start }: { value: number; decima
   );
 }
 
-function NumbersSection() {
+function NumbersSection({ m }: { m: Showcase }) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useSeenOnce(ref, 0.3);
   return (
     <section className="section" id="numbers">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">03 · Measured on Hedera testnet, {MEASURED.date}</span>
+          <span className="eyebrow">03 · {m.live ? "Latest run" : "Measured"} on Hedera testnet, {m.date}</span>
           <h2>
-            Frozen and undone in <span className="accent">8.31 seconds</span>
+            Frozen and undone in <span className="accent">{m.wipedS.toFixed(2)} seconds</span>
           </h2>
         </div>
         <div ref={ref} className="figures">
-          <Figure value={MEASURED.detectionS} decimals={2} unit="s" label="Theft detected" start={seen} />
-          <Figure value={MEASURED.treasuryFrozenS} decimals={2} unit="s" label="Treasury frozen" start={seen} />
-          <Figure value={MEASURED.wipedS} decimals={2} unit="s" label="Stolen tokens wiped, attacker frozen" start={seen} />
-          <Figure value={10000} decimals={0} unit={deploy.token.symbol} label="Taken back from the attacker" start={seen} />
+          <Figure value={m.detectionS} decimals={2} unit="s" label="Theft detected" start={seen} />
+          <Figure value={m.treasuryFrozenS} decimals={2} unit="s" label="Treasury frozen" start={seen} />
+          <Figure value={m.wipedS} decimals={2} unit="s" label="Stolen tokens wiped, attacker frozen" start={seen} />
+          <Figure value={m.wipedValue} decimals={m.wipedValue % 1 ? 2 : 0} unit={deploy.token.symbol} label="Taken back from the attacker" start={seen} />
         </div>
       </div>
     </section>
