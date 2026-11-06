@@ -54,16 +54,27 @@ export const CAPTIONS = {
   mint: "Fake tokens printed with a stolen key. Watch the supply.",
   unlock: "Only 2 of 3 managers together can unlock.",
   contained: (s: number) => `Frozen and taken back in ${s.toFixed(2)} s.`,
+  failed: "That step did not go through on Hedera. Try ↺ Reset demo, then again.",
 };
+
+/** The one line worth showing from a failed run's log: a Hedera status code, an error line, else the last line. */
+export function runError(lines: string[]): string {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const code = lines[i].match(/\b[A-Z]{3,}(?:_[A-Z]+)+\b/);
+    if (code) return code[0];
+  }
+  const e = [...lines].reverse().find((l) => /^(error|not paid|FAIL)/i.test(l.trim()));
+  return (e ?? lines[lines.length - 1] ?? "").trim().slice(0, 90);
+}
 
 /**
  * The big caption. A containment that has just finished on the page (breach banner "contained")
  * wins; otherwise the current step's line; a hack/mint step that was contained keeps saying so.
  */
 export function storyCaption(s: StoryState, breach: { kind: string; seconds?: number }): string {
-  if (breach.kind === "contained" && typeof breach.seconds === "number" && s.last !== "send" && s.last !== "unlock") return CAPTIONS.contained(breach.seconds);
   if (breach.kind === "live" && s.last !== "mint") return CAPTIONS.hack;
-  if (!s.last) return CAPTIONS.idle;
+  if (!s.last) return breach.kind === "contained" && typeof breach.seconds === "number" ? CAPTIONS.contained(breach.seconds) : CAPTIONS.idle;
+  if (s.failed === s.last && !s.running) return CAPTIONS.failed;
   if ((s.last === "hack" || s.last === "mint") && s.containedS !== null) return CAPTIONS.contained(s.containedS);
   return CAPTIONS[s.last];
 }
@@ -150,11 +161,11 @@ export interface Milestone {
 
 /** detected · treasury frozen · taken back, with the times they landed (null until they do). */
 export function milestones(c: ContainState, treasury: string): Milestone[] {
-  const freeze = c.steps.find((a) => a.step === "freezeAccount" && a.account === treasury) ?? c.steps.find((a) => a.step === "freezeAccount");
+  const freeze = c.steps.find((a) => a.step === "freezeAccount" && a.account === treasury) ?? c.steps.find((a) => a.step === "freezeAccount") ?? c.steps.find((a) => a.step === "wipeAndFreeze");
   const wipes = c.steps.filter((a) => a.step === "wipeAndFreeze" || a.step === "wipeFrozen" || a.step === "burnSupply");
   return [
     { key: "detected", label: "detected", ms: c.detectedMs ?? null },
-    { key: "frozen", label: freeze && freeze.account !== treasury ? "account frozen" : "treasury frozen", ms: freeze ? freeze.atMs : null },
+    { key: "frozen", label: freeze && freeze.account !== treasury ? "thief frozen" : "treasury frozen", ms: freeze ? freeze.atMs : null },
     { key: "back", label: "taken back", ms: wipes.length ? wipes[wipes.length - 1].atMs : null },
   ];
 }

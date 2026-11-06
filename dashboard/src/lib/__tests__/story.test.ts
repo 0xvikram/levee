@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CAPTIONS, initialStory, milestones, proofFromContain, proofFromRun, stepTone, storyCaption, storyReducer, type StoryAction } from "../story";
+import { CAPTIONS, initialStory, runError, milestones, proofFromContain, proofFromRun, stepTone, storyCaption, storyReducer, type StoryAction } from "../story";
 import { containReducer, initialContain } from "../stopwatch";
 import { BREACH, INCIDENT } from "./fixtures";
 
@@ -15,13 +15,22 @@ describe("story", () => {
     expect(storyCaption(run({ type: "start", kind: "reopen" }), calm)).toBe(CAPTIONS.unlock);
   });
   it("says how fast it was contained, with the real number, and keeps saying it", () => {
-    expect(storyCaption(run({ type: "start", kind: "attack" }), { kind: "contained", seconds: 8.314 })).toBe("Frozen and taken back in 8.31 s.");
+    expect(storyCaption(run({ type: "start", kind: "attack" }, { type: "contained", seconds: 8.314 }), { kind: "contained", seconds: 8.314 })).toBe("Frozen and taken back in 8.31 s.");
+    // a containment from an earlier step does not leak into the next one
+    expect(storyCaption(run({ type: "start", kind: "attack" }, { type: "contained", seconds: 5 }, { type: "start", kind: "mint" }), { kind: "contained", seconds: 5 })).toBe(CAPTIONS.mint);
     const s = run({ type: "start", kind: "attack" }, { type: "contained", seconds: 6.5 }, { type: "finish", kind: "attack", ok: true });
     expect(storyCaption(s, calm)).toBe("Frozen and taken back in 6.50 s.");
     expect(storyCaption(storyReducer(s, { type: "start", kind: "reopen" }), calm)).toBe(CAPTIONS.unlock);
   });
-  it("a breach nobody pressed for still reads as a theft", () => {
+  it("a breach nobody pressed for still reads as a theft, then as contained", () => {
     expect(storyCaption(initialStory, { kind: "live" })).toBe(CAPTIONS.hack);
+    expect(storyCaption(initialStory, { kind: "contained", seconds: 7 })).toBe(CAPTIONS.contained(7));
+  });
+  it("a failed step says so, and the log line shown is the Hedera status", () => {
+    const s = run({ type: "start", kind: "mint" }, { type: "finish", kind: "mint", ok: false });
+    expect(storyCaption(s, calm)).toBe(CAPTIONS.failed);
+    expect(runError(["$ npx tsx x", "r [StatusError]: receipt contained error status CONTRACT_REVERT_EXECUTED", "  status: e { _code: 33 },", "Node.js v24.21.0"])).toBe("CONTRACT_REVERT_EXECUTED");
+    expect(runError(["error: demo runner is not running"])).toBe("error: demo runner is not running");
   });
   it("marks steps active, done and failed; reset clears the story", () => {
     let s = run({ type: "start", kind: "pay" });

@@ -22,9 +22,9 @@ import { INDUSTRY, logPos } from "../lib/numbers";
 import { passesReducer, passLeftMs } from "../lib/passes";
 import { initialPipeline, NODE_LABEL, NODE_SUB, NODES, pipelineReducer, type PipelineState } from "../lib/pipeline";
 import { RUN_BUTTONS, useRunner, type RunKind, type RunView } from "../lib/runner";
-import { type ChartEvent, type ChartEventKind } from "../lib/series";
+import { withSpike, type ChartEvent, type ChartEventKind } from "../lib/series";
 import { containReducer, elapsedMs, initialContain, stepLabel, type ContainState } from "../lib/stopwatch";
-import { CAPTIONS, dedupeLinks, initialStory, milestones, proofFromContain, proofFromRun, STORY, stepTone, storyCaption, storyReducer, type ProofLink, type StoryState } from "../lib/story";
+import { CAPTIONS, dedupeLinks, runError, initialStory, milestones, proofFromContain, proofFromRun, STORY, stepTone, storyCaption, storyReducer, type ProofLink, type StoryState } from "../lib/story";
 import type { BreachView, CheckerEvent, GateDecision, Incident, Movement, PassView, WatcherSnapshot } from "../lib/types";
 
 const fmt = (raw: string) => formatAmount(raw, deploy.token.decimals);
@@ -214,6 +214,12 @@ export function Live() {
     ? shownRows.filter((r) => r.consensusAt && (r.status === "receipt" || r.status === "breach")).map((r) => ({ t: consensusToMs(r.consensusAt!), kind: r.status === "receipt" ? "send" : r.kind === "mint" ? "mint" : "theft" }))
     : [...runEvents, ...feed.rows.filter((r) => r.status === "breach" && r.consensusAt && !r.historic).map((r) => ({ t: consensusToMs(r.consensusAt!), kind: (r.kind === "mint" ? "mint" : "theft") as ChartEventKind }))];
 
+  // ---- supply spike of a contained mint (drawn from the incident: mint consensus time to the wipe)
+  const mintRow = !chainMode ? feed.rows.find((r) => r.kind === "mint" && r.status === "breach" && r.txId === contain.breachTxId && r.consensusAt) : undefined;
+  const mintWipe = mintRow && contain.startMs !== undefined ? [...contain.steps].reverse().find((a) => a.step === "wipeAndFreeze" || a.step === "wipeFrozen" || a.step === "burnSupply") : undefined;
+  const supplyLine =
+    mintRow && mintWipe && contain.startMs !== undefined ? withSpike(series.supply, { from: consensusToMs(mintRow.consensusAt!), to: contain.startMs + mintWipe.atMs, amount: Number(mintRow.amount) / 10 ** deploy.token.decimals }) : series.supply;
+
   // ---- proof for the latest step
   const isMint = !!shownContain.breachTxId && shownRows.some((r) => r.txId === shownContain.breachTxId && r.kind === "mint");
   const proof = proofLinks({ chain: chainMode, run: runner.run, contain: shownContain, mint: isMint || story.last === "mint" });
@@ -244,7 +250,7 @@ export function Live() {
           {chainMode ? (
             <ChainStory genuine={genuine} replay={replay} onReplay={() => setReplay({ startMs: Date.now(), done: false })} />
           ) : (
-            <StoryPanel story={story} up={runner.up} busy={runner.busy} run={runner.run} error={runner.error} onRun={go} />
+            <StoryPanel story={story} up={runner.up} busy={runner.busy} run={runner.run} error={runner.error} onRun={go} thiefFrozen={!!deploy.attacker && relations[deploy.attacker]?.freeze === "FROZEN"} />
           )}
           <p className={`cc-caption${mode.kind === "live" ? " live" : ""}`} aria-live="polite">
             {caption}
@@ -260,7 +266,7 @@ export function Live() {
           <ContainPanel s={shownContain} reduced={reduced} extra={null} />
           <LiveChart
             treasury={series.treasury}
-            supply={series.supply}
+            supply={supplyLine}
             events={chartEvents}
             now={now}
             symbol={sym}
@@ -372,7 +378,7 @@ export function KpiStrip({ kpis }: { kpis: Kpi[] }) {
 
 // ------------------------------------------------------------------ story
 
-export function StoryPanel({ story, up, busy, run, error, onRun }: { story: StoryState; up: boolean; busy: boolean; run: RunView | null; error: string | null; onRun: (k: RunKind) => void }) {
+export function StoryPanel({ story, up, busy, run, error, onRun, thiefFrozen = false }: { story: StoryState; up: boolean; busy: boolean; run: RunView | null; error: string | null; onRun: (k: RunKind) => void; thiefFrozen?: boolean }) {
   return (
     <>
       <div className="card-head">
@@ -384,15 +390,17 @@ export function StoryPanel({ story, up, busy, run, error, onRun }: { story: Stor
       <ol className="stepper">
         {STORY.map((s) => {
           const tone = stepTone(story, s.id);
+          // the mint lands in the thief's account: while it is frozen (after ②) the mint would revert
+          const blocked = s.id === "mint" && thiefFrozen;
           return (
             <li key={s.id} className={`step t-${tone}`}>
-              <button type="button" className={`step-btn${s.primary ? " primary" : ""}`} disabled={!up || busy} onClick={() => onRun(s.kind)} aria-current={tone === "active" ? "step" : undefined}>
+              <button type="button" className={`step-btn${s.primary ? " primary" : ""}`} disabled={!up || busy || blocked} onClick={() => onRun(s.kind)} aria-current={tone === "active" ? "step" : undefined}>
                 <span className="step-n" aria-hidden="true">
                   {tone === "done" ? "✓" : s.n}
                 </span>
                 <span className="step-text">
                   <b>{s.label}</b>
-                  <small>{tone === "active" && story.running ? "running…" : tone === "failed" ? "failed, see log" : s.sub}</small>
+                  <small>{tone === "active" && story.running ? "running…" : tone === "failed" ? "failed, see log" : blocked ? "thief's account is frozen: unlock ④ or reset first" : s.sub}</small>
                 </span>
               </button>
             </li>
@@ -411,7 +419,7 @@ export function StoryPanel({ story, up, busy, run, error, onRun }: { story: Stor
       {run && (
         <p className={`run-line small mono r-${run.status}`}>
           {run.kind} · {run.status === "running" ? "running…" : run.status === "ok" ? "done" : "failed"}
-          {run.status === "failed" && run.lines?.length ? <span className="dim"> · {run.lines[run.lines.length - 1].slice(0, 90)}</span> : null}
+          {run.status === "failed" && run.lines?.length ? <span className="dim"> · {runError(run.lines)}</span> : null}
         </p>
       )}
     </>

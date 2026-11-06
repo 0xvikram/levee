@@ -98,3 +98,16 @@ describe("visibleEvents", () => {
     ]);
   });
 });
+
+import { withSpike } from "../series";
+describe("withSpike (mint then wipe between polls)", () => {
+  it("raises the line by the minted amount between the mint and the wipe", () => {
+    const pts: Pt[] = [{ t: 0, v: 100 }, { t: 3000, v: 100 }, { t: 6000, v: 100 }, { t: 9000, v: 100 }];
+    const out = withSpike(pts, { from: 4000, to: 8000, amount: 5 });
+    expect(out).toEqual([{ t: 0, v: 100 }, { t: 3000, v: 100 }, { t: 4000, v: 105 }, { t: 7999, v: 105 }, { t: 8000, v: 100 }, { t: 9000, v: 100 }]);
+  });
+  it("does nothing without a value before the mint", () => {
+    const pts: Pt[] = [{ t: 5000, v: 100 }];
+    expect(withSpike(pts, { from: 4000, to: 8000, amount: 5 })).toBe(pts);
+  });
+});

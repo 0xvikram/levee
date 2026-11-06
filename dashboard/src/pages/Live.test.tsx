@@ -56,6 +56,11 @@ describe("StoryPanel", () => {
     for (const b of screen.getAllByRole("button")) expect(b).toBeDisabled();
     expect(screen.getByRole("button", { name: /Fake mint/ })).toHaveAttribute("aria-current", "step");
   });
+  it("fake mint waits while the thief's account is frozen", () => {
+    render(<StoryPanel story={initialStory} up busy={false} run={null} error={null} onRun={() => undefined} thiefFrozen />);
+    expect(screen.getByRole("button", { name: /Fake mint/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Unlock/ })).toBeEnabled();
+  });
   it("buttons are off when the runner is not running", () => {
     render(<StoryPanel story={initialStory} up={false} busy={false} run={null} error={null} onRun={() => undefined} />);
     expect(screen.getByRole("button", { name: /Send 500 to Asha Pay/ })).toBeDisabled();

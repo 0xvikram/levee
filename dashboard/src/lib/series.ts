@@ -163,3 +163,18 @@ export function axisLabel(v: number): string {
   const abs = Math.abs(v);
   return v.toLocaleString("en-US", { maximumFractionDigits: abs >= 1000 ? 0 : 2 });
 }
+
+/**
+ * A mint and its wipe land a few seconds apart, often between two 3 s polls, so the supply line
+ * may never see the jump. Draw it from the incident itself: supply was `amount` higher from the
+ * mint's consensus time until the wipe. Points already showing the raised value are left alone.
+ */
+export function withSpike(points: Pt[], spike: { from: number; to: number; amount: number }): Pt[] {
+  if (!(spike.to > spike.from) || !points.length) return points;
+  const before = [...points].reverse().find((p) => p.t <= spike.from && p.v !== null);
+  if (!before || before.v === null) return points;
+  const base = before.v;
+  const up = base + spike.amount;
+  const kept = points.filter((p) => p.t < spike.from || p.t > spike.to || (p.v !== null && Math.abs(p.v - up) < 1e-6));
+  return [...kept, { t: spike.from, v: up }, { t: spike.to - 1, v: up }, { t: spike.to, v: base }].sort((a, b) => a.t - b.t);
+}
