@@ -400,7 +400,7 @@ export function StoryPanel({ story, up, busy, run, error, onRun, thiefFrozen = f
                 </span>
                 <span className="step-text">
                   <b>{s.label}</b>
-                  <small>{tone === "active" && story.running ? "running…" : tone === "failed" ? "failed, see log" : blocked ? "thief's account is frozen: unlock ④ or reset first" : s.sub}</small>
+                  <small>{tone === "active" && story.running ? "running…" : tone === "failed" ? "failed, see log" : blocked ? "thief's account is frozen: unlock ③ or reset first" : s.sub}</small>
                 </span>
               </button>
             </li>

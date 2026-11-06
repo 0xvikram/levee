@@ -9,8 +9,8 @@ export type StepId = "send" | "hack" | "mint" | "unlock";
 export const STORY: { id: StepId; kind: RunKind; n: string; label: string; sub: string; primary?: boolean }[] = [
   { id: "send", kind: "pay", n: "①", label: "Send 500 to Asha Pay", sub: "a normal payment" },
   { id: "hack", kind: "attack", n: "②", label: "Hack it", sub: "Simulate theft", primary: true },
-  { id: "mint", kind: "mint", n: "③", label: "Fake mint", sub: "print tokens with a stolen key", primary: true },
-  { id: "unlock", kind: "reopen", n: "④", label: "Unlock (2 of 3)", sub: "two managers sign" },
+  { id: "unlock", kind: "reopen", n: "③", label: "Unlock (2 of 3)", sub: "two managers sign" },
+  { id: "mint", kind: "mint", n: "④", label: "Fake mint", sub: "print tokens with a stolen key", primary: true },
 ];
 
 export const stepOf = (kind: RunKind): StepId | null => STORY.find((s) => s.kind === kind)?.id ?? null;
