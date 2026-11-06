@@ -10,7 +10,12 @@ const payee1 = state.payees[1];
 
 async function main() {
   const before = await waitFreeze(payee1.id, "UNFROZEN", 3000);
-  if (before !== "UNFROZEN") log.note(`note: payee1 started as ${before}`);
+  if (before !== "UNFROZEN") {
+    // Left frozen by an earlier run. Hedera rejects freezing a frozen account, so reopen first.
+    log.note(`note: payee1 started as ${before}; reopening it before the test`);
+    await reopenAccount(payee1.evm, log);
+    await waitFreeze(payee1.id, "UNFROZEN");
+  }
 
   const r1 = await callController("watcher", "freezeAccount", [payee1.evm, incidentId("t1")]);
   log.step("watcher freezeAccount(payee1)", r1);

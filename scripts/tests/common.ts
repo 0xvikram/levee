@@ -84,11 +84,15 @@ export async function waitPause(want: "PAUSED" | "UNPAUSED", timeoutMs = 20_000)
 
 /** Reopen (unfreeze) an account with a 2-of-3 proposal: admin0 proposes, admin1 approves. */
 export async function reopenAccount(evm: string, log: Log): Promise<boolean> {
+  // Read the count BEFORE proposing: eth_call right after a tx can still see the old state.
+  const before = (await readController("proposalCount")) as bigint;
   const p = await callController("admin0", "propose", [0, evm]);
   log.step("admin0 propose(Unfreeze)", p);
   if (!p.ok) return false;
-  const id = (await readController("proposalCount")) as bigint;
-  const a = await callController("admin1", "approve", [id]);
+  const id = before + 1n;
+  // Fixed gas: the approving call also executes unfreeze via the Studio proxy (HTS precompile),
+  // which a gas estimate taken before the proposal is visible does not include.
+  const a = await callController("admin1", "approve", [id], 900_000);
   log.step(`admin1 approve(${id})`, a);
   return a.ok;
 }

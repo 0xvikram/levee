@@ -41,3 +41,20 @@ One daily top-up of 100 HBAR at portal.hedera.com covers everything.
   `grantUnlimitedSupplierRole(address)` (SupplierAdminFacet), not `grantRole`.
 - Demo accounts have an EVM alias, so `msg.sender` is the alias address for both HAPI ContractExecute and
   JSON-RPC calls; the treasury (threshold key) uses its long-zero address.
+
+<!-- T1:start -->
+## T1: controller holds the roles (freeze by watcher, 2-of-3 unfreeze)
+
+**Result: PASS** — run 2026-11-06T03:12:33.518Z
+
+note: payee1 started as FROZEN; reopening it before the test
+- PASS: admin0 propose(Unfreeze) — expected success, got SUCCESS ([0.0.11333483-1793934735-326290532](https://hashscan.io/testnet/transaction/0.0.11333483-1793934735-326290532))
+- PASS: admin1 approve(5) — expected success, got SUCCESS ([0.0.11333484-1793934734-424992898](https://hashscan.io/testnet/transaction/0.0.11333484-1793934734-424992898))
+- PASS: watcher freezeAccount(payee1) — expected success, got SUCCESS ([0.0.11333487-1793934738-147501159](https://hashscan.io/testnet/transaction/0.0.11333487-1793934738-147501159))
+- PASS: payee1 is FROZEN on the mirror node — status FROZEN
+- PASS: gate (non-watcher, non-admin) freezeAccount(payee0) reverts — expected failure, got CONTRACT_REVERT_EXECUTED / NotWatcherOrAdmin() ([0.0.11333489-1793934739-965101241](https://hashscan.io/testnet/transaction/0.0.11333489-1793934739-965101241))
+- PASS: revert reason is NotWatcherOrAdmin — NotWatcherOrAdmin()
+- PASS: admin0 propose(Unfreeze) — expected success, got SUCCESS ([0.0.11333483-1793934744-630792981](https://hashscan.io/testnet/transaction/0.0.11333483-1793934744-630792981))
+- PASS: admin1 approve(6) — expected success, got SUCCESS ([0.0.11333484-1793934746-146817866](https://hashscan.io/testnet/transaction/0.0.11333484-1793934746-146817866))
+- PASS: payee1 is UNFROZEN after 2-of-3 — status UNFROZEN
+<!-- T1:end -->
