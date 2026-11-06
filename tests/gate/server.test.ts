@@ -33,7 +33,7 @@ const good = { machine: "payouts-1", to: "0.0.6001", amount: "500", kind: "trans
 describe("gate HTTP", () => {
   it("GET /health", async () => {
     const r = await fetch(`${base}/health`);
-    expect(await r.json()).toMatchObject({ ok: true, service: "gate", treasury: "0.0.6000" });
+    expect(await r.json()).toMatchObject({ ok: true, service: "gate", treasury: "0.0.6000", capPerTransfer: "10000", capPerDay: "50000", spentToday: "0", knownDestinations: ["0.0.6001"] });
   });
   it("400 on a bad request", async () => {
     const r = await post({ ...good, amount: "-1" });

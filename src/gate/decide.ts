@@ -116,6 +116,8 @@ export interface GateEvent {
   reason?: RefusalReason | "execute-failed";
   detail?: string;
   txId?: string;
+  receiptTxId?: string; // HCS submit tx of the receipt (approved requests only)
+  receiptSequence?: number; // receipt's sequence number on the receipts topic
   timings?: Record<string, number>;
 }
 

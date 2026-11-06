@@ -99,7 +99,19 @@ export function createGate(d: GateDeps, ledger = new SpendLedger()) {
   let served = 0;
 
   app.get("/health", (_req, res) => {
-    res.json({ ok: true, service: "gate", served, treasury: d.state.treasury.id, token: d.state.token.tokenId, sseClients: hub.size });
+    res.json({
+      ok: true,
+      service: "gate",
+      served,
+      treasury: d.state.treasury.id,
+      token: d.state.token.tokenId,
+      sseClients: hub.size,
+      // smallest units, as strings (bigint-safe)
+      capPerTransfer: d.rules.capPerTransfer.toString(),
+      capPerDay: d.rules.capPerDay.toString(),
+      spentToday: ledger.get(utcDay(Date.now())).toString(),
+      knownDestinations: d.rules.knownDestinations,
+    });
   });
   app.get("/events", hub.handler);
 
@@ -159,8 +171,8 @@ export function createGate(d: GateDeps, ledger = new SpendLedger()) {
       return { status: 502, body: { ok: false, reason: "execute-failed", detail, txId, receipt, timings } };
     }
     served++;
-    hub.publish("decision", gateEvent(r, { ok: true }, Date.now(), { txId, timings }));
-    return { status: 200, body: { ok: true, receipt: { ...receipt, sequence: sub.sequence }, txId, timings } };
+    hub.publish("decision", gateEvent(r, { ok: true }, Date.now(), { txId, receiptTxId: sub.txId, receiptSequence: sub.sequence, timings }));
+    return { status: 200, body: { ok: true, receipt: { ...receipt, sequence: sub.sequence }, receiptTxId: sub.txId, txId, timings } };
   }
 
   return { app, hub, ledger };
