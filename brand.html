@@ -26,6 +26,7 @@
   --line:       rgba(27,26,23,.12);
   --yellow:     #F2E34C;  /* the ONE accent: CTA buttons + the italic accent word */
   --yellow-ink: #1B1A17;  /* text on yellow */
+  --gold:       #7A5A00;  /* accent word on LIGHT grounds (5.1:1 on --sky). Yellow fails there (1.07:1). */
   --glass:      rgba(255,255,255,.18);
   --glass-line: rgba(255,255,255,.35);
   --white:      #FFFFFF;
@@ -58,7 +59,8 @@ h1,h2,h3{font-family:var(--f-head);font-weight:500;margin:0;text-wrap:balance}
 h1{font-size:var(--h1);line-height:1.02;letter-spacing:-.035em}
 h2{font-size:var(--h2);line-height:1.06;letter-spacing:-.03em}
 h3{font-size:var(--h3);letter-spacing:-.01em}
-.accent{font-family:var(--f-accent);font-style:italic;font-weight:400;color:var(--yellow);letter-spacing:-.01em}
+.accent{font-family:var(--f-accent);font-style:italic;font-weight:400;color:var(--gold);letter-spacing:-.01em}
+.on-dark .accent{color:var(--yellow)}
 .eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--smoke)}
 p{margin:0;max-width:62ch}
 section{display:flex;flex-direction:column;gap:16px}
@@ -111,12 +113,14 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
     <div class="sw"><i style="background:#2E3722"></i><div>--moss<br>#2E3722<br>dark sections</div></div>
     <div class="sw"><i style="background:#1B1A17"></i><div>--ink<br>#1B1A17<br>text</div></div>
     <div class="sw"><i style="background:#6B665C"></i><div>--smoke<br>#6B665C<br>secondary text</div></div>
-    <div class="sw"><i style="background:#F2E34C"></i><div>--yellow<br>#F2E34C<br>CTA + accent word</div></div>
+    <div class="sw"><i style="background:#F2E34C"></i><div>--yellow<br>#F2E34C<br>buttons; accent word on dark only</div></div>
+    <div class="sw"><i style="background:#7A5A00"></i><div>--gold<br>#7A5A00<br>accent word on light</div></div>
     <div class="sw"><i style="background:#C8432B"></i><div>--breach<br>#C8432B<br>dashboard breach only</div></div>
   </div>
   <table>
     <tr><th>Rule</th><th>Detail</th></tr>
     <tr><td>One accent</td><td>Yellow appears only on primary buttons and on the single italic accent word in a heading. Never on body text, borders or charts.</td></tr>
+    <tr><td>Accent word contrast</td><td>On light grounds (sky, haze, bright parts of the hero) the accent word uses <code>--gold</code> #7A5A00 (5.1:1). Bright <code>--yellow</code> is used for the accent word only on dark grounds: moss, ink, the dusk footer, the dashboard (9.4–13:1). Text must always reach 4.5:1.</td></tr>
     <tr><td>Three colours per frame</td><td>Any screen or slide uses the image plus at most ink, one ground colour and yellow.</td></tr>
     <tr><td>Red is a state, not a colour</td><td><code>--breach</code> is used only in the dashboard while a breach is live, then fades back to olive when contained.</td></tr>
     <tr><td>Dark sections</td><td>Use <code>--moss</code> ground with <code>--sky</code> text; yellow stays the accent.</td></tr>
