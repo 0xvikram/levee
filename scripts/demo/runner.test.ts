@@ -1,18 +1,23 @@
 import { describe, expect, it } from "vitest";
 import type { AddressInfo } from "node:net";
-import { allowedOrigins, argvFor, assertDemoMode, createRunner, linksIn, SPAWN_ARGV, type RunnerDeps } from "./runner.js";
+import { allowedOrigins, argvFor, assertDemoMode, createRunner, linksIn, RUN_KINDS, SPAWN_ARGV, type RunnerDeps } from "./runner.js";
 
 describe("demo runner allow-list", () => {
   it("maps only the fixed run kinds to fixed argv", () => {
     expect(argvFor("attack")).toEqual(["npx", "tsx", "scripts/attack.ts", "10000"]);
     expect(argvFor("reopen")).toEqual(["npx", "tsx", "scripts/reopen.ts", "treasury", "attacker"]);
-    for (const bad of ["pay", "attack; rm -rf /", "../attack", "ATTACK", "", undefined, null, 1, {}, ["attack"], "__proto__", "constructor"]) {
+    expect(argvFor("mint")).toEqual(["npx", "tsx", "scripts/attack-mint.ts", "5000"]);
+    expect(argvFor("reset")).toEqual(["npx", "tsx", "scripts/demo/reset.ts"]);
+    expect([...RUN_KINDS]).toEqual(["pay", "attack", "mint", "reopen", "reset"]);
+    for (const bad of ["pay", "attack; rm -rf /", "../attack", "ATTACK", "", undefined, null, 1, {}, ["attack"], "__proto__", "constructor", "MINT", "reset ", "mint/../x"]) {
       expect(argvFor(bad)).toBeNull();
     }
   });
   it("argv is frozen", () => {
     expect(Object.isFrozen(SPAWN_ARGV)).toBe(true);
     expect(Object.isFrozen(SPAWN_ARGV.attack)).toBe(true);
+    expect(Object.isFrozen(SPAWN_ARGV.mint)).toBe(true);
+    expect(Object.isFrozen(SPAWN_ARGV.reset)).toBe(true);
   });
   it("extracts HashScan links only", () => {
     expect(linksIn("tx https://hashscan.io/testnet/transaction/0.0.1-2-3 and https://evil.example/x")).toEqual(["https://hashscan.io/testnet/transaction/0.0.1-2-3"]);
@@ -66,6 +71,28 @@ describe("runner HTTP", () => {
       expect((await fetch(`${t.base}/run/shell`, { method: "POST" })).status).toBe(404);
       expect((await fetch(`${t.base}/run/attack`, { method: "POST", headers: { origin: "https://evil.example" } })).status).toBe(403);
       expect(t.spawned).toHaveLength(1);
+    } finally {
+      t.close();
+    }
+  });
+  it("spawns mint and reset with their fixed argv, one at a time; unknown kinds 404", async () => {
+    const t = await start();
+    try {
+      const r1 = await fetch(`${t.base}/run/mint`, { method: "POST", body: "5000000" });
+      expect(r1.status).toBe(202);
+      const id = ((await r1.json()) as { run: { id: string } }).run.id;
+      for (const k of ["reset", "attack", "pay", "reopen", "mint"]) expect((await fetch(`${t.base}/run/${k}`, { method: "POST" })).status).toBe(409);
+      t.exit(1);
+      const run = (await (await fetch(`${t.base}/runs/${id}`)).json()) as { run: { kind: string; status: string; exitCode: number; lines: string[]; links: string[] } };
+      expect(run.run).toMatchObject({ kind: "mint", status: "failed", exitCode: 1 });
+      expect(run.run.lines[0]).toBe("$ npx tsx scripts/attack-mint.ts 5000");
+      expect((await fetch(`${t.base}/run/reset`, { method: "POST" })).status).toBe(202);
+      t.exit(0);
+      for (const k of ["mint5000", "unpause", "reset.ts", "%2e%2e"]) expect((await fetch(`${t.base}/run/${k}`, { method: "POST" })).status).toBe(404);
+      expect(t.spawned).toEqual([
+        ["npx", "tsx", "scripts/attack-mint.ts", "5000"],
+        ["npx", "tsx", "scripts/demo/reset.ts"],
+      ]);
     } finally {
       t.close();
     }

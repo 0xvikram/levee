@@ -1,8 +1,10 @@
-// Demo runner: lets the dashboard's three demo buttons run the fixed demo actions.
+// Demo runner: lets the dashboard's demo buttons run the fixed demo actions.
 //   POST /run/pay     -> gate POST /request: 500 RUPC from payouts-server to payee0, signed with its machine key
 //                        (the gate schedules it with its key, writes the receipt; the issuer signer adds the 2nd signature)
 //   POST /run/attack  -> npx tsx scripts/attack.ts 10000
+//   POST /run/mint    -> npx tsx scripts/attack-mint.ts 5000   (stolen CASHIN key mints straight to the attacker)
 //   POST /run/reopen  -> npx tsx scripts/reopen.ts treasury attacker
+//   POST /run/reset   -> npx tsx scripts/demo/reset.ts          (2-of-3 unpause + reopen whatever is frozen)
 //   GET  /runs/:id    -> one run (status, log lines, HashScan links)
 //   GET  /events      -> SSE: "run" (status changes) and "line" (stdout/stderr lines)
 // Safety: refuses to start unless DEMO_MODE=1, binds 127.0.0.1 only, CORS + Origin check limited
@@ -19,13 +21,15 @@ export const HOST = "127.0.0.1";
 export const PORT = Number(process.env.DEMO_RUNNER_PORT ?? 8713);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-export type RunKind = "pay" | "attack" | "reopen";
-export const RUN_KINDS: readonly RunKind[] = ["pay", "attack", "reopen"];
+export type RunKind = "pay" | "attack" | "mint" | "reopen" | "reset";
+export const RUN_KINDS: readonly RunKind[] = Object.freeze(["pay", "attack", "mint", "reopen", "reset"] as const);
 
 /** The only commands the runner ever spawns. Fixed argv, no shell, nothing from the request. */
 export const SPAWN_ARGV: Readonly<Record<Exclude<RunKind, "pay">, readonly string[]>> = Object.freeze({
   attack: Object.freeze(["npx", "tsx", "scripts/attack.ts", "10000"]),
+  mint: Object.freeze(["npx", "tsx", "scripts/attack-mint.ts", "5000"]),
   reopen: Object.freeze(["npx", "tsx", "scripts/reopen.ts", "treasury", "attacker"]),
+  reset: Object.freeze(["npx", "tsx", "scripts/demo/reset.ts"]),
 });
 
 export function isRunKind(k: unknown): k is RunKind {
@@ -34,7 +38,7 @@ export function isRunKind(k: unknown): k is RunKind {
 
 /** argv for a run kind, or null for anything outside the allow-list (pay is an HTTP call, not a spawn). */
 export function argvFor(kind: unknown): readonly string[] | null {
-  if (kind === "attack" || kind === "reopen") return SPAWN_ARGV[kind];
+  if (kind === "attack" || kind === "mint" || kind === "reopen" || kind === "reset") return SPAWN_ARGV[kind];
   return null;
 }
 
