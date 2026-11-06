@@ -178,6 +178,8 @@ All IDs are on Hedera testnet, deployed 6 Nov 2026 (also in [dashboard/src/lib/c
 | Demo attacker | [0.0.11333494](https://hashscan.io/testnet/account/0.0.11333494) |
 | Admins | [0.0.11333483](https://hashscan.io/testnet/account/0.0.11333483), [0.0.11333484](https://hashscan.io/testnet/account/0.0.11333484), [0.0.11333485](https://hashscan.io/testnet/account/0.0.11333485) |
 
+Contract source verified on HashScan (full match: creation and runtime bytecode, metadata included): [0.0.11333603 source](https://hashscan.io/testnet/contract/0.0.11333603) (Sourcify, chain 296). The verified source is `contracts/ContainmentController.sol` as of commit `60f2afa` (solc 0.8.24, optimizer 200 runs, evmVersion cancun). The later commit `4073626` only added NatSpec comments: same ABI and same bytecode apart from the metadata hash.
+
 ## Measured results
 
 All runs on testnet, 6 Nov 2026. Raw numbers are in [docs/LIVE_RUN.md](docs/LIVE_RUN.md) and the incident messages on topic [0.0.11333500](https://hashscan.io/testnet/topic/0.0.11333500).
