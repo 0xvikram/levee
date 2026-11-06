@@ -1,6 +1,7 @@
 // Live normal path + three refusals, against a running demo (scripts/demo/up.sh).
 //   1. payouts-server asks for 500 RUPC to payee0 -> receipt on HCS -> transfer -> watcher "matched"
-//   2. laptop-vikram asks for 500 RUPC to payee0  -> refused (no live pass)
+//   2. laptop-vikram asks for 500 RUPC to payee0  -> refused (wrong-role: an employee laptop, or no live pass)
+// Every request is signed with the asking machine's own key (lib.ts gateRequest).
 //   3. payouts-server asks for CAP+1 RUPC          -> refused (over-transfer-cap)
 //   4. payouts-server asks for 500 RUPC to an unknown account -> refused (unknown-destination)
 // Writes state/live-normal-path-<ts>.json. Usage: npx tsx scripts/demo/normal-path.ts

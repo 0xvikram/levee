@@ -660,7 +660,8 @@ export function PassesStrip({ passes, reachable, reduced, chain = false }: { pas
 
 // ------------------------------------------------------------------ demo panel
 
-const payCmd = `curl -s -X POST localhost:8710/request -H 'content-type: application/json' -d '{"machine":"payouts-server","to":"${deploy.payees[0] ?? "0.0.x"}","amount":"500000000"}'`;
+// Requests must be signed with the machine's key, so the CLI (not a raw curl) is the copyable command.
+const payCmd = `npm run request -- --machine payouts-server --to ${deploy.payees[0] ?? "0.0.x"} --amount 500`;
 const cliFor = (k: RunKind, cmd: string) => (k === "pay" ? payCmd : cmd);
 
 export function DemoPanel({ chain = false }: { chain?: boolean }) {

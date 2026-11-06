@@ -3,7 +3,10 @@
 // state/demo.pids.json (scripts/demo/down.sh stops them). Usage:
 //   npx tsx scripts/demo/up.ts [--memory] [--no-laptop] [--restart] [--allow-sleep]
 // Env passes through (e.g. CAP_PER_DAY=200000 for the normal-load run, HEARTBEAT_SECONDS).
+// /enrol is locked: a fresh random ENROL_TOKEN is made per run (unless one is set) and handed only to the
+// processes this script spawns, through their environment. It is never printed or written to disk.
 import { spawn, spawnSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { env } from "../../src/shared/config.js";
@@ -88,6 +91,8 @@ async function main() {
     fs.writeFileSync(PIDS, JSON.stringify(pids, null, 2));
     console.log(`  caffeinate (no idle sleep while the demo runs) pid ${c.pid}`);
   }
+  // Lock /enrol for this run. Children inherit it via process.env; machines already enrolled keep their key.
+  if (!process.env.ENROL_TOKEN) process.env.ENROL_TOKEN = randomBytes(24).toString("hex");
   console.log(`Levee demo up (caps: ${env.capPerTransfer} RUPC per transfer, ${env.capPerDay} RUPC per day)`);
   start("checker", ["src/checker/server.ts", ...(has("memory") ? ["--memory"] : [])]);
   await waitFor("checker answering", async () => (await getJson(`${CHECKER}/passes`)).status === 200, 30, "checker");
@@ -95,7 +100,7 @@ async function main() {
   const machines = has("no-laptop") ? [SERVER] : [SERVER, LAPTOP];
   for (const m of machines) {
     if (enrolled(m.machine)) continue;
-    const r = spawnSync(TSX, ["src/agent/index.ts", "--machine", m.machine, "--profile", m.profile, "--enrol", "--role", m.profile === "server" ? "payouts" : "employee"], { cwd: ROOT, encoding: "utf8" });
+    const r = spawnSync(TSX, ["src/agent/index.ts", "--machine", m.machine, "--profile", m.profile, "--enrol", "--role", m.profile === "server" ? "payouts" : "employee"], { cwd: ROOT, encoding: "utf8", env: process.env });
     console.log(`  enrol ${m.machine}: ${(r.stdout + r.stderr).trim().split("\n").pop()}`);
     if (r.status !== 0) throw new Error(`enrol ${m.machine} failed`);
   }

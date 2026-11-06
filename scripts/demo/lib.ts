@@ -1,5 +1,6 @@
 // Small helpers shared by the live demo scripts (gate requests, watcher SSE, links).
 import { env, readState, type DeployState } from "../../src/shared/config.js";
+import { signedRequest } from "../../src/agent/request.js";
 
 // Lazy-tolerant: unit tests import the pure helpers on machines without state/deploy.json.
 export const state: DeployState = (() => {
@@ -23,9 +24,11 @@ export interface GateReply {
   body: { ok: boolean; reason?: string; detail?: string; txId?: string; receiptTxId?: string; receipt?: { sequence?: number }; timings?: Record<string, number> };
 }
 
+/** POST a request to the gate, signed with the machine's own key (state/machine-<name>.key). */
 export async function gateRequest(machine: string, to: string, amount: string, kind: "transfer" | "mint" = "transfer"): Promise<GateReply> {
+  const body = await signedRequest(machine, { to, amount, kind });
   const t0 = Date.now();
-  const r = await fetch(`${GATE}/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ machine, to, amount, kind }) });
+  const r = await fetch(`${GATE}/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   return { status: r.status, ms: Date.now() - t0, body: (await r.json()) as GateReply["body"] };
 }
 

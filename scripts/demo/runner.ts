@@ -1,5 +1,5 @@
 // Demo runner: lets the dashboard's three demo buttons run the fixed demo actions.
-//   POST /run/pay     -> gate POST /request: 500 RUPC from payouts-server to payee0
+//   POST /run/pay     -> gate POST /request: 500 RUPC from payouts-server to payee0, signed with its machine key
 //   POST /run/attack  -> npx tsx scripts/attack.ts 10000
 //   POST /run/reopen  -> npx tsx scripts/reopen.ts treasury attacker
 //   GET  /runs/:id    -> one run (status, log lines, HashScan links)
@@ -12,6 +12,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
+import { signedRequest } from "../../src/agent/request.js";
 
 export const HOST = "127.0.0.1";
 export const PORT = Number(process.env.DEMO_RUNNER_PORT ?? 8713);
@@ -199,12 +200,13 @@ async function pay(log: (l: string) => void): Promise<boolean> {
   const { payee, machine } = readDeploy();
   const gate = `http://127.0.0.1:${Number(process.env.GATE_PORT ?? 8710)}`;
   const amount = "500000000"; // 500 RUPC, 6 decimals
-  log(`${machine} asks the gate for 500 RUPC -> ${payee}`);
+  log(`${machine} asks the gate for 500 RUPC -> ${payee} (signed with its machine key)`);
+  const body = await signedRequest(machine, { to: payee, amount, kind: "transfer" });
   const t0 = Date.now();
   const r = await fetch(`${gate}/request`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ machine, to: payee, amount, kind: "transfer" }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(60_000),
   });
   const b = (await r.json()) as { ok: boolean; reason?: string; detail?: string; txId?: string; receiptTxId?: string; receipt?: { sequence?: number } };
