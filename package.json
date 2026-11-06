@@ -1,9 +1,9 @@
 {
-  "name": "fire-exit",
+  "name": "levee",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Leash + Fire Exit: receipt-gated treasury moves and automatic breach containment for Hedera Stablecoin Studio tokens",
+  "description": "Levee: receipt-gated treasury payouts and automatic stolen-key containment for Hedera Stablecoin Studio tokens, with machine passes on Arkiv",
   "scripts": {
     "compile": "tsx scripts/compile.ts",
     "test": "vitest run",
