@@ -1,5 +1,6 @@
 // Demo runner: lets the dashboard's three demo buttons run the fixed demo actions.
 //   POST /run/pay     -> gate POST /request: 500 RUPC from payouts-server to payee0, signed with its machine key
+//                        (the gate schedules it with its key, writes the receipt; the issuer signer adds the 2nd signature)
 //   POST /run/attack  -> npx tsx scripts/attack.ts 10000
 //   POST /run/reopen  -> npx tsx scripts/reopen.ts treasury attacker
 //   GET  /runs/:id    -> one run (status, log lines, HashScan links)
@@ -207,16 +208,19 @@ async function pay(log: (l: string) => void): Promise<boolean> {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(90_000),
   });
-  const b = (await r.json()) as { ok: boolean; reason?: string; detail?: string; txId?: string; receiptTxId?: string; receipt?: { sequence?: number } };
+  const b = (await r.json()) as { ok: boolean; reason?: string; detail?: string; txId?: string; receiptTxId?: string; receipt?: { sequence?: number }; scheduleId?: string; signTxId?: string };
   if (!b.ok) {
-    log(`refused at gate: ${b.reason}${b.detail ? ` (${b.detail})` : ""} · HTTP ${r.status}`);
-    if (b.txId) log(`transfer https://hashscan.io/testnet/transaction/${b.txId}`);
+    log(`not paid: ${b.reason}${b.detail ? ` (${b.detail})` : ""} · HTTP ${r.status}`);
+    if (b.scheduleId) log(`schedule https://hashscan.io/testnet/schedule/${b.scheduleId}`);
     return false;
   }
-  log(`receipt written to HCS (seq ${b.receipt?.sequence ?? "?"})`);
+  log(`gate scheduled the transfer with its key (schedule ${b.scheduleId}) and wrote the receipt (seq ${b.receipt?.sequence ?? "?"})`);
+  if (b.scheduleId) log(`schedule https://hashscan.io/testnet/schedule/${b.scheduleId}`);
   if (b.receiptTxId) log(`receipt https://hashscan.io/testnet/transaction/${b.receiptTxId}`);
+  log(`issuer signer found the receipt on Hedera and added the 2nd signature`);
+  if (b.signTxId) log(`signature https://hashscan.io/testnet/transaction/${b.signTxId}`);
   log(`transfer https://hashscan.io/testnet/transaction/${b.txId}`);
   log(`done in ${Date.now() - t0} ms; the watcher will match it to the receipt`);
   return true;

@@ -1,4 +1,7 @@
-// Bring the Levee demo up: checker (real Arkiv) -> agents -> watcher (WATCHER_SINCE=now) -> gate.
+// Bring the Levee demo up: checker (real Arkiv) -> agents -> watcher (WATCHER_SINCE=now) -> issuer signer -> gate.
+// The issuer signer (src/signer, key: treasurySigner only) adds the second signature to each transfer the
+// gate schedules, after it finds the receipt on Hedera itself. It needs state/deploy.json issuerSigner
+// (npm run setup:signer, once).
 // Each service runs detached in its own process group; logs in state/logs/<name>.log, pids in
 // state/demo.pids.json (scripts/demo/down.sh stops them). Usage:
 //   npx tsx scripts/demo/up.ts [--memory] [--no-laptop] [--restart] [--allow-sleep]
@@ -20,7 +23,7 @@ const has = (f: string) => process.argv.includes(`--${f}`);
 export const SERVER = { machine: "payouts-server", profile: "server" };
 export const LAPTOP = { machine: "laptop-vikram", profile: "laptop" };
 const url = (port: number) => `http://localhost:${port}`;
-const CHECKER = url(env.checkerPort), WATCHER = url(env.watcherPort), GATE = url(env.gatePort);
+const CHECKER = url(env.checkerPort), WATCHER = url(env.watcherPort), GATE = url(env.gatePort), SIGNER = url(env.signerPort);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const pids: Record<string, number> = fs.existsSync(PIDS) ? JSON.parse(fs.readFileSync(PIDS, "utf8")) : {};
@@ -107,9 +110,11 @@ async function main() {
 
   start("watcher", ["src/watcher/index.ts"], { WATCHER_SINCE: "now" });
   for (const m of machines) start(`agent-${m.machine}`, ["src/agent/index.ts", "--machine", m.machine, "--profile", m.profile]);
+  start("signer", ["src/signer/server.ts"]);
   start("gate", ["src/gate/server.ts"]);
 
   await waitFor("watcher /health ok", async () => (await getJson(`${WATCHER}/health`)).body.ok === true, 90, "watcher");
+  await waitFor("issuer signer /health ok", async () => (await getJson(`${SIGNER}/health`)).body.ok === true, 60, "signer");
   await waitFor("gate /health ok", async () => (await getJson(`${GATE}/health`)).body.ok === true, 60, "gate");
   await waitFor(`${SERVER.machine} pass live on Arkiv`, async () => (await getJson(`${CHECKER}/pass/${SERVER.machine}`)).body.live === true, 120, `agent-${SERVER.machine}`);
   if (!has("no-laptop")) {
@@ -122,6 +127,7 @@ async function main() {
   console.log(`
 Levee demo is up.
   gate     ${GATE}     POST /request  GET /health  GET /events (SSE)
+  signer   ${SIGNER}     POST /schedule  GET /decisions  GET /health  GET /events (SSE)  (issuer signer, 127.0.0.1 only)
   watcher  ${WATCHER}     GET /state  GET /health  GET /events (SSE)
   checker  ${CHECKER}     GET /passes  GET /pass/:machine  GET /events (SSE)
   logs     state/logs/   stop: scripts/demo/down.sh`);

@@ -17,11 +17,25 @@ export const units = (whole: number | bigint): string => (BigInt(whole) * 10n **
 export const hashscanTx = (txId: string) => `https://hashscan.io/testnet/transaction/${txId}`;
 export const hashscanTopic = (topic: string) => `https://hashscan.io/testnet/topic/${topic}`;
 export const hashscanAccount = (id: string) => `https://hashscan.io/testnet/account/${id}`;
+export const hashscanSchedule = (id: string) => `https://hashscan.io/testnet/schedule/${id}`;
+export const SIGNER = process.env.SIGNER_URL ?? `http://localhost:${env.signerPort}`;
 
 export interface GateReply {
   status: number;
   ms: number;
-  body: { ok: boolean; reason?: string; detail?: string; txId?: string; receiptTxId?: string; receipt?: { sequence?: number }; timings?: Record<string, number> };
+  body: {
+    ok: boolean;
+    reason?: string;
+    detail?: string;
+    /** transfers: the id the scheduled transfer executes under (= scheduledTxId) */
+    txId?: string;
+    receiptTxId?: string;
+    receipt?: { sequence?: number };
+    scheduleId?: string;
+    scheduledTxId?: string;
+    signTxId?: string; // the issuer signer's ScheduleSign
+    timings?: Record<string, number>;
+  };
 }
 
 /** POST a request to the gate, signed with the machine's own key (state/machine-<name>.key). */

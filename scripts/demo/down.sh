@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop every service started by scripts/demo/up.sh (each runs in its own process group).
+# Stop every service started by scripts/demo/up.sh, the issuer signer included (each runs in its own process group).
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 PIDS=state/demo.pids.json

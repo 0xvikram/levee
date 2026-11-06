@@ -1,5 +1,6 @@
 // Live normal path + three refusals, against a running demo (scripts/demo/up.sh).
-//   1. payouts-server asks for 500 RUPC to payee0 -> receipt on HCS -> transfer -> watcher "matched"
+//   1. payouts-server asks for 500 RUPC to payee0 -> gate schedules it (gate key) -> receipt on HCS
+//      -> issuer signer finds the receipt, adds the 2nd signature -> Hedera executes -> watcher "matched"
 //   2. laptop-vikram asks for 500 RUPC to payee0  -> refused (wrong-role: an employee laptop, or no live pass)
 // Every request is signed with the asking machine's own key (lib.ts gateRequest).
 //   3. payouts-server asks for CAP+1 RUPC          -> refused (over-transfer-cap)
@@ -7,7 +8,7 @@
 // Writes state/live-normal-path-<ts>.json. Usage: npx tsx scripts/demo/normal-path.ts
 import fs from "node:fs";
 import { env } from "../../src/shared/config.js";
-import { CHECKER, WATCHER, gateRequest, getJson, hashscanTopic, hashscanTx, state, subscribe, units, type SseFrame } from "./lib.js";
+import { CHECKER, WATCHER, gateRequest, getJson, hashscanSchedule, hashscanTopic, hashscanTx, state, subscribe, units, type SseFrame } from "./lib.js";
 
 const SERVER = "payouts-server";
 const LAPTOP = "laptop-vikram";
@@ -33,11 +34,13 @@ if (r1.body.ok && r1.body.txId) {
   const tGate = Date.now();
   for (let i = 0; i < 120 && !matched.has(r1.body.txId); i++) await new Promise((r) => setTimeout(r, 250));
   matchedMs = matched.has(r1.body.txId) ? matched.get(r1.body.txId)! - tGate : null;
+  console.log(`   schedule        ${hashscanSchedule(r1.body.scheduleId!)}`);
   console.log(`   receipt seq ${r1.body.receipt?.sequence}  ${hashscanTx(r1.body.receiptTxId!)}`);
+  console.log(`   signer sign     ${hashscanTx(r1.body.signTxId!)}`);
   console.log(`   transfer        ${hashscanTx(r1.body.txId)}`);
   console.log(`   timings ${JSON.stringify(r1.body.timings)}; watcher matched ${matchedMs === null ? "NOT within 30 s" : `${matchedMs} ms after the gate replied`}`);
 }
-out.normal = { reply: r1, matchedAfterGateMs: matchedMs, links: r1.body.ok ? { receipt: hashscanTx(r1.body.receiptTxId!), transfer: hashscanTx(r1.body.txId!), topic: hashscanTopic(state.topics.receipts) } : null };
+out.normal = { reply: r1, matchedAfterGateMs: matchedMs, links: r1.body.ok ? { schedule: hashscanSchedule(r1.body.scheduleId!), receipt: hashscanTx(r1.body.receiptTxId!), signerSign: hashscanTx(r1.body.signTxId!), transfer: hashscanTx(r1.body.txId!), topic: hashscanTopic(state.topics.receipts) } : null };
 
 // 2-4. refusals
 const refusals: [string, string, string, string][] = [

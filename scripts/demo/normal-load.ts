@@ -1,5 +1,7 @@
 // False-alarm test: N legitimate, gate-approved transfers while the watcher runs, then assert
-// the watcher matched every one and raised zero breaches.
+// the watcher matched every one and raised zero breaches. Each transfer is a Hedera scheduled
+// transaction: the gate schedules it, the issuer signer signs after finding the receipt, so the
+// gate reply (gateLatencyMs) now includes the signer's Mirror check and ScheduleSign.
 //   npx tsx scripts/demo/normal-load.ts [N=100] [--seed 1] [--min 10] [--max 900] [--machine payouts-server]
 // The demo must be up (scripts/demo/up.sh) with a daily cap that fits the run; the script reads the
 // gate's caps and today's spend from GET /health and refuses to start if the plan would not fit,
@@ -43,7 +45,7 @@ const hbarBefore = await hbarBalances();
 const startSec = Date.now() / 1000;
 const t0 = Date.now();
 
-const sent: { i: number; to: string; amount: string; txId?: string; status: number; ms: number; reason?: string; gateDoneAt: number }[] = [];
+const sent: { i: number; to: string; amount: string; txId?: string; scheduleId?: string; status: number; ms: number; reason?: string; gateDoneAt: number; timings?: Record<string, number> }[] = [];
 for (const p of plan) {
   let r;
   try {
@@ -52,7 +54,7 @@ for (const p of plan) {
     sent.push({ i: p.i, to: p.to, amount: p.amount.toString(), status: 0, ms: 0, reason: (e as Error).message, gateDoneAt: Date.now() });
     continue;
   }
-  sent.push({ i: p.i, to: p.to, amount: p.amount.toString(), txId: r.body.txId, status: r.status, ms: r.ms, reason: r.body.ok ? undefined : `${r.body.reason}: ${r.body.detail}`, gateDoneAt: Date.now() });
+  sent.push({ i: p.i, to: p.to, amount: p.amount.toString(), txId: r.body.txId, scheduleId: r.body.scheduleId, status: r.status, ms: r.ms, reason: r.body.ok ? undefined : `${r.body.reason}: ${r.body.detail}`, gateDoneAt: Date.now(), timings: r.body.timings });
   if (!r.body.ok) console.log(`  #${p.i} refused/failed: HTTP ${r.status} ${r.body.reason}: ${r.body.detail}`);
   if ((p.i + 1) % 10 === 0) console.log(`  ${p.i + 1}/${N} sent, ${matched.size} matched so far, ${breaches.filter((b) => Number(b.data.consensusAt) >= startSec).length} breaches (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
 }
@@ -89,6 +91,13 @@ const result = {
   durationS: +((Date.now() - t0) / 1000).toFixed(1),
   sendPhaseS: +(sendDoneMs / 1000).toFixed(1),
   gateLatencyMs: { p50: gateMs[Math.floor(gateMs.length / 2)] ?? null, max: gateMs[gateMs.length - 1] ?? null },
+  // where the time goes (p50 over approved sends): ScheduleCreate, receipt, issuer signer (Mirror check + ScheduleSign)
+  stepP50Ms: Object.fromEntries(
+    ["scheduleMs", "receiptMs", "signerMs", "signerVerifyMs", "signerSignMs"].map((k) => {
+      const v = approved.map((s) => s.timings?.[k]).filter((x): x is number => typeof x === "number").sort((a, b) => a - b);
+      return [k, v.length ? v[Math.floor(v.length / 2)] : null];
+    }),
+  ),
   matchLatencyAfterGateMs: { p50: pct(0.5), p95: pct(0.95), max: lat[lat.length - 1] ?? null },
   hbarSpent: spent,
   hbarSpentTotal: +Object.values(spent).reduce((a, b) => a + b, 0).toFixed(4),
