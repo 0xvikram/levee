@@ -2,6 +2,7 @@
    Contrast pairs (checked in src/lib/__tests__/contrast.test.ts, all >= 4.5:1 for text):
      ink #1B1A17 on sky #EFE6D2 / haze #E6D8B4 / white      body text, light grounds
      smoke #6B665C on sky                                    secondary text, light grounds
+     olive #5F6B3B on sky                                    "protects" check mark, light grounds
      gold #7A5A00 on sky / haze / white                      accent word on LIGHT grounds
      ink on yellow #F2E34C                                   primary buttons
      sky on ink / moss                                       text, dark grounds (/live, footer, moss sections)
@@ -234,6 +235,20 @@ code { font-family: var(--f-mono); font-size: 0.88em; }
 .addon-list li { border: 1px dashed var(--line); border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .addon-list b { font-weight: 600; font-size: 0.95rem; }
 .addon-links { grid-column: 2; }
+.addons .roadmap { grid-column: 2; }
+
+/* e2) scope: protects against / doesn't (light ground: ink text; olive / gold / smoke marks) */
+.section.scope-section { padding-top: 0; }
+.scope { border-top: 1px solid var(--line); padding-top: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 40px; align-items: start; }
+.scope-col { display: flex; flex-direction: column; gap: 12px; }
+.scope-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.scope-list li { display: flex; gap: 10px; align-items: baseline; color: var(--ink); }
+.scope-mark { flex: none; width: 1.1em; text-align: center; font-weight: 700; }
+.scope-mark.yes { color: var(--olive); }
+.scope-mark.partly { color: var(--gold); }
+.scope-mark.no { color: var(--smoke); }
+.scope-links { grid-column: 1 / -1; }
+.hero-copy .hero-eyebrow { color: var(--ink); }
 
 /* d) incidents */
 .incidents { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -483,6 +498,8 @@ a.tb-item:hover { text-decoration: underline; }
   .addons { grid-template-columns: 1fr; }
   .addon-list { grid-template-columns: 1fr; }
   .addon-links { grid-column: auto; }
+  .addons .roadmap { grid-column: auto; }
+  .scope { grid-template-columns: 1fr; }
   .keys { gap: 8px; }
   .key-card { padding: 14px 10px; }
   .key svg { width: 44px; height: 44px; }

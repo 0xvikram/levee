@@ -25,20 +25,20 @@ describe("FeedPanel", () => {
 });
 
 describe("FeedPanel payee names", () => {
-  it("shows Asha next to the first payee's account id", () => {
+  it("shows Asha Pay next to the first payee's account id", () => {
     const s = feedReducer(initialFeed, { type: "matched", movement: { ...MATCHED, to: deploy.payees[0] } });
     render(<FeedPanel rows={s.rows} reachable />);
-    expect(screen.getByText(new RegExp(`→ Asha · ${deploy.payees[0].replace(/\./g, "\\.")}`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`→ Asha Pay · ${deploy.payees[0].replace(/\./g, "\\.")}`))).toBeInTheDocument();
   });
 });
 
-describe("machine health add-on", () => {
+describe("Phase 2 machine health", () => {
   afterEach(() => window.localStorage.clear());
   it("is collapsed on first view and remembers being opened", () => {
     window.localStorage.clear();
     const passes = [{ machine: "payouts-server", live: true, kind: "ok", expiresAt: new Date(Date.now() + 120_000).toISOString(), reason: null }];
     const { container, unmount } = render(<PassesStrip passes={passes} reachable reduced />);
-    const btn = screen.getByRole("button", { name: /Add-on: machine health/ });
+    const btn = screen.getByRole("button", { name: /Phase 2: machine health/ });
     expect(btn).toHaveAttribute("aria-expanded", "false");
     expect(container.querySelector(".ring")).toBeNull();
     fireEvent.click(btn);
@@ -47,7 +47,7 @@ describe("machine health add-on", () => {
     expect(window.localStorage.getItem(ADDON_KEY)).toBe("1");
     unmount();
     render(<PassesStrip passes={passes} reachable reduced />);
-    expect(screen.getByRole("button", { name: /Add-on: machine health/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Phase 2: machine health/ })).toHaveAttribute("aria-expanded", "true");
   });
 });
 

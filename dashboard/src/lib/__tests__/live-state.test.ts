@@ -119,8 +119,8 @@ describe("service health", () => {
 
 describe("payeeName", () => {
   it("names the demo payees for display only", () => {
-    expect(payeeName(deploy.payees[0])).toBe("Asha");
-    expect(payeeName(deploy.payees[1])).toBe("Ravi");
+    expect(payeeName(deploy.payees[0])).toBe("Asha Pay");
+    expect(payeeName(deploy.payees[1])).toBe("Ravi Exchange");
     expect(payeeName(deploy.attacker)).toBeNull();
     expect(payeeName(undefined)).toBeNull();
   });

@@ -1,4 +1,4 @@
-// Pipeline row for the one rule: Request (payout app) → Receipt (Hedera) → Transfer → Check.
+// Pipeline row for the one rule: Request (issuer app) → Receipt (Hedera) → Transfer → Check.
 // Check ends in ✓ (matched to its receipt) or ✗ (no receipt: the contract contains it).
 // Pure reducer from service events to node tones + the connector pulses to animate.
 // SSE replays history on (re)connect, so events older than FRESH_MS never light the row.
@@ -12,7 +12,7 @@ export const NODE_LABEL: Record<NodeId, string> = {
   check: "Check",
 };
 export const NODE_SUB: Record<NodeId, string> = {
-  request: "payout app",
+  request: "issuer app",
   receipt: "on Hedera",
   transfer: "from treasury",
   check: "✓ matched · ✗ contain",
@@ -63,13 +63,13 @@ export function pipelineReducer(s: PipelineState, a: PipelineAction): PipelineSt
   switch (a.type) {
     case "approved":
       if (!fresh(a) || breachLive) return s;
-      return light(s, a.now, { request: "ok", receipt: "ok", transfer: "ok" }, [0, 1], "ok", "Receipt written on Hedera, then the payment was sent", true);
+      return light(s, a.now, { request: "ok", receipt: "ok", transfer: "ok" }, [0, 1], "ok", "Receipt written on Hedera, then the tokens were sent", true);
     case "refused":
       if (!fresh(a) || breachLive) return s;
       return light(s, a.now, { request: "refused", receipt: "refused" }, [0], "refused", `Refused, no receipt written: ${a.reason}`, true);
     case "matched":
       if (!fresh(a) || breachLive) return s;
-      return light(s, a.now, { transfer: "ok", check: "ok" }, [2], "ok", "Check ✓ the payment matched its receipt");
+      return light(s, a.now, { transfer: "ok", check: "ok" }, [2], "ok", "Check ✓ the transfer matched its receipt");
     case "breach":
       if (a.historic || !fresh(a)) return s;
       return light(s, a.now, { transfer: "breach", check: "breach" }, [2], "breach", "Check ✗ no receipt: freezing the treasury and clawing the tokens back", true);

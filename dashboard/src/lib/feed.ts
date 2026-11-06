@@ -125,9 +125,9 @@ export const REASONS: Record<string, string> = {
   "receipt-after-movement": "receipt came after the move",
   "receipt-mismatch": "receipt does not match",
   "receipt-reused": "receipt already used",
-  "over-transfer-cap": "over the per-payout cap (add-on)",
-  "over-daily-cap": "over the daily cap (add-on)",
-  "unknown-destination": "payee not on the known list (add-on)",
+  "over-transfer-cap": "over the per-transfer cap (Phase 2)",
+  "over-daily-cap": "over the daily cap (Phase 2)",
+  "unknown-destination": "recipient not on the known list (Phase 2)",
   "treasury-allowance": "allowance granted on treasury",
-  "no-pass": "machine health pass expired (Arkiv add-on)",
+  "no-pass": "machine health pass expired (Arkiv, Phase 2)",
 };

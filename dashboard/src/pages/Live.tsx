@@ -158,7 +158,7 @@ export function Live() {
   const health: [string, ServiceStatus][] = [
     ["Receipts", st(gHealth, gSse)],
     ["Watcher", st(wState, wSse)],
-    ["Arkiv add-on", st(cPasses, cSse)],
+    ["Arkiv (Phase 2)", st(cPasses, cSse)],
   ];
   const replayButton = chainMode && genuine && (
     <div className="replay-box">
@@ -341,12 +341,12 @@ function TreasuryCard({ relations, spentToday, capPerDay }: { relations: Relatio
       </div>
       <div className={`state-line-lg ${t?.freeze === "FROZEN" ? "frozen" : "open"}`}>
         <i className="dot" aria-hidden="true" />
-        {t ? (t.freeze === "FROZEN" ? "Frozen · two of three admins must reopen" : "Open · every payout needs a receipt first") : "Reading Mirror Node…"}
+        {t ? (t.freeze === "FROZEN" ? "Frozen · two of three admins must reopen" : "Open · every send needs a receipt first") : "Reading Mirror Node…"}
       </div>
       {spentToday !== undefined && capPerDay !== undefined && (
         <div className="cap">
           <div className="cap-row small">
-            <span className="dim">Add-on cap · paid today</span>
+            <span className="dim">Phase 2 cap · sent today</span>
             <span className="mono num">
               {fmt(spentToday)} / {fmt(capPerDay)}
             </span>
@@ -439,7 +439,7 @@ export function FeedPanel({ rows, reachable, emptyText }: { rows: FeedRow[]; rea
                   {r.status === "refused" && <span>{reason ?? "refused"}</span>}
                   {r.status === "breach" && <span>{isLiveBreach(r) ? "containing" : "frozen and clawed back"}</span>}
                   {r.status !== "refused" && reason && <span>{reason}</span>}
-                  {r.machine && <span>payout app {r.machine}</span>}
+                  {r.machine && <span>issuer app {r.machine}</span>}
                   {r.kind === "mint" && <span>mint</span>}
                   {r.receiptTxId && (
                     <a href={hashscan.tx(r.receiptTxId)} target="_blank" rel="noreferrer">
@@ -581,7 +581,7 @@ function freezeWord(f: string | undefined): string {
   return f === "FROZEN" ? "frozen" : f === "UNFROZEN" ? "open" : f === "NOT_APPLICABLE" ? "n/a" : "…";
 }
 
-// ------------------------------------------------------------------ add-on: machine health (Arkiv)
+// ------------------------------------------------------------------ Phase 2: machine health (Arkiv)
 
 const R = 17;
 export const ADDON_KEY = "levee.addon.machineHealth";
@@ -617,10 +617,10 @@ export function PassesStrip({ passes, reachable, reduced, chain = false }: { pas
             <span className="addon-caret" aria-hidden="true">
               ▸
             </span>
-            Add-on: machine health (Arkiv)
+            Phase 2: machine health (Arkiv)
           </button>
         </h2>
-        <span className="eyebrow">optional rule · not needed for the main rule</span>
+        <span className="eyebrow">stricter rules · optional, not needed for the main rule</span>
         <a className="small" href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
           Arkiv explorer
         </a>
@@ -628,7 +628,7 @@ export function PassesStrip({ passes, reachable, reduced, chain = false }: { pas
       {open && (
         <div id="passes-body" className="addon-body">
           <p className="dim small">
-            With this add-on on, Levee only writes a receipt for a payout machine that holds a health pass on Arkiv. The pass expires in {PASS_SECONDS / 60} minutes unless the machine renews it.
+            With this rule on, Levee only writes a receipt for a treasury service that holds a health pass on Arkiv. The pass expires in {PASS_SECONDS / 60} minutes unless the machine renews it.
             {chain && " The health check runs on the operator's machine, so live countdowns are not shown here."}
             {!chain && !reachable && " The health check is off. Start it with npm run checker."}
           </p>

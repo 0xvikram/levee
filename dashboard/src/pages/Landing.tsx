@@ -25,7 +25,8 @@ const DOCS = `${GITHUB}#readme`;
 const BRAND = `${GITHUB}/blob/build/brand.html`;
 const ARKIV_CODE = `${GITHUB}/tree/build/arkiv`;
 const PAYEE = deploy.payees[0] ?? "0.0.x";
-const PAYEE_NAME = payeeName(PAYEE) ?? "Asha";
+const PAYEE_NAME = payeeName(PAYEE) ?? "Asha Pay";
+const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
 
 export function Landing() {
   useRiseIn();
@@ -58,10 +59,11 @@ export function Landing() {
 
         <div className="hero-copy">
           <span className="chip">✦ Built on Hedera Stablecoin Studio</span>
+          <span className="eyebrow hero-eyebrow">For stablecoin issuers on Hedera</span>
           <h1>
             Stop a theft before it <span className="accent">spreads</span>
           </h1>
-          <p>One rule for a company treasury: every token that leaves needs a receipt on Hedera first. No receipt, and it is frozen and clawed back in seconds.</p>
+          <p>Levee is a circuit breaker for your treasury: every token that leaves needs a receipt on Hedera first. Tokens that move without one, from stolen keys or a rogue insider, are frozen and taken back in seconds, and only 2 of 3 admins can reopen.</p>
           <form className="search" onSubmit={watch} role="search">
             <label htmlFor="token" className="sr-only">
               Hedera token ID
@@ -78,6 +80,7 @@ export function Landing() {
         <ReceiptSection />
         <ContainSection m={showcase} />
         <ReopenSection />
+        <ScopeSection />
         <AddOnsSection />
         <NumbersSection m={showcase} />
         <IncidentsSection />
@@ -97,18 +100,18 @@ function ReceiptSection() {
     <section className="section" id="how">
       <div className="section-inner split">
         <div className="section-head" data-rise>
-          <span className="eyebrow">Step 1 · Pay ✓</span>
+          <span className="eyebrow">Step 1 · Send ✓</span>
           <h2>
-            Every payout gets a <span className="accent">receipt</span> first
+            Every send gets a <span className="accent">receipt</span> first
           </h2>
           <p className="muted">
-            A company pays people from a stablecoin treasury made with Hedera Stablecoin Studio. The payout app asks “pay {PAYEE_NAME} 500”. Levee writes a receipt on Hedera, then sends. The watcher finds the receipt: ✓.
+            A rupee stablecoin issuer sends {deploy.token.symbol} from its treasury to its partners. The issuer app asks “send 500 {deploy.token.symbol} to {PAYEE_NAME}”. Levee writes a receipt on Hedera, then sends. The watcher finds the receipt: matched ✓.
           </p>
         </div>
-        <div ref={ref} className={`receipt-seq${seen ? " play" : ""}`} aria-label="A receipt on Hedera, then the payout it allows">
+        <div ref={ref} className={`receipt-seq${seen ? " play" : ""}`} aria-label="A receipt on Hedera, then the transfer it allows">
           <article className="mini-card receipt-card">
             <span className="eyebrow">Receipt · on Hedera, topic {deploy.topics.receipts}</span>
-            <span className="mc-line mono">payout app · pay {PAYEE_NAME}</span>
+            <span className="mc-line mono">issuer app · send to {PAYEE_NAME}</span>
             <span className="mc-big mono num">500 {deploy.token.symbol}</span>
             <span className="mc-line mono">
               → {PAYEE_NAME} · {PAYEE}
@@ -141,7 +144,7 @@ function ContainSection({ m }: { m: Showcase }) {
     <section className="section dark" id="contain">
       <div className="section-inner">
         <div className="section-head" data-rise>
-          <span className="eyebrow">Step 2 · Theft</span>
+          <span className="eyebrow">Step 2 · Theft → frozen and clawed back</span>
           <h2>
             No receipt? Frozen and clawed <span className="accent">back</span>
           </h2>
@@ -270,7 +273,7 @@ function ReopenSection() {
     <section className="section" id="reopen">
       <div className="section-inner split">
         <div className="section-head" data-rise>
-          <span className="eyebrow">Step 3 · Reopen</span>
+          <span className="eyebrow">Step 3 · Reopen: 2 of 3 admins</span>
           <h2>
             Only two of three admins can <span className="accent">reopen</span>
           </h2>
@@ -296,12 +299,67 @@ function ReopenSection() {
   );
 }
 
-// ---------------------------------------------------------------- f) add-on rules
+// ---------------------------------------------------------------- e2) scope
+
+const PROTECTS: { mark: "yes" | "partly"; text: string }[] = [
+  { mark: "yes", text: "Stolen treasury keys" },
+  { mark: "yes", text: "Insiders moving funds outside the process" },
+  { mark: "yes", text: "Every incident public on Hedera" },
+  { mark: "partly", text: "A hacked treasury service (with the stricter rules)" },
+];
+const DOESNT = ["Tokens you didn't issue (e.g. USDC)", "Funds already moved on from the receiver", "Approved payments to the wrong recipient", "2 of 3 admins colluding"];
+
+function ScopeSection() {
+  return (
+    <section className="section scope-section" id="scope">
+      <div className="section-inner">
+        <div className="scope" data-rise>
+          <div className="scope-col">
+            <span className="eyebrow">Protects against</span>
+            <ul className="scope-list">
+              {PROTECTS.map((p) => (
+                <li key={p.text}>
+                  <span className={`scope-mark ${p.mark}`} aria-hidden="true">
+                    {p.mark === "yes" ? "✓" : "!"}
+                  </span>
+                  <span>
+                    {p.mark === "partly" && <span className="sr-only">Partly: </span>}
+                    {p.text}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="scope-col">
+            <span className="eyebrow">Doesn't</span>
+            <ul className="scope-list">
+              {DOESNT.map((t) => (
+                <li key={t}>
+                  <span className="scope-mark no" aria-hidden="true">
+                    ✗
+                  </span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="links scope-links">
+            <a href={SCOPE} target="_blank" rel="noreferrer">
+              Full scope and limits
+            </a>
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- f) Phase 2 stricter rules
 
 const ADDONS = [
-  { name: "Caps", text: "A daily limit on how much can leave." },
-  { name: "Known payees only", text: "Receipts only for accounts on the list." },
-  { name: "Machine health on Arkiv", text: "The payout machine keeps a health pass on Arkiv. It expires in 3 min unless renewed." },
+  { name: "Caps", text: "A daily limit on how much can leave the treasury." },
+  { name: "Known recipients only", text: "Receipts only for partners on the list." },
+  { name: "Machine health on Arkiv", text: "The treasury service keeps a health pass on Arkiv. It expires in 3 min unless renewed." },
 ];
 
 function AddOnsSection() {
@@ -310,7 +368,7 @@ function AddOnsSection() {
       <div className="section-inner">
         <div className="addons" data-rise>
           <div className="addons-head">
-            <span className="eyebrow">Add-on rules</span>
+            <span className="eyebrow">Phase 2 · stricter rules (optional)</span>
             <p>
               Optional. Add <span className="accent">one at a time</span>, on top of the one rule.
             </p>
@@ -328,8 +386,11 @@ function AddOnsSection() {
               Arkiv explorer
             </a>
             <a href={ARKIV_CODE} target="_blank" rel="noreferrer">
-              The Arkiv add-on code
+              The Arkiv rule code
             </a>
+          </p>
+          <p className="muted small roadmap">
+            <b>Phase 3 · roadmap:</b> custodian approval, mint rule, mainnet. Not built yet.
           </p>
         </div>
       </div>
@@ -518,7 +579,7 @@ function Footer({ showcase }: { showcase: Showcase }) {
         <p className="footer-ticker" aria-live="off">
           {matched !== null && (
             <span>
-              <b>{matched.toLocaleString("en-US")}</b> {matched === 1 ? "payment" : "payments"} matched today
+              <b>{matched.toLocaleString("en-US")}</b> {matched === 1 ? "transfer" : "transfers"} matched today
             </span>
           )}
           {showcase.live && (

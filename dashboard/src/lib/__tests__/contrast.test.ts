@@ -17,7 +17,7 @@ function over(fg: string, alpha: number, bg: string): string {
   return "#" + f.map((v, i) => Math.round(v * alpha + g[i] * (1 - alpha)).toString(16).padStart(2, "0")).join("");
 }
 
-const C = { sky: "#EFE6D2", haze: "#E6D8B4", white: "#FFFFFF", ink: "#1B1A17", moss: "#2E3722", smoke: "#6B665C", gold: "#7A5A00", yellow: "#F2E34C", oliveLit: "#B6C383", amber: "#D9B25C", breachLit: "#F08C74", breach: "#C8432B" };
+const C = { sky: "#EFE6D2", haze: "#E6D8B4", white: "#FFFFFF", ink: "#1B1A17", moss: "#2E3722", smoke: "#6B665C", gold: "#7A5A00", yellow: "#F2E34C", olive: "#5F6B3B", oliveLit: "#B6C383", amber: "#D9B25C", breachLit: "#F08C74", breach: "#C8432B" };
 
 /** screen blend of the footer cursor light's brightest stop (sun #F6ECC6 at 0.2) over ink */
 const LIT_INK = (() => {
@@ -30,6 +30,7 @@ const PAIRS: [string, string, string][] = [
   ["ink on sky", C.ink, C.sky],
   ["ink on haze", C.ink, C.haze],
   ["smoke on sky", C.smoke, C.sky],
+  ["olive scope mark on sky", C.olive, C.sky],
   ["gold accent on sky", C.gold, C.sky],
   ["gold accent on haze", C.gold, C.haze],
   ["gold accent on white", C.gold, C.white],

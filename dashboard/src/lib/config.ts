@@ -25,12 +25,12 @@ const FALLBACK: DeployIds = {
 const injected = typeof __LEVEE_DEPLOY__ !== "undefined" ? __LEVEE_DEPLOY__ : null;
 export const deploy: DeployIds = injected?.token?.tokenId ? { ...FALLBACK, ...injected } : FALLBACK;
 
-/** Display-only names for the demo payees (payees[0] is Asha, payees[1] is Ravi). Never sent anywhere. */
-const PAYEE_NAMES = ["Asha", "Ravi"];
+/** Display-only names for the demo recipients of the RUPC issuer: payees[0] is Asha Pay (distributor), payees[1] is Ravi Exchange (partner). Never sent anywhere. */
+const PAYEE_NAMES = ["Asha Pay", "Ravi Exchange"];
 export function payeeName(id: string | undefined): string | null {
   if (!id) return null;
   const i = deploy.payees.indexOf(id);
-  return i >= 0 ? (PAYEE_NAMES[i] ?? `Payee ${i + 1}`) : null;
+  return i >= 0 ? (PAYEE_NAMES[i] ?? `Partner ${i + 1}`) : null;
 }
 
 const env = import.meta.env;
