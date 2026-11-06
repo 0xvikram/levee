@@ -473,3 +473,6 @@ a.ba-name:hover { text-decoration: underline; }
   .ms-t { font-size: 1.15rem; }
   .cc-watch .watch .digits { font-size: 4rem; }
 }
+
+/* SiteLogo: an SVG mark sits on the text baseline like the ▲ glyph it replaces */
+.site-logo-mark { display: inline-block; vertical-align: -0.12em; }

@@ -17,13 +17,13 @@ afterEach(() => {
 const live = { ...FALLBACK_SHOWCASE, live: true, detectionS: 2.51, treasuryFrozenS: 4.1, wipedS: 5.62 };
 
 describe("Landing structure", () => {
-  it("has one h1 with a single yellow accent, the short subtitle and both CTAs", () => {
+  it("has a one-line h1 with a single yellow accent, the full-idea subtitle and both CTAs", () => {
     const { container } = render(<Landing />);
     const h1s = container.querySelectorAll("h1");
     expect(h1s).toHaveLength(1);
-    expect(h1s[0].textContent).toBe("Hacked? Your stablecoin snaps back in seconds.");
+    expect(h1s[0].textContent).toBe("Hacked? It snaps back.");
     expect(h1s[0].querySelectorAll(".accent")).toHaveLength(1);
-    expect(screen.getByText("For stablecoin issuers on Hedera. No receipt, no movement.")).toBeInTheDocument();
+    expect(screen.getByText("Stolen stablecoins frozen and taken back in seconds, on Hedera.")).toBeInTheDocument();
     const hero = container.querySelector(".lp-hero-copy")!;
     expect(within(hero as HTMLElement).getByRole("link", { name: "Watch it live" })).toHaveAttribute("href", "/live");
     expect(within(hero as HTMLElement).getByRole("link", { name: "Read the docs" })).toHaveAttribute("href", DOCS_URL);

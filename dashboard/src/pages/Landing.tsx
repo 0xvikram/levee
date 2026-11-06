@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./landing.css";
 import { DitherImage } from "../components/DitherImage";
 import { Link } from "../components/router";
+import { SiteLogo } from "../components/SiteLogo";
 import { ARKIV_EXPLORER, DOCS, GITHUB, MIRROR, deploy, hashscan } from "../lib/config";
 import { FACTS, INDUSTRY, TICKS, logPos } from "../lib/numbers";
 import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
@@ -40,7 +41,7 @@ export function Landing() {
         <div className="lp-hero-scrim" aria-hidden="true" />
         <div className="lp-nav">
           <Link to="/" className="lp-logo">
-            <span aria-hidden="true">▲</span> Levee
+            <SiteLogo />
           </Link>
           <nav aria-label="Main">
             <a href="#how">How it works</a>
@@ -60,9 +61,9 @@ export function Landing() {
             <i aria-hidden="true" /> Live on Hedera {deploy.network}
           </span>
           <h1>
-            Hacked? Your stablecoin <span className="accent">snaps back</span> in seconds.
+            Hacked? It <span className="accent">snaps back</span>.
           </h1>
-          <p>For stablecoin issuers on Hedera. No receipt, no movement.</p>
+          <p>Stolen stablecoins frozen and taken back in seconds, on Hedera.</p>
           <div className="lp-ctas">
             <Link to="/live" className="lp-btn primary">
               Watch it live

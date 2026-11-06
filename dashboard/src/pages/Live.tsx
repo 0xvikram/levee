@@ -4,6 +4,7 @@
 // the Hedera Mirror Node and offers a replay of the newest genuine incident.
 import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Link } from "../components/router";
+import { SiteLogo } from "../components/SiteLogo";
 import { LiveChart } from "../components/LiveChart";
 import { QR } from "../components/QR";
 import { breachModeReducer, calm, type BreachMode } from "../lib/breach";
@@ -331,7 +332,7 @@ export function TopBar({ treasury, health, arkiv, mirrorOk, chain = false }: { t
   return (
     <header className="topbar cc-top">
       <Link to="/" className="wordmark">
-        ▲ Levee
+        <SiteLogo />
       </Link>
       <a className="tb-item mono" href={hashscan.token(deploy.token.tokenId)} target="_blank" rel="noreferrer">
         {sym} <span className="dim">{deploy.token.tokenId}</span>
