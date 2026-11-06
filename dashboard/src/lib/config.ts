@@ -31,7 +31,23 @@ export const services = {
   gate: (env.VITE_GATE_URL as string | undefined) ?? "/api/gate",
   watcher: (env.VITE_WATCHER_URL as string | undefined) ?? "/api/watcher",
   checker: (env.VITE_CHECKER_URL as string | undefined) ?? "/api/checker",
+  runner: (env.VITE_RUNNER_URL as string | undefined) ?? "/api/runner",
 };
+
+const PORTS = { gate: 8710, watcher: 8711, checker: 8712 } as const;
+/**
+ * SSE URL for a service. On local dev/preview the stream goes straight to the service port
+ * (services send CORS * on /events), so the three never-ending streams do not use up the
+ * browser's 6-connections-per-origin budget that the proxied polls share. See lib/health.ts.
+ */
+export function eventsUrl(svc: keyof typeof PORTS, loc: { hostname: string; port: string; protocol: string } | undefined = typeof window !== "undefined" ? window.location : undefined): string {
+  const explicit = env[`VITE_${svc.toUpperCase()}_URL`] as string | undefined;
+  if (explicit) return `${explicit}/events`;
+  if (loc && loc.protocol === "http:" && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(loc.hostname) && (loc.port === "5173" || loc.port === "4173")) {
+    return `http://${loc.hostname}:${PORTS[svc]}/events`;
+  }
+  return `${services[svc]}/events`;
+}
 export const MIRROR = (env.VITE_MIRROR_URL as string | undefined) ?? `https://${deploy.network}.mirrornode.hedera.com`;
 export const GITHUB = "https://github.com/0xvikram/levee";
 
@@ -41,15 +57,17 @@ export const hashscan = {
   topic: (id: string) => `${hs}/topic/${id}`,
   account: (id: string) => `${hs}/account/${id}`,
   token: (id: string) => `${hs}/token/${id}`,
+  contract: (id: string) => `${hs}/contract/${id}`,
 };
 
 /** The measured testnet run (6 Nov 2026), shown on the landing page. */
 export const MEASURED = {
   date: "6 Nov 2026",
-  detectionS: "3–4",
-  treasuryFrozenS: "6.4",
-  wipedS: "8.3",
+  detectionS: 4.19,
+  treasuryFrozenS: 6.44,
+  wipedS: 8.31,
   wipedAmount: "10,000",
   attackTx: "0.0.11333495-1793935170-233904996",
+  freezeTx: "0.0.11333487-1793935173-898405003",
   wipeTx: "0.0.11333487-1793935180-013412119",
 };
