@@ -61,25 +61,33 @@ async function latestHeartbeat(mirror: MirrorClient, topic: string): Promise<Wat
   return parseHeartbeat(m.text).ok ? { consensusAt: m.consensusAt } : null;
 }
 
-/** Build and freeze the treasury transaction with a pre-generated id (payer = treasury). */
+/** EVM address for an account: the one setup recorded (alias or long-zero), else long-zero. */
+export function evmFor(state: DeployState, id: string): string {
+  const known = [state.treasury, state.gate, state.watcher, state.attacker, ...(state.payees ?? []), ...(state.admins ?? [])].find((a) => a?.id === id);
+  return known?.evm ?? longZero(id);
+}
+
+/**
+ * Build and freeze the transaction with a pre-generated id, so the receipt can name it.
+ *  transfer: TransferTransaction treasury -> to, payer = treasury (needs 2 of {treasurySigner, gate, cold}).
+ *  mint:     Studio cash-in proxy.mint(address,int64), payer = gate (setup grants CASHIN to the gate account).
+ */
 function buildFrozenTx(d: GateDeps, req: GateRequest) {
-  const treasury = AccountId.fromString(d.state.treasury.id);
-  const txId = TransactionId.generate(treasury);
   const amount = Long.fromString(req.amount);
   if (req.kind === "transfer") {
+    const treasury = AccountId.fromString(d.state.treasury.id);
     const token = TokenId.fromString(d.state.token.tokenId);
     return new TransferTransaction()
-      .setTransactionId(txId)
+      .setTransactionId(TransactionId.generate(treasury))
       .addTokenTransfer(token, treasury, amount.negate())
       .addTokenTransfer(token, AccountId.fromString(req.to), amount)
       .freezeWith(d.client);
   }
-  // Stablecoin Studio cash-in: proxy.mint(address beneficiary, int64 amount); msg.sender = treasury (holds CASHIN role).
   return new ContractExecuteTransaction()
-    .setTransactionId(txId)
+    .setTransactionId(TransactionId.generate(AccountId.fromString(d.state.gate.id)))
     .setContractId(ContractId.fromString(d.state.token.proxy))
     .setGas(CASHIN_GAS)
-    .setFunction("mint", new ContractFunctionParameters().addAddress(longZero(req.to)).addInt64(amount))
+    .setFunction("mint", new ContractFunctionParameters().addAddress(evmFor(d.state, req.to)).addInt64(amount))
     .freezeWith(d.client);
 }
 
@@ -133,10 +141,10 @@ export function createGate(d: GateDeps, ledger = new SpendLedger()) {
     timings.receiptMs = Date.now() - t1;
     ledger.add(today, BigInt(r.amount));
 
-    // f) 2-of-3: treasury signer + gate, then execute.
+    // f) transfer: 2-of-3 (treasury signer + gate); mint: gate (CASHIN holder). Then execute.
     const t2 = Date.now();
     try {
-      await tx.sign(d.signerKey);
+      if (r.kind === "transfer") await tx.sign(d.signerKey); // second key of the treasury 2-of-3
       await tx.sign(d.gateKey);
       const resp = await tx.execute(d.client);
       const rec = await resp.getReceipt(d.client);

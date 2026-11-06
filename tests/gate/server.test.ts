@@ -62,3 +62,12 @@ describe("gate HTTP", () => {
     expect(await (await post(good)).json()).toMatchObject({ reason: "no-watcher" });
   });
 });
+
+describe("evmFor", () => {
+  it("prefers the EVM address recorded by setup, else long-zero", async () => {
+    const { evmFor } = await import("../../src/gate/server.js");
+    const s = { ...state, payees: [{ id: "0.0.6001", evm: "0xabc" }] } as unknown as DeployState;
+    expect(evmFor(s, "0.0.6001")).toBe("0xabc");
+    expect(evmFor(s, "0.0.6666")).toBe("0x0000000000000000000000000000000000001a0a");
+  });
+});
