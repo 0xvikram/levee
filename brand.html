@@ -10,9 +10,9 @@
 /*
   LEVEE BRAND RULES
   Source of truth for the site, dashboard, deck and video.
-  Look: dreamy surreal landscape photography (meadow, floating earth islands, god rays,
-  haze), a glass nav, a big tight grotesk headline with ONE italic serif accent word in
-  sunlit yellow, white pill inputs, yellow pill buttons.
+  Look (v2, Nov 2026): dusk blue-hour hero video, navy / ultramarine grounds, cream text,
+  a glass nav, a big tight grotesk headline with ONE italic serif accent word in yellow,
+  frosted dark glass cards, yellow pill buttons. Yellow #F2E34C is the only accent; gold is retired.
 */
 :root{
   /* ---------- colour tokens ---------- */
@@ -26,7 +26,16 @@
   --line:       rgba(27,26,23,.12);
   --yellow:     #F2E34C;  /* the ONE accent: CTA buttons + the italic accent word */
   --yellow-ink: #1B1A17;  /* text on yellow */
-  --gold:       #7A5A00;  /* accent word on LIGHT grounds (5.1:1 on --sky). Yellow fails there (1.07:1). */
+  /* --gold #7A5A00 is RETIRED (Nov 2026): no gold or brown anywhere. */
+  /* ---------- landing (dusk) tokens: navy grounds, cream text, yellow the only accent ---------- */
+  --navy-950:   #060A1C;  /* deepest ground: landing page, footer */
+  --navy-900:   #0A1130;  /* main dark ground */
+  --navy-800:   #111B45;  /* raised surfaces, window bar */
+  --ultramarine:#2438A8;  /* glows and gradients only, never text */
+  --cobalt:     #1F3FBF;  /* footer engraving tint, gradients only */
+  --cream:      #F3ECDD;  /* text on navy (16:1 on navy-950) */
+  --cream-dim:  rgba(243,236,221,.72); /* secondary text on navy */
+  --cream-faint:rgba(243,236,221,.6);  /* "Built on Hedera" logo row */
   --glass:      rgba(255,255,255,.18);
   --glass-line: rgba(255,255,255,.35);
   --white:      #FFFFFF;
@@ -56,42 +65,42 @@
   --shadow: 0 10px 40px rgba(27,26,23,.12);
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--sky);color:var(--ink);font-family:var(--f-body);font-size:var(--body);line-height:1.55;
+body{margin:0;background:var(--navy-950);color:var(--cream);font-family:var(--f-body);font-size:var(--body);line-height:1.55;
   padding:40px max(16px,4vw) 80px}
 .wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:48px}
 h1,h2,h3{font-family:var(--f-head);font-weight:500;margin:0;text-wrap:balance}
 h1{font-size:var(--h1);line-height:1.02;letter-spacing:-.035em}
 h2{font-size:var(--h2);line-height:1.06;letter-spacing:-.03em}
 h3{font-size:var(--h3);letter-spacing:-.01em}
-.accent{font-family:var(--f-accent);font-style:italic;font-weight:400;color:var(--gold);letter-spacing:-.01em}
+.accent{font-family:var(--f-accent);font-style:italic;font-weight:400;color:var(--yellow);letter-spacing:-.01em}
 .on-dark .accent{color:var(--yellow)}
-.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--smoke)}
+.eyebrow{font-family:var(--f-mono);font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--cream-dim)}
 p{margin:0;max-width:62ch}
 section{display:flex;flex-direction:column;gap:16px}
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.sw{border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--white)}
+.sw{border-radius:16px;overflow:hidden;border:1px solid rgba(243,236,221,.14);background:var(--navy-900)}
 .sw i{display:block;height:84px}
 .sw div{padding:10px 12px;font-family:var(--f-mono);font-size:.78rem;line-height:1.4}
 table{border-collapse:collapse;width:100%;font-size:.95rem}
-td,th{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+td,th{text-align:left;padding:10px 12px;border-bottom:1px solid rgba(243,236,221,.14);vertical-align:top}
 th{font-family:var(--f-head);font-weight:600}
-code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);padding:1px 6px;border-radius:6px}
+code{font-family:var(--f-mono);font-size:.85em;background:rgba(243,236,221,.08);padding:1px 6px;border-radius:6px}
 /* components */
 .stage{position:relative;border-radius:28px;overflow:hidden;min-height:460px;padding:24px;
-  background:linear-gradient(180deg,#d9cdb0 0%,#efe6d2 45%,#cfc59a 75%,#6f7a45 100%);display:flex;flex-direction:column;align-items:center;gap:28px}
+  background:linear-gradient(180deg,#0A1130 0%,#1B2A78 38%,#3A4FB0 62%,#111B45 86%,#060A1C 100%);display:flex;flex-direction:column;align-items:center;gap:28px}
 .nav{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 12px 10px 20px;border-radius:var(--r-pill);
-  background:var(--glass);border:1px solid var(--glass-line);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));flex-wrap:wrap}
+  background:rgba(6,10,28,.32);border:1px solid var(--glass-line);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));flex-wrap:wrap}
 .nav .logo{font-family:var(--f-head);font-weight:600;color:var(--white)}
 .nav nav{display:flex;gap:22px;font-size:.9rem;color:var(--white);flex-wrap:wrap}
 .btn{display:inline-flex;align-items:center;gap:8px;border:0;border-radius:var(--r-pill);padding:12px 20px;font-family:var(--f-head);font-weight:600;font-size:.95rem;
   background:var(--yellow);color:var(--yellow-ink);cursor:pointer}
-.btn:focus-visible,.search input:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
 .chip{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:var(--r-pill);background:rgba(255,255,255,.55);
   backdrop-filter:blur(10px);font-size:.82rem;color:var(--ink)}
 .search{display:flex;align-items:center;gap:10px;background:var(--white);border-radius:var(--r-pill);padding:6px 6px 6px 18px;box-shadow:var(--shadow);width:min(520px,100%)}
 .search input{flex:1;border:0;font:inherit;background:transparent;color:var(--ink);min-width:0}
 .hero-copy{text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px;margin-top:24px}
-.hero-copy p{color:var(--ink);opacity:.8;text-align:center}
+.hero-copy p{color:var(--cream);text-align:center}
 .do{border-left:3px solid var(--olive);padding-left:12px}
 .dont{border-left:3px solid var(--breach);padding-left:12px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
@@ -101,14 +110,14 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
 <div class="wrap">
 
 <header style="display:flex;flex-direction:column;gap:12px">
-  <span class="eyebrow">Levee · brand rules v1 · Nov 2026</span>
+  <span class="eyebrow">Levee · brand rules v2 (dusk) · Nov 2026</span>
   <h1>Hold the line on <span class="accent">every token</span></h1>
   <p>Levee lets a token issuer on Hedera undo a theft within seconds. The brand feels calm, warm and certain: a quiet landscape after the storm, not an alarm.</p>
 </header>
 
 <section>
   <span class="eyebrow">01 · Colour</span>
-  <h2>Warm haze, one yellow</h2>
+  <h2>Dusk navy, one yellow</h2>
   <div class="swatches">
     <div class="sw"><i style="background:#EFE6D2"></i><div>--sky<br>#EFE6D2<br>main ground</div></div>
     <div class="sw"><i style="background:#E6D8B4"></i><div>--haze<br>#E6D8B4<br>second ground</div></div>
@@ -118,7 +127,12 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
     <div class="sw"><i style="background:#1B1A17"></i><div>--ink<br>#1B1A17<br>text</div></div>
     <div class="sw"><i style="background:#6B665C"></i><div>--smoke<br>#6B665C<br>secondary text</div></div>
     <div class="sw"><i style="background:#F2E34C"></i><div>--yellow<br>#F2E34C<br>buttons; accent word on dark only</div></div>
-    <div class="sw"><i style="background:#7A5A00"></i><div>--gold<br>#7A5A00<br>accent word on light</div></div>
+    <div class="sw"><i style="background:#060A1C"></i><div>--navy-950<br>#060A1C<br>landing ground</div></div>
+    <div class="sw"><i style="background:#0A1130"></i><div>--navy-900<br>#0A1130<br>dark ground</div></div>
+    <div class="sw"><i style="background:#111B45"></i><div>--navy-800<br>#111B45<br>raised surfaces</div></div>
+    <div class="sw"><i style="background:#2438A8"></i><div>--ultramarine<br>#2438A8<br>glows only</div></div>
+    <div class="sw"><i style="background:#F3ECDD"></i><div>--cream<br>#F3ECDD<br>text on navy</div></div>
+    <div class="sw"><i style="background:repeating-linear-gradient(45deg,#E6D8B4 0 6px,#fff 6px 12px)"></i><div><s>--gold</s><br><s>#7A5A00</s><br>RETIRED, do not use</div></div>
     <div class="sw"><i style="background:#C8432B"></i><div>--breach<br>#C8432B<br>dashboard breach only</div></div>
     <div class="sw"><i style="background:#B6C383"></i><div>--olive-lit<br>#B6C383<br>success text on dark</div></div>
     <div class="sw"><i style="background:#D9B25C"></i><div>--amber<br>#D9B25C<br>refusal text on dark</div></div>
@@ -127,11 +141,12 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
   <table>
     <tr><th>Rule</th><th>Detail</th></tr>
     <tr><td>One accent</td><td>Yellow appears only on primary buttons and on the single italic accent word in a heading. Never on body text, borders or charts.</td></tr>
-    <tr><td>Accent word contrast</td><td>On light grounds (sky, haze, bright parts of the hero) the accent word uses <code>--gold</code> #7A5A00 (5.1:1). Bright <code>--yellow</code> is used for the accent word only on dark grounds: moss, ink, the dusk footer, the dashboard (9.4–13:1). Text must always reach 4.5:1.</td></tr>
+    <tr><td>Landing theme (Nov 2026)</td><td>The landing page is dusk: <code>--navy-950</code>/<code>--navy-900</code>/<code>--navy-800</code> grounds with ultramarine and cobalt glows, <code>--cream</code> text (<code>--cream-dim</code> for secondary), and <code>--yellow</code> #F2E34C as the ONLY accent: primary buttons (navy text), the one italic accent word per heading, pills, the Levee bar. Glass cards: cream 7% fill, 1px cream 14% border, soft inner glow.</td></tr>
+    <tr><td>Gold is retired</td><td><code>--gold</code> #7A5A00 is no longer used anywhere. No gold, brown or tan colours. Yellow is used only on dark grounds (navy, ink, moss), where it reaches 9–15:1; never yellow text on cream. Text must always reach 4.5:1 (tested in <code>dashboard/src/lib/__tests__/contrast.test.ts</code>).</td></tr>
     <tr><td>Three colours per frame</td><td>Any screen or slide uses the image plus at most ink, one ground colour and yellow.</td></tr>
     <tr><td>Status text on dark grounds</td><td>On ink or moss, status <em>text</em> uses the lit tints: <code>--olive-lit</code> #B6C383 for success and contained (9.2:1 on ink), <code>--amber</code> #D9B25C for refusals and warnings (8.7:1), <code>--breach-lit</code> #F08C74 for a live breach (7.2:1). Plain <code>--olive</code> and <code>--breach</code> stay for fills, borders and frames only, since as text on ink they reach just 3.0:1 and 3.6:1. Refusals are amber, never red.</td></tr>
     <tr><td>Red is a state, not a colour</td><td><code>--breach</code> is used only in the dashboard while a breach is live, then fades back to olive when contained.</td></tr>
-    <tr><td>Dark sections</td><td>Use <code>--moss</code> ground with <code>--sky</code> text; yellow stays the accent.</td></tr>
+    <tr><td>Dark sections</td><td>Landing: navy grounds with <code>--cream</code> text. Dashboard (/live): <code>--ink</code>/<code>--moss</code> with <code>--sky</code> text. Yellow stays the accent.</td></tr>
   </table>
 </section>
 
@@ -151,12 +166,12 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
   <span class="eyebrow">03 · Components</span>
   <h2>The hero, built from the tokens</h2>
   <div class="stage">
-    <div class="nav"><span class="logo">▲ Levee</span><nav><span>How it works</span><span>Demo</span><span>Docs</span><span>GitHub</span></nav><button class="btn" type="button">Try the demo</button></div>
+    <div class="nav"><span class="logo">▲ Levee</span><nav><span>How it works</span><span>Pricing</span><span>FAQ</span><span>Docs</span></nav><button class="btn" type="button" style="color:var(--navy-950)">Watch it live</button></div>
     <div class="hero-copy">
       <span class="chip">✦ Built on Hedera Stablecoin Studio</span>
-      <h1 style="color:var(--ink)">Stop a theft before it <span class="accent">spreads</span></h1>
-      <p>No receipt, no movement. Anything that moves without one is frozen and undone in seconds.</p>
-      <div class="search"><input id="brand-search" type="text" placeholder="Paste a Hedera token ID…" aria-label="Token ID"><button class="btn" type="button">Check token</button></div>
+      <h1 style="color:var(--cream)">Hacked? Your stablecoin <span class="accent">snaps back</span> in seconds.</h1>
+      <p>For stablecoin issuers on Hedera. No receipt, no movement.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><button class="btn" type="button" style="color:var(--navy-950)">Watch it live</button><button class="btn" type="button" style="background:transparent;color:var(--cream);box-shadow:inset 0 0 0 1px rgba(243,236,221,.3)">Read the docs</button></div>
     </div>
   </div>
   <table>
@@ -164,9 +179,9 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
     <tr><td>Nav</td><td>Full-width pill, <code>--glass</code> fill, 1px <code>--glass-line</code> border, 16px backdrop blur, white text, yellow CTA on the right.</td></tr>
     <tr><td>Primary button</td><td>Pill, yellow fill, ink text, Inter Tight 600. One per view.</td></tr>
     <tr><td>Secondary button</td><td>Pill, white fill, ink text.</td></tr>
-    <tr><td>Chip</td><td>Pill, white 55% with blur, small sparkle mark, 13px text. Sits above the H1.</td></tr>
-    <tr><td>Input pill</td><td>White pill with soft shadow and a yellow button inside on the right.</td></tr>
-    <tr><td>Cards</td><td>22px radius, white or <code>--haze</code>, no borders on images, soft shadow only on floating elements.</td></tr>
+    <tr><td>Eyebrow pill</td><td>Small mono uppercase pill above each section heading: yellow text on a yellow 8% fill with a yellow 35% hairline.</td></tr>
+    <tr><td>Product window</td><td>Browser-style frame (18px radius, glass border, traffic-light dots, title "levee · live") playing the muted demo loop; overlaps the bottom quarter of the hero.</td></tr>
+    <tr><td>Cards</td><td>Landing: frosted dark glass, 22px radius, 1px cream 14% border, soft inner glow. Dashboard: moss cards.</td></tr>
   </table>
 </section>
 
@@ -174,7 +189,7 @@ code{font-family:var(--f-mono);font-size:.85em;background:rgba(27,26,23,.06);pad
   <span class="eyebrow">04 · Imagery and motion</span>
   <h2>Calm after the <span class="accent">storm</span></h2>
   <div class="grid2">
-    <div class="do"><h3>Do</h3><p>Surreal cinematic photography: wide meadow of small white flowers, a lone figure from behind, huge floating earth islands with hanging roots, warm god rays through haze, film grain, shallow depth of field. Empty sky at centre-top for the headline. Slow 8-second loops: drifting haze, swaying grass, light shafts moving. Words rise in on scroll.</p></div>
+    <div class="do"><h3>Do</h3><p>Landing (Nov 2026): a dusk blue-hour landscape for the hero (slow muted loop, navy tint for text contrast), cobalt line engravings (a levee coastline) for the footer and small section art, and the real product shown in a browser window. Earlier meadow photography is retired from the landing. Slow loops, words rise in on scroll, all motion off under reduced motion.</p></div>
     <div class="dont"><h3>Don't</h3><p>Glowing blockchain cubes, hacker hoodies, padlocks, red alarms on the site, neon gradients, stock office photos, fast cuts, camera shake, text inside images. Never remove AI-content watermarks; frame them instead.</p></div>
   </div>
 </section>
