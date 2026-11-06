@@ -1,4 +1,5 @@
-// Pure gate logic: validate a request, then pass -> rules -> watcher-alive, in that order.
+// Pure gate logic: validate a request, then pass -> rules -> watcher-alive, in that order
+// (the signature / freshness / replay / role checks run before this, in auth.ts).
 // No I/O here so every refusal path is unit-tested.
 import type { Receipt, Rules } from "../shared/types.js";
 import type { PassStatus } from "../shared/pass.js";
@@ -14,6 +15,11 @@ export interface GateRequest {
 
 export type RefusalReason =
   | "bad-request"
+  | "unknown-machine"
+  | "bad-signature"
+  | "stale-request"
+  | "replayed-request"
+  | "wrong-role"
   | "no-pass"
   | "over-transfer-cap"
   | "over-daily-cap"

@@ -16,6 +16,7 @@
     "watcher": "tsx src/watcher/index.ts",
     "checker": "tsx src/checker/server.ts",
     "agent": "tsx src/agent/index.ts",
+    "request": "tsx src/agent/request.ts",
     "arkiv:smoke": "tsx src/checker/arkiv-smoke.ts",
     "t2": "tsx scripts/tests/t2-wipe-order.ts",
     "t3": "tsx scripts/tests/t3-pause.ts",

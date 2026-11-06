@@ -5,6 +5,9 @@ import { createGate } from "../../src/gate/server.js";
 import { neverLive, alwaysLive, type PassChecker } from "../../src/shared/pass.js";
 import type { DeployState } from "../../src/shared/config.js";
 import type { MirrorClient } from "../../src/shared/mirror.js";
+import { RequestAuthenticator, staticDirectory } from "../../src/gate/auth.js";
+import { newMachineKey, publicKeyOf } from "../../src/agent/protocol.js";
+import { signRequestWithKey } from "../../src/agent/request.js";
 
 const state = {
   token: { tokenId: "0.0.5001", proxy: "0.0.5000" },
@@ -17,7 +20,15 @@ const rules = { token: "0.0.5001", treasury: "0.0.6000", capPerTransfer: 10_000n
 let pass: PassChecker = neverLive("pass expired");
 let beat: { text: string; consensusAt: string } | null = null;
 const mirror = { latestTopicMessage: async () => (beat ? { ...beat, sequence: 1, payer: "0.0.1" } : null) } as unknown as MirrorClient;
-const gate = createGate({ state, rules, mirror, pass: { isLive: (m) => pass.isLive(m) }, client: {} as never, gateKey: {} as never, signerKey: {} as never });
+const key = newMachineKey();
+const laptopKey = newMachineKey();
+const auth = new RequestAuthenticator(
+  staticDirectory([
+    { machine: "payouts-1", publicKey: publicKeyOf(key), role: "payouts" },
+    { machine: "laptop-1", publicKey: publicKeyOf(laptopKey), role: "employee" },
+  ]),
+);
+const gate = createGate({ state, rules, mirror, pass: { isLive: (m) => pass.isLive(m) }, auth, client: {} as never, gateKey: {} as never, signerKey: {} as never });
 let server: Server;
 let base = "";
 beforeAll(async () => {
@@ -27,8 +38,14 @@ beforeAll(async () => {
 });
 afterAll(() => server.close());
 
-const post = (body: unknown) => fetch(`${base}/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-const good = { machine: "payouts-1", to: "0.0.6001", amount: "500", kind: "transfer" };
+const postRaw = (body: unknown) => fetch(`${base}/request`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+const good = { machine: "payouts-1", to: "0.0.6001", amount: "500", kind: "transfer" as const };
+/** Signs with payouts-1's key unless told otherwise (bad requests are posted unsigned). */
+const post = async (body: typeof good) => {
+  const { machine, ...r } = body;
+  if (!/^\d+$/.test(r.amount)) return postRaw(body);
+  return postRaw(await signRequestWithKey(machine === "laptop-1" ? laptopKey : key, machine, r));
+};
 
 describe("gate HTTP", () => {
   it("GET /health", async () => {
@@ -60,6 +77,34 @@ describe("gate HTTP", () => {
     expect(await (await post(good)).json()).toMatchObject({ reason: "no-watcher" });
     beat = { text: "garbage", consensusAt: `${Math.floor(Date.now() / 1000)}.000000000` };
     expect(await (await post(good)).json()).toMatchObject({ reason: "no-watcher" });
+  });
+});
+
+describe("gate HTTP: who is asking", () => {
+  it("403 unknown-machine / bad-signature for unsigned or forged requests, before any pass check", async () => {
+    pass = alwaysLive;
+    const unsigned = await postRaw(good);
+    expect(unsigned.status).toBe(403);
+    expect(await unsigned.json()).toMatchObject({ reason: "bad-signature" });
+    // signed by the laptop's key but claiming to be payouts-1
+    const forged = await postRaw(await signRequestWithKey(laptopKey, "payouts-1", { to: "0.0.6001", amount: "500" }));
+    expect(forged.status).toBe(403);
+    expect(await forged.json()).toMatchObject({ reason: "bad-signature" });
+    const nobody = await postRaw(await signRequestWithKey(key, "ghost-1", { to: "0.0.6001", amount: "500" }));
+    expect(nobody.status).toBe(403);
+    expect(await nobody.json()).toMatchObject({ reason: "unknown-machine" });
+  });
+  it("403 wrong-role for an enrolled, correctly signed employee laptop", async () => {
+    pass = alwaysLive;
+    const r = await post({ ...good, machine: "laptop-1" });
+    expect(r.status).toBe(403);
+    expect(await r.json()).toMatchObject({ reason: "wrong-role" });
+  });
+  it("403 replayed-request when the same signed body is sent twice", async () => {
+    pass = neverLive("pass expired");
+    const body = await signRequestWithKey(key, "payouts-1", { to: "0.0.6001", amount: "500" });
+    expect(await (await postRaw(body)).json()).toMatchObject({ reason: "no-pass" });
+    expect(await (await postRaw(body)).json()).toMatchObject({ reason: "replayed-request" });
   });
 });
 

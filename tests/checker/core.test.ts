@@ -3,6 +3,12 @@ import { CheckerCore, HttpError } from "../../src/checker/core.js";
 import { MemoryPassStore } from "../../src/shared/arkiv.js";
 import { buildPayload, newMachineKey, publicKeyOf, signPayload } from "../../src/agent/protocol.js";
 import { CHECK_IDS, type CheckResult } from "../../src/agent/checks.js";
+import { createApp } from "../../src/checker/server.js";
+import { HttpMachineDirectory } from "../../src/gate/auth.js";
+import type { AddressInfo } from "node:net";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const PASS = 180;
 const results = (bad: string[] = []): CheckResult[] => CHECK_IDS.map((id) => ({ id, ok: !bad.includes(id), detail: "", evidenceHash: `h-${id}` }));
@@ -36,6 +42,39 @@ describe("enrol", () => {
     const c = new CheckerCore({ store, passSeconds: PASS, enrolToken: "s3cret" });
     expect(() => c.enrol({ machine: "m2", publicKey: publicKeyOf(key) }, "nope")).toThrow(/token/);
     expect(c.enrol({ machine: "m2", publicKey: publicKeyOf(key) }, "s3cret").ok).toBe(true);
+  });
+  it("with a token set, a missing or near-miss token is 401", async () => {
+    const c = new CheckerCore({ store, passSeconds: PASS, enrolToken: "s3cret" });
+    for (const tok of [undefined, "", "s3cre", "s3cret!", "S3CRET"]) {
+      expect(await status(async () => c.enrol({ machine: "m3", publicKey: publicKeyOf(key) }, tok))).toBe(401);
+    }
+  });
+  it("machines enrolled before the token was set keep heartbeating (the token guards /enrol only)", async () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "levee-")), "machines.json");
+    const open = new CheckerCore({ store, passSeconds: PASS, now: () => t, stateFile: file });
+    open.enrol({ machine: "m1", publicKey: publicKeyOf(key), role: "payouts" });
+    const locked = new CheckerCore({ store, passSeconds: PASS, now: () => t, stateFile: file, enrolToken: "s3cret" });
+    const hb = await signPayload(key, buildPayload("m1", 1, locked.nonce("m1").nonce, results(), t));
+    expect(await locked.heartbeat(hb)).toMatchObject({ ok: true, renewed: true });
+    expect(locked.machine("m1")).toMatchObject({ role: "payouts" });
+  });
+});
+
+describe("machine record (what the gate verifies requests against)", () => {
+  it("returns key, role and profile; 404 for unknown", async () => {
+    expect(core.machine("m1")).toEqual({ machine: "m1", publicKey: publicKeyOf(key), role: "employee", profile: "laptop" });
+    expect(await status(async () => core.machine("nope"))).toBe(404);
+  });
+  it("GET /machine/:name over HTTP, read by the gate's HttpMachineDirectory", async () => {
+    const server = createApp(core).listen(0);
+    await new Promise((r) => server.once("listening", r));
+    try {
+      const dir = new HttpMachineDirectory(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+      expect(await dir.lookup("m1")).toEqual({ machine: "m1", publicKey: publicKeyOf(key), role: "employee", profile: "laptop" });
+      expect(await dir.lookup("nope")).toBeNull();
+    } finally {
+      server.close();
+    }
   });
 });
 

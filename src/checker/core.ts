@@ -1,5 +1,5 @@
 // Checker logic, free of HTTP so it can be unit-tested with a MemoryPassStore.
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
@@ -42,6 +42,13 @@ export interface PassView {
   profile?: Profile;
 }
 
+/** Constant-time string compare (enrol token). */
+function sameSecret(given: string | undefined, want: string): boolean {
+  if (typeof given !== "string") return false;
+  const a = Buffer.from(given), b = Buffer.from(want);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
     super(message);
@@ -80,7 +87,7 @@ export class CheckerCore {
   }
 
   enrol(body: { machine?: string; publicKey?: string; role?: string; profile?: string }, token?: string) {
-    if (this.o.enrolToken && token !== this.o.enrolToken) throw new HttpError(401, "bad enrol token");
+    if (this.o.enrolToken && !sameSecret(token, this.o.enrolToken)) throw new HttpError(401, "bad enrol token");
     const { machine, publicKey } = body;
     const role = body.role ?? "employee";
     if (!machine || !/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(machine)) throw new HttpError(400, "bad machine name");
@@ -98,6 +105,13 @@ export class CheckerCore {
       this.emit("enrol", { machine, role, profile });
     }
     return { ok: true, machine, role: cur?.role ?? role, profile };
+  }
+
+  /** Public enrolment record: what the gate needs to verify a signed request (key) and judge it (role). */
+  machine(machine: string | undefined) {
+    const m = machine ? this.machines.get(machine) : undefined;
+    if (!m) throw new HttpError(404, "unknown machine");
+    return { machine: m.machine, publicKey: m.publicKey, role: m.role, profile: m.profile ?? "laptop" };
   }
 
   nonce(machine: string | undefined) {

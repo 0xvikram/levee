@@ -1,6 +1,7 @@
 // Leash gate: the only thing that co-signs treasury moves.
-//   POST /request {machine, to, amount, kind}
-//     pass check -> rules (+ daily spend) -> watcher alive -> build + freeze tx (txId known)
+//   POST /request {machine, to, amount, kind, nonce, sentAt, signature}
+//     signed by the machine's own key (auth.ts: enrolled key, fresh, not replayed, allowed role)
+//     -> pass check -> rules (+ daily spend) -> watcher alive -> build + freeze tx (txId known)
 //     -> receipt to HCS, wait for consensus -> sign (treasurySigner + gate = 2 of 3) -> execute
 //   GET /health, GET /events (SSE of decisions)
 import express from "express";
@@ -38,6 +39,7 @@ import {
   type WatcherBeat,
 } from "./decide.js";
 import { SseHub } from "./sse.js";
+import { allowedRolesFromEnv, HttpMachineDirectory, RequestAuthenticator } from "./auth.js";
 
 const CASHIN_GAS = Number(process.env.CASHIN_GAS ?? "300000");
 const HEARTBEAT_MAX_AGE_MS = Number(process.env.WATCHER_HEARTBEAT_MAX_AGE_S ?? "120") * 1000;
@@ -48,6 +50,8 @@ export interface GateDeps {
   state: DeployState;
   rules: Rules;
   pass: PassChecker;
+  /** checks the request is signed by the named machine's enrolled key, fresh, unreplayed, with an allowed role */
+  auth: RequestAuthenticator;
   mirror: MirrorClient;
   client: Client; // pays for receipts + submits the signed treasury tx
   gateKey: PrivateKey;
@@ -131,6 +135,15 @@ export function createGate(d: GateDeps, ledger = new SpendLedger()) {
     if (!parsed.ok) return { status: 400, body: parsed };
     const r = parsed.value;
 
+    // Who is asking: the signature must come from this machine's enrolled key (before any pass/rules work).
+    const who = await d.auth.check(r, body);
+    timings.authMs = Date.now() - t0;
+    if (!who.ok) {
+      const refusal = { ok: false as const, reason: who.reason, detail: who.detail };
+      hub.publish("decision", gateEvent(r, refusal, Date.now(), { timings }));
+      return { status: 403, body: refusal };
+    }
+
     const [pass, heartbeat] = await Promise.all([
       d.pass.isLive(r.machine).finally(() => (timings.passMs = Date.now() - t0)),
       latestHeartbeat(d.mirror, d.state.topics.heartbeats).catch(() => null).finally(() => (timings.heartbeatMs = Date.now() - t0)),
@@ -195,6 +208,7 @@ async function main() {
       rules,
       mirror,
       pass: new HttpPassChecker(),
+      auth: new RequestAuthenticator(new HttpMachineDirectory(), allowedRolesFromEnv()),
       client: roleClient(ROLE_GATE, state.gate.id),
       gateKey: roleKey(ROLE_GATE),
       signerKey: roleKey(ROLE_SIGNER),
@@ -202,7 +216,7 @@ async function main() {
     ledger,
   );
   gate.app.listen(env.gatePort, () => {
-    console.log(`gate listening on :${env.gatePort} (treasury ${state.treasury.id}, token ${state.token.tokenId}); spent today ${ledger.get(today)} from ${receipts.length} receipts`);
+    console.log(`gate listening on :${env.gatePort}, signed requests only, roles ${allowedRolesFromEnv().join("/")} (treasury ${state.treasury.id}, token ${state.token.tokenId}); spent today ${ledger.get(today)} from ${receipts.length} receipts`);
   });
 }
 

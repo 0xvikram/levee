@@ -21,6 +21,7 @@ export function createApp(core: CheckerCore) {
   app.post("/enrol", wrap((req) => core.enrol(req.body ?? {}, req.header("x-enrol-token"))));
   app.get("/nonce", wrap((req) => core.nonce(String(req.query.machine ?? ""))));
   app.post("/heartbeat", wrap((req) => core.heartbeat(req.body)));
+  app.get("/machine/:machine", wrap((req) => core.machine(String(req.params.machine))));
   app.get("/pass/:machine", wrap((req) => core.pass(String(req.params.machine))));
   app.get("/passes", wrap(() => core.passes()));
   app.get("/events", (req, res) => {
@@ -45,7 +46,9 @@ export function startChecker(store: PassStore, port = env.checkerPort) {
     stateFile: path.resolve("state/checker-machines.json"),
     enrolToken: process.env.ENROL_TOKEN || undefined,
   });
-  return createApp(core).listen(port, () => console.log(`[checker] listening on :${port}, pass lifetime ${env.passSeconds}s`));
+  return createApp(core).listen(port, () =>
+    console.log(`[checker] listening on :${port}, pass lifetime ${env.passSeconds}s, /enrol ${process.env.ENROL_TOKEN ? "needs ENROL_TOKEN" : "OPEN (no ENROL_TOKEN set)"}`),
+  );
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
