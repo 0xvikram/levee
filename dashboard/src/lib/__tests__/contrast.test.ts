@@ -31,6 +31,9 @@ const SKY_GRAIN = over(N.cream, 0.05, N.sky);
 const NAV_GLASS = over(N.ink, 0.72, N.cream);
 /** Page grain: cream at <= 5% over the ground (soft-light is gentler than this plain mix). */
 const GRAIN = over(N.cream, 0.05, N.cobalt);
+/** Hero engraving at its cap behind text: a white pixel at 10% over the lighter (cobalt) end of the hero ground,
+ *  under the page grain. */
+const HERO_ART = over(N.cream, 0.05, over(C.white, 0.1, N.cobalt));
 
 /** screen blend of the footer cursor light's brightest stop (sun #F6ECC6 at 0.2) over ink */
 const LIT_INK = (() => {
@@ -87,6 +90,14 @@ const PAIRS: [string, string, string][] = [
   ["yellow hero accent on the hero ground (cobalt-deep end)", C.yellow, N.deep],
   ["cream ghost button (cream 8%) on the hero ground", N.cream, over(N.cream, 0.08, N.cobalt)],
   ["cream chip (cobalt-ink 60%) on the hero ground", N.cream, over(N.ink, 0.6, N.cobalt)],
+  // hero engraving (hero.jpg at opacity 0.4 under a top-transparent mask): its effective strength behind any text
+  // is capped at 10% (checked headless); worst case is a pure white pixel there, plus the page grain
+  ["cream hero copy over the hero engraving at its cap", N.cream, HERO_ART],
+  ["yellow hero accent over the hero engraving at its cap", C.yellow, HERO_ART],
+  ["cream ghost button (cream 8%) over the hero engraving at its cap", N.cream, over(N.cream, 0.08, HERO_ART)],
+  ["cobalt-ink on the yellow CTA (opaque, unaffected by the engraving)", N.ink, C.yellow],
+  // video sound pill: cobalt-ink at 78% over the brightest video pixel (white)
+  ["cream sound pill on cobalt-ink 78% over a white video pixel", N.cream, over(N.ink, 0.78, C.white)],
   // footer: all copy on the plain sky above the engraving, under the page grain
   ["cream footer link on cobalt-sky under the grain", N.cream, SKY_GRAIN],
   ["cream-dim footer description / legal row on cobalt-sky", CREAM_DIM(N.sky), N.sky],

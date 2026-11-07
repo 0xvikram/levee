@@ -9,16 +9,19 @@ import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
 import { usePrefersReducedMotion, useRiseIn } from "../lib/hooks";
 
 const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
-/** The explainer in the product window (English captions). Until these files exist the window shows the mock. */
+/** The explainer in the product window. Its English subtitles are burned into the picture, so the .vtt track is
+ *  offered but off by default (no second subtitle line). Until these files exist the window shows the mock. */
 export const EXPLAINER = {
   webm: "/media/explainer.webm",
   mp4: "/media/explainer.mp4",
   poster: "/media/explainer-poster.jpg",
   vtt: "/media/explainer.vtt",
 };
-/** Media lives only in the footer (the hero is a plain cobalt ground, Nov 2026). The engraving's sky, sampled
- *  from its top rows with PIL, is #1F3F88 = --cobalt-sky, the footer ground, so the art meets it with no seam. */
+/** Hero: a quiet engraving (levee coast, empty sky ≈ #203C91) faded into the cobalt ground behind the window.
+ *  Footer: the engraving's sky, sampled from its top rows with PIL, is #1F3F88 = --cobalt-sky, the footer
+ *  ground, so the art meets it with no seam. */
 const ART = {
+  hero: "/media/engraving/hero.jpg",
   footer: "/media/footer-engraving.jpg",
 };
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
@@ -42,6 +45,7 @@ export function Landing() {
         Skip to content
       </a>
       <header className="lp-hero">
+        <img className="lp-hero-art" src={ART.hero} alt="" aria-hidden="true" decoding="async" />
         <div className="lp-nav">
           <Link to="/" className="lp-logo">
             <SiteLogo />
@@ -124,9 +128,11 @@ function useExplainerReady(enabled: boolean): boolean {
 }
 
 /**
- * The full-size browser window under the hero. Its screen plays the explainer: muted, looping and inline with
- * the English captions on, paused while off screen. "Watch with sound" unmutes it, restarts it from 0 and shows
- * the native controls. Reduced motion: the poster and that button only, nothing autoplays. Until the files
+ * The browser window under the hero, sized so the whole 16:9 video fits on screen at once (object-fit: contain,
+ * nothing cropped). Its screen plays the explainer: muted, looping and inline, paused while off screen; the
+ * subtitles are burned into the picture, so the captions track stays off. A sound pill on the video (bottom-left)
+ * mutes and unmutes it in place; "Watch with sound" in the window bar restarts it from 0 with sound and the native
+ * controls. Reduced motion: the poster and those controls only, nothing autoplays. Until the files
  * exist (or if they cannot play) the screen is a mock of the incident view with the measured (or live)
  * numbers, and the whole window links to /live.
  */
@@ -138,6 +144,7 @@ export function ProductWindow({ m = FALLBACK_SHOWCASE, video = true }: { m?: Sho
   const [visible, setVisible] = useState(true);
   const [videoOk, setVideoOk] = useState(true);
   const [sound, setSound] = useState(false);
+  const [muted, setMuted] = useState(true);
   const [duration, setDuration] = useState(0);
   const showVideo = video && ready && videoOk;
 
@@ -151,22 +158,33 @@ export function ProductWindow({ m = FALLBACK_SHOWCASE, video = true }: { m?: Sho
 
   useEffect(() => {
     const v = vid.current;
-    if (!v || sound) return;
-    v.muted = true; // React does not always write the attribute, which autoplay needs
-    if (visible && !reduced) v.play?.()?.catch(() => undefined);
-    else v.pause?.();
-  }, [visible, reduced, sound, showVideo]);
+    if (v) v.muted = muted; // React does not always write the attribute, which autoplay needs
+  }, [muted, showVideo]);
 
   useEffect(() => {
-    // keep the English captions showing (some browsers ignore `default` on a muted autoplay)
-    const t = vid.current?.textTracks?.[0];
-    if (t) t.mode = "showing";
-  }, [showVideo]);
+    const v = vid.current;
+    if (!v) return;
+    // the subtitles are in the picture: never show the captions track on top of them
+    for (const t of Array.from(v.textTracks ?? [])) if (t.mode === "showing") t.mode = "disabled";
+    if (sound) return; // the native controls own play / pause now
+    if (visible && (!reduced || !muted)) v.play?.()?.catch(() => undefined);
+    else v.pause?.();
+  }, [visible, reduced, sound, muted, showVideo]);
+
+  const toggleMute = () => {
+    const v = vid.current;
+    if (!v) return;
+    const next = !muted;
+    v.muted = next;
+    setMuted(next);
+    if (!next) v.play?.()?.catch(() => undefined);
+  };
 
   const withSound = () => {
     const v = vid.current;
     if (!v) return;
     setSound(true);
+    setMuted(false);
     v.muted = false;
     v.loop = false;
     v.currentTime = 0;
@@ -208,9 +226,16 @@ export function ProductWindow({ m = FALLBACK_SHOWCASE, video = true }: { m?: Sho
     <div className="lp-window-shell" ref={box}>
       <div className="lp-window is-video" data-testid="product-window">
         {bar(
-          <Link to="/live" className="lp-window-open">
-            Open live ↗
-          </Link>,
+          <span className="lp-window-actions">
+            {!sound && (
+              <button type="button" className="lp-btn primary small lp-sound" onClick={withSound}>
+                <span aria-hidden="true">▶</span> Watch with sound{duration > 0 && Number.isFinite(duration) ? ` (${clock(duration)})` : ""}
+              </button>
+            )}
+            <Link to="/live" className="lp-window-open">
+              Open live ↗
+            </Link>
+          </span>,
         )}
         <div className="lp-window-body">
           <video
@@ -222,23 +247,37 @@ export function ProductWindow({ m = FALLBACK_SHOWCASE, video = true }: { m?: Sho
             preload={reduced ? "none" : "metadata"}
             poster={EXPLAINER.poster}
             controls={sound}
-            aria-label="Levee explainer video, with English captions"
+            aria-label="Levee explainer video, with English subtitles in the picture"
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onVolumeChange={(e) => setMuted(e.currentTarget.muted)}
             onError={(e) => e.target === e.currentTarget && setVideoOk(false)}
           >
             <source src={EXPLAINER.webm} type="video/webm" />
             {/* a failed <source> fires error on itself (React bubbles it to the video's onError, hence the target check); only the last one means none could play */}
             <source src={EXPLAINER.mp4} type="video/mp4" onError={() => setVideoOk(false)} />
-            <track kind="captions" srcLang="en" label="English" src={EXPLAINER.vtt} default />
+            {/* off by default: the subtitles are burned into the picture; offered for anyone who wants the text track */}
+            <track kind="captions" srcLang="en" label="English" src={EXPLAINER.vtt} />
           </video>
-          {!sound && (
-            <button type="button" className="lp-btn primary lp-sound" onClick={withSound}>
-              <span aria-hidden="true">▶</span> Watch with sound{duration > 0 && Number.isFinite(duration) ? ` (${clock(duration)})` : ""}
-            </button>
-          )}
+          <button type="button" className={`lp-mute${sound ? " above-controls" : ""}`} onClick={toggleMute}>
+            <SpeakerIcon muted={muted} />
+            {muted ? "Tap for sound" : "Mute"}
+          </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" />
+      {muted ? (
+        <path d="M16 9l5 6M21 9l-5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+      ) : (
+        <path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
+      )}
+    </svg>
   );
 }
 

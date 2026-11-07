@@ -39,13 +39,19 @@ describe("Landing structure", () => {
     expect(nav.querySelector(".lp-nav-cta")).toHaveAttribute("href", "/live");
   });
 
-  it("keeps media to the footer only: the hero is a plain ground with no video, image or canvas", () => {
+  it("gives the hero one quiet, decorative engraving and no video or canvas; sections stay media-free", () => {
     const { container } = render(<Landing />);
     expect(container.querySelector("main")!.querySelectorAll("img, video, canvas, .dither")).toHaveLength(0);
     expect(container.querySelector(".lp-window-wrap")!.querySelectorAll("img, video")).toHaveLength(0);
     const hero = container.querySelector(".lp-hero")!;
     expect(hero.querySelector("video")).toBeNull();
-    expect(hero.querySelectorAll("img, canvas, .dither, .lp-hero-media")).toHaveLength(0);
+    expect(hero.querySelectorAll("canvas, .dither, .lp-hero-media")).toHaveLength(0);
+    const art = hero.querySelectorAll("img");
+    expect(art).toHaveLength(1);
+    expect(art[0]).toHaveClass("lp-hero-art");
+    expect(art[0]).toHaveAttribute("src", "/media/engraving/hero.jpg");
+    expect(art[0]).toHaveAttribute("alt", "");
+    expect(art[0]).toHaveAttribute("aria-hidden", "true");
     expect(container.innerHTML).not.toContain("hero-lighthouse");
   });
 
@@ -108,7 +114,7 @@ describe("product window", () => {
     expect(container.querySelector(".lp-mock")).not.toBeNull();
   });
 
-  it("plays the explainer muted, looping and inline with English captions on, webm then mp4, poster under it", async () => {
+  it("plays the explainer muted, looping and inline with the captions track off (subtitles are burned in), webm then mp4, poster under it", async () => {
     vi.stubGlobal("fetch", videoHead());
     const { container } = render(<ProductWindow m={live} />);
     await act(async () => undefined);
@@ -125,10 +131,34 @@ describe("product window", () => {
     expect(t).toHaveAttribute("kind", "captions");
     expect(t).toHaveAttribute("srclang", "en");
     expect(t).toHaveAttribute("src", "/media/explainer.vtt");
-    expect(t.hasAttribute("default")).toBe(true);
+    // the subtitles are burned into the picture: the track is offered but never on by default
+    expect(t.hasAttribute("default")).toBe(false);
+    for (const tt of Array.from(v.textTracks ?? [])) expect(tt.mode).not.toBe("showing");
     // the window is not a link around a video; /live is the bar's own link
     expect(screen.getByRole("link", { name: "Open live ↗" })).toHaveAttribute("href", "/live");
     expect(container.querySelector(".lp-mock")).toBeNull();
+  });
+
+  it("has a sound pill on the video that unmutes and mutes it in place", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      const pill = screen.getByRole("button", { name: "Tap for sound" });
+      expect(pill.closest(".lp-window-body")).not.toBeNull();
+      v.currentTime = 12;
+      fireEvent.click(pill);
+      expect(v.muted).toBe(false);
+      expect(v.currentTime).toBe(12); // in place, no restart
+      expect(play).toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Mute" }));
+      expect(v.muted).toBe(true);
+      expect(screen.getByRole("button", { name: "Tap for sound" })).toBeInTheDocument();
+    } finally {
+      play.mockRestore();
+    }
   });
 
   it("'Watch with sound' unmutes, restarts from 0 and shows the controls, with the length once known", async () => {
