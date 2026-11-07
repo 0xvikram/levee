@@ -9,8 +9,13 @@ import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
 import { usePrefersReducedMotion, useRiseIn } from "../lib/hooks";
 
 const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
-/** The product window plays the recorded demo when true; until the new video lands it shows a cobalt mock with the live numbers. */
-export const DEMO_VIDEO = false;
+/** The explainer in the product window (English captions). Until these files exist the window shows the mock. */
+export const EXPLAINER = {
+  webm: "/media/explainer.webm",
+  mp4: "/media/explainer.mp4",
+  poster: "/media/explainer-poster.jpg",
+  vtt: "/media/explainer.vtt",
+};
 /** Media lives only in the footer (the hero is a plain cobalt ground, Nov 2026). The engraving's sky, sampled
  *  from its top rows with PIL, is #1F3F88 = --cobalt-sky, the footer ground, so the art meets it with no seam. */
 const ART = {
@@ -95,81 +100,148 @@ export function Landing() {
 
 // ---------------------------------------------------------------- product window
 
+/** m:ss for the sound button, from the video's own duration. */
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+
 /**
- * Browser-style window showing the product. Until the new demo video lands it is a mock
- * of the incident view, filled with the measured (or live) numbers. With `video` (or DEMO_VIDEO =
- * true) it plays the recorded demo instead: sources are attached only once the window is near the
- * screen, it plays muted on a loop while visible and pauses when scrolled away; the poster still sits
- * under it, and the mock comes back if neither can load. Reduced motion: the still only. Links to /live.
+ * Asks the server once whether the explainer exists. A missing file falls through to the SPA's index.html,
+ * so only a video content type counts. Any failure (offline, 404, HTML) keeps the mock.
  */
-export function ProductWindow({ m = FALLBACK_SHOWCASE, video = DEMO_VIDEO }: { m?: Showcase; video?: boolean } = {}) {
+function useExplainerReady(enabled: boolean): boolean {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!enabled || typeof fetch === "undefined") return;
+    let live = true;
+    Promise.resolve()
+      .then(() => fetch(EXPLAINER.mp4, { method: "HEAD" }))
+      .then((r) => live && r.ok && (r.headers.get("content-type") ?? "").startsWith("video/") && setReady(true))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+  return ready;
+}
+
+/**
+ * The full-size browser window under the hero. Its screen plays the explainer: muted, looping and inline with
+ * the English captions on, paused while off screen. "Watch with sound" unmutes it, restarts it from 0 and shows
+ * the native controls. Reduced motion: the poster and that button only, nothing autoplays. Until the files
+ * exist (or if they cannot play) the screen is a mock of the incident view with the measured (or live)
+ * numbers, and the whole window links to /live.
+ */
+export function ProductWindow({ m = FALLBACK_SHOWCASE, video = true }: { m?: Showcase; video?: boolean } = {}) {
   const reduced = usePrefersReducedMotion();
+  const ready = useExplainerReady(video);
   const box = useRef<HTMLDivElement>(null);
   const vid = useRef<HTMLVideoElement>(null);
-  const [near, setNear] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [posterOk, setPosterOk] = useState(true);
+  const [visible, setVisible] = useState(true);
   const [videoOk, setVideoOk] = useState(true);
+  const [sound, setSound] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const showVideo = video && ready && videoOk;
 
   useEffect(() => {
-    if (!video) return;
     const el = box.current;
-    if (!el) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setNear(true);
-      setVisible(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      ([e]) => {
-        setVisible(e.isIntersecting);
-        if (e.isIntersecting) setNear(true);
-      },
-      { rootMargin: "200px 0px" },
-    );
+    if (!showVideo || !el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
-  }, [video]);
+  }, [showVideo]);
 
-  const showVideo = video && near && !reduced && videoOk;
   useEffect(() => {
     const v = vid.current;
-    if (!v) return;
+    if (!v || sound) return;
     v.muted = true; // React does not always write the attribute, which autoplay needs
-    if (visible) v.play?.()?.catch(() => undefined);
+    if (visible && !reduced) v.play?.()?.catch(() => undefined);
     else v.pause?.();
-  }, [visible, showVideo]);
+  }, [visible, reduced, sound, showVideo]);
 
-  const media = video && (posterOk || showVideo);
+  useEffect(() => {
+    // keep the English captions showing (some browsers ignore `default` on a muted autoplay)
+    const t = vid.current?.textTracks?.[0];
+    if (t) t.mode = "showing";
+  }, [showVideo]);
+
+  const withSound = () => {
+    const v = vid.current;
+    if (!v) return;
+    setSound(true);
+    v.muted = false;
+    v.loop = false;
+    v.currentTime = 0;
+    v.play?.()?.catch(() => undefined);
+  };
+
+  const bar = (open: ReactNode) => (
+    <span className="lp-window-bar">
+      <span className="lp-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span className="lp-window-title" aria-hidden="true">
+        levee · live
+      </span>
+      {open}
+    </span>
+  );
+
+  if (!showVideo) {
+    return (
+      <div className="lp-window-shell" ref={box}>
+        <Link to="/live" className="lp-window" aria-label="Open the live demo: a theft frozen and taken back on Hedera testnet" data-testid="product-window">
+          {bar(
+            <span className="lp-window-open" aria-hidden="true">
+              Open ↗
+            </span>,
+          )}
+          <span className="lp-window-body mock" aria-hidden="true">
+            <WindowMock m={m} />
+          </span>
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="lp-window-shell" ref={box}>
-      <Link to="/live" className="lp-window" aria-label="Open the live demo: a theft frozen and taken back on Hedera testnet" data-testid="product-window">
-        <span className="lp-window-bar" aria-hidden="true">
-          <span className="lp-dots">
-            <i />
-            <i />
-            <i />
-          </span>
-          <span className="lp-window-title">levee · live</span>
-          <span className="lp-window-open">Open ↗</span>
-        </span>
-        <span className={`lp-window-body${media ? "" : " mock"}`} aria-hidden="true">
-          {video && posterOk && <img src="/media/demo-poster.jpg" alt="" decoding="async" onError={() => setPosterOk(false)} />}
-          {showVideo && (
-            <video ref={vid} muted autoPlay loop playsInline preload="metadata" poster={posterOk ? "/media/demo-poster.jpg" : undefined} onError={(e) => e.target === e.currentTarget && setVideoOk(false)}>
-              <source src="/media/demo.webm" type="video/webm" />
-              {/* a failed <source> fires error on itself (React bubbles it to the video's onError, hence the target check); only the last one means none could play */}
-              <source src="/media/demo.mp4" type="video/mp4" onError={() => setVideoOk(false)} />
-            </video>
+      <div className="lp-window is-video" data-testid="product-window">
+        {bar(
+          <Link to="/live" className="lp-window-open">
+            Open live ↗
+          </Link>,
+        )}
+        <div className="lp-window-body">
+          <video
+            ref={vid}
+            muted
+            loop
+            playsInline
+            autoPlay={!reduced}
+            preload={reduced ? "none" : "metadata"}
+            poster={EXPLAINER.poster}
+            controls={sound}
+            aria-label="Levee explainer video, with English captions"
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onError={(e) => e.target === e.currentTarget && setVideoOk(false)}
+          >
+            <source src={EXPLAINER.webm} type="video/webm" />
+            {/* a failed <source> fires error on itself (React bubbles it to the video's onError, hence the target check); only the last one means none could play */}
+            <source src={EXPLAINER.mp4} type="video/mp4" onError={() => setVideoOk(false)} />
+            <track kind="captions" srcLang="en" label="English" src={EXPLAINER.vtt} default />
+          </video>
+          {!sound && (
+            <button type="button" className="lp-btn primary lp-sound" onClick={withSound}>
+              <span aria-hidden="true">▶</span> Watch with sound{duration > 0 && Number.isFinite(duration) ? ` (${clock(duration)})` : ""}
+            </button>
           )}
-          {!media && <WindowMock m={m} />}
-        </span>
-      </Link>
+        </div>
+      </div>
     </div>
   );
 }
 
-/** The incident view, drawn from the numbers: headline time, the four steps, the treasury line, the event log. */
 function WindowMock({ m }: { m: Showcase }) {
   const span = Math.max(m.wipedS, 1) * 1.4;
   const x = (t: number) => 60 + (t / span) * 500;

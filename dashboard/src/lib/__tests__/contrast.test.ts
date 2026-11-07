@@ -93,6 +93,8 @@ const PAIRS: [string, string, string][] = [
   ["cream-dim footer description / legal row on cobalt-sky under the grain", CREAM_DIM(SKY_GRAIN), SKY_GRAIN],
   ["cream footer pill link on its 10% hover fill", N.cream, over(N.cream, 0.1, N.sky)],
   ["yellow logo mark on cobalt-sky", C.yellow, N.sky],
+  // explainer captions in the product window: cream on cobalt-ink at 82%, worst case over a white frame
+  ["cream caption on its cue box over a white frame", N.cream, over(N.ink, 0.82, C.white)],
   ["cream nav link on the nav glass over a cream pixel", N.cream, NAV_GLASS],
   ["cream heading over the blurred Pricing word", N.cream, over(N.cream, 0.09, N.cobalt)],
   // tonal section band: cobalt-ink at 22% over the ground, and a glass card on it

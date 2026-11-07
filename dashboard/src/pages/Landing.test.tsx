@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { CompareChart, FaqSection, Footer, HederaStrip, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
 import { FALLBACK_SHOWCASE } from "../lib/incident";
 import { FACTS, INDUSTRY } from "../lib/numbers";
@@ -85,8 +85,11 @@ describe("Landing structure", () => {
 });
 
 describe("product window", () => {
-  it("is a link to /live titled levee · live, with a cobalt mock of the incident view (no media)", () => {
+  const videoHead = () => vi.fn(() => Promise.resolve(new Response(null, { status: 200, headers: { "content-type": "video/mp4" } })));
+
+  it("until the explainer exists, is a link to /live titled levee · live with a cobalt mock of the incident view (no media)", async () => {
     const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
     const a = screen.getByTestId("product-window");
     expect(a).toHaveAttribute("href", "/live");
     expect(a.textContent).toContain("levee · live");
@@ -97,27 +100,107 @@ describe("product window", () => {
     expect(mock.textContent).toMatch(/Request.*Receipt.*Transfer.*Check/);
   });
 
-  it("with video on, shows the poster that degrades to the mock", () => {
-    const { container } = render(<ProductWindow video />);
-    const a = screen.getByTestId("product-window");
-    expect(a).toHaveAttribute("href", "/live");
-    expect(a.textContent).toContain("levee · live");
-    expect(a.querySelectorAll(".lp-dots i")).toHaveLength(3);
-    const img = container.querySelector(".lp-window-body img")!;
-    expect(img).toHaveAttribute("src", "/media/demo-poster.jpg");
-    fireEvent.error(img);
-    expect(container.querySelector(".lp-window-body img")).toBeNull();
+  it("keeps the mock when the server answers the explainer with the SPA page (missing file)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("<!doctype html>", { status: 200, headers: { "content-type": "text/html" } }))));
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector(".lp-mock")).not.toBeNull();
   });
 
-  it("with video on, attaches the demo (webm then mp4, muted, looping, inline) once near the screen", () => {
-    // jsdom has no IntersectionObserver, so the window counts as on screen at once
-    const { container } = render(<ProductWindow video />);
-    const v = container.querySelector("video")!;
+  it("plays the explainer muted, looping and inline with English captions on, webm then mp4, poster under it", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    const v = container.querySelector(".lp-window-body video") as HTMLVideoElement;
     expect(v).not.toBeNull();
     expect(v.muted).toBe(true);
     expect(v.loop).toBe(true);
+    expect(v.autoplay).toBe(true);
     expect(v.hasAttribute("playsinline")).toBe(true);
-    expect([...v.querySelectorAll("source")].map((s) => s.getAttribute("src"))).toEqual(["/media/demo.webm", "/media/demo.mp4"]);
+    expect(v.hasAttribute("controls")).toBe(false);
+    expect(v).toHaveAttribute("poster", "/media/explainer-poster.jpg");
+    expect([...v.querySelectorAll("source")].map((s) => s.getAttribute("src"))).toEqual(["/media/explainer.webm", "/media/explainer.mp4"]);
+    const t = v.querySelector("track")!;
+    expect(t).toHaveAttribute("kind", "captions");
+    expect(t).toHaveAttribute("srclang", "en");
+    expect(t).toHaveAttribute("src", "/media/explainer.vtt");
+    expect(t.hasAttribute("default")).toBe(true);
+    // the window is not a link around a video; /live is the bar's own link
+    expect(screen.getByRole("link", { name: "Open live ↗" })).toHaveAttribute("href", "/live");
+    expect(container.querySelector(".lp-mock")).toBeNull();
+  });
+
+  it("'Watch with sound' unmutes, restarts from 0 and shows the controls, with the length once known", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      Object.defineProperty(v, "duration", { value: 170, configurable: true });
+      fireEvent.loadedMetadata(v);
+      const btn = screen.getByRole("button", { name: /Watch with sound \(2:50\)/ });
+      v.currentTime = 42;
+      fireEvent.click(btn);
+      expect(v.muted).toBe(false);
+      expect(v.currentTime).toBe(0);
+      expect(v.hasAttribute("controls")).toBe(true);
+      expect(play).toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: /Watch with sound/ })).toBeNull();
+    } finally {
+      play.mockRestore();
+    }
+  });
+
+  it("pauses the loop when scrolled off screen and plays it when back", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    let cb: (e: { isIntersecting: boolean }[]) => void = () => undefined;
+    vi.stubGlobal("IntersectionObserver", vi.fn(function (this: unknown, fn: typeof cb) {
+      cb = fn;
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    }));
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    try {
+      render(<ProductWindow />);
+      await act(async () => undefined);
+      play.mockClear();
+      act(() => cb([{ isIntersecting: false }]));
+      expect(pause).toHaveBeenCalled();
+      act(() => cb([{ isIntersecting: true }]));
+      expect(play).toHaveBeenCalled();
+    } finally {
+      play.mockRestore();
+      pause.mockRestore();
+    }
+  });
+
+  it("under reduced motion shows the poster and the sound button only (no autoplay)", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    vi.stubGlobal("matchMedia", vi.fn((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      expect(v.autoplay).toBe(false);
+      expect(v).toHaveAttribute("preload", "none");
+      expect(v).toHaveAttribute("poster", "/media/explainer-poster.jpg");
+      expect(play).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /Watch with sound/ })).toBeInTheDocument();
+    } finally {
+      play.mockRestore();
+    }
+  });
+
+  it("falls back to the mock when neither source can play", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    fireEvent.error(container.querySelectorAll("video source")[1]);
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector(".lp-mock")).not.toBeNull();
   });
 });
 
