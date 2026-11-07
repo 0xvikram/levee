@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { CompareChart, FaqSection, Footer, HederaStrip, HeroMedia, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { CompareChart, FaqSection, Footer, HederaStrip, HowSection, Landing, PricingSection, ProductWindow, ProofSection } from "./Landing";
 import { FALLBACK_SHOWCASE } from "../lib/incident";
 import { FACTS, INDUSTRY } from "../lib/numbers";
 import { DOCS, DOCS_URL, deploy } from "../lib/config";
@@ -39,73 +39,20 @@ describe("Landing structure", () => {
     expect(nav.querySelector(".lp-nav-cta")).toHaveAttribute("href", "/live");
   });
 
-  it("keeps media to the hero and the footer only", () => {
+  it("gives the hero one quiet, decorative engraving and no video or canvas; sections stay media-free", () => {
     const { container } = render(<Landing />);
     expect(container.querySelector("main")!.querySelectorAll("img, video, canvas, .dither")).toHaveLength(0);
     expect(container.querySelector(".lp-window-wrap")!.querySelectorAll("img, video")).toHaveLength(0);
-  });
-
-  it("plays the lighthouse loop behind the hero copy (webm then mp4, muted, looping, inline, poster, decorative)", () => {
-    const { container } = render(<Landing />);
-    expect(container.querySelector(".lp-hero .dither, .lp-hero canvas")).toBeNull();
-    const v = container.querySelector(".lp-hero video.lp-hero-media") as HTMLVideoElement;
-    expect(v).not.toBeNull();
-    expect(v).toHaveAttribute("aria-hidden", "true");
-    expect(v.muted).toBe(true);
-    expect(v.autoplay).toBe(true);
-    expect(v.loop).toBe(true);
-    expect(v.hasAttribute("playsinline")).toBe(true);
-    expect(v).toHaveAttribute("preload", "metadata");
-    expect(v).toHaveAttribute("poster", "/media/hero-lighthouse.jpg");
-    expect([...v.querySelectorAll("source")].map((s) => [s.getAttribute("src"), s.getAttribute("type")])).toEqual([
-      ["/media/hero-lighthouse.webm", "video/webm"],
-      ["/media/hero-lighthouse.mp4", "video/mp4"],
-    ]);
-  });
-
-  it("falls back to the poster still when neither video source can play", () => {
-    const { container } = render(<Landing />);
-    const sources = container.querySelectorAll(".lp-hero video source");
-    fireEvent.error(sources[1]);
-    expect(container.querySelector(".lp-hero video")).toBeNull();
-    const img = container.querySelector(".lp-hero img.lp-hero-media")!;
-    expect(img).toHaveAttribute("src", "/media/hero-lighthouse.jpg");
-    fireEvent.error(img);
-    expect(container.querySelector(".lp-hero .lp-hero-media")).toBeNull();
-  });
-
-  it("shows only the poster under reduced motion (no autoplay)", () => {
-    const mm = vi.fn((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-    vi.stubGlobal("matchMedia", mm);
-    try {
-      const { container } = render(<HeroMedia />);
-      expect(container.querySelector("video")).toBeNull();
-      expect(container.querySelector("img")).toHaveAttribute("src", "/media/hero-lighthouse.jpg");
-    } finally {
-      vi.unstubAllGlobals();
-      vi.stubGlobal("fetch", vi.fn(() => Promise.reject(new Error("offline"))));
-    }
-  });
-
-  it("pauses the hero video when it scrolls off screen and plays it when back", () => {
-    let cb: (e: { isIntersecting: boolean }[]) => void = () => undefined;
-    const IO = vi.fn(function (this: unknown, fn: typeof cb) {
-      cb = fn;
-      return { observe: vi.fn(), disconnect: vi.fn() };
-    });
-    vi.stubGlobal("IntersectionObserver", IO);
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
-    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
-    try {
-      render(<HeroMedia />);
-      cb([{ isIntersecting: false }]);
-      expect(pause).toHaveBeenCalled();
-      cb([{ isIntersecting: true }]);
-      expect(play).toHaveBeenCalled();
-    } finally {
-      play.mockRestore();
-      pause.mockRestore();
-    }
+    const hero = container.querySelector(".lp-hero")!;
+    expect(hero.querySelector("video")).toBeNull();
+    expect(hero.querySelectorAll("canvas, .dither, .lp-hero-media")).toHaveLength(0);
+    const art = hero.querySelectorAll("img");
+    expect(art).toHaveLength(1);
+    expect(art[0]).toHaveClass("lp-hero-art");
+    expect(art[0]).toHaveAttribute("src", "/media/engraving/hero.jpg");
+    expect(art[0]).toHaveAttribute("alt", "");
+    expect(art[0]).toHaveAttribute("aria-hidden", "true");
+    expect(container.innerHTML).not.toContain("hero-lighthouse");
   });
 
   it("styles the sections as the /logos patchwork: cobalt-deep cards holding cream patches", () => {
@@ -144,8 +91,11 @@ describe("Landing structure", () => {
 });
 
 describe("product window", () => {
-  it("is a link to /live titled levee · live, with a cobalt mock of the incident view (no media)", () => {
+  const videoHead = () => vi.fn(() => Promise.resolve(new Response(null, { status: 200, headers: { "content-type": "video/mp4" } })));
+
+  it("until the explainer exists, is a link to /live titled levee · live with a cobalt mock of the incident view (no media)", async () => {
     const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
     const a = screen.getByTestId("product-window");
     expect(a).toHaveAttribute("href", "/live");
     expect(a.textContent).toContain("levee · live");
@@ -156,27 +106,131 @@ describe("product window", () => {
     expect(mock.textContent).toMatch(/Request.*Receipt.*Transfer.*Check/);
   });
 
-  it("with video on, shows the poster that degrades to the mock", () => {
-    const { container } = render(<ProductWindow video />);
-    const a = screen.getByTestId("product-window");
-    expect(a).toHaveAttribute("href", "/live");
-    expect(a.textContent).toContain("levee · live");
-    expect(a.querySelectorAll(".lp-dots i")).toHaveLength(3);
-    const img = container.querySelector(".lp-window-body img")!;
-    expect(img).toHaveAttribute("src", "/media/demo-poster.jpg");
-    fireEvent.error(img);
-    expect(container.querySelector(".lp-window-body img")).toBeNull();
+  it("keeps the mock when the server answers the explainer with the SPA page (missing file)", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(new Response("<!doctype html>", { status: 200, headers: { "content-type": "text/html" } }))));
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector(".lp-mock")).not.toBeNull();
   });
 
-  it("with video on, attaches the demo (webm then mp4, muted, looping, inline) once near the screen", () => {
-    // jsdom has no IntersectionObserver, so the window counts as on screen at once
-    const { container } = render(<ProductWindow video />);
-    const v = container.querySelector("video")!;
+  it("plays the explainer muted, looping and inline with the captions track off (subtitles are burned in), webm then mp4, poster under it", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    const v = container.querySelector(".lp-window-body video") as HTMLVideoElement;
     expect(v).not.toBeNull();
     expect(v.muted).toBe(true);
     expect(v.loop).toBe(true);
+    expect(v.autoplay).toBe(true);
     expect(v.hasAttribute("playsinline")).toBe(true);
-    expect([...v.querySelectorAll("source")].map((s) => s.getAttribute("src"))).toEqual(["/media/demo.webm", "/media/demo.mp4"]);
+    expect(v.hasAttribute("controls")).toBe(false);
+    expect(v).toHaveAttribute("poster", "/media/explainer-poster.jpg");
+    expect([...v.querySelectorAll("source")].map((s) => s.getAttribute("src"))).toEqual(["/media/explainer.webm", "/media/explainer.mp4"]);
+    const t = v.querySelector("track")!;
+    expect(t).toHaveAttribute("kind", "captions");
+    expect(t).toHaveAttribute("srclang", "en");
+    expect(t).toHaveAttribute("src", "/media/explainer.vtt");
+    // the subtitles are burned into the picture: the track is offered but never on by default
+    expect(t.hasAttribute("default")).toBe(false);
+    for (const tt of Array.from(v.textTracks ?? [])) expect(tt.mode).not.toBe("showing");
+    // the window is not a link around a video; /live is the bar's own link
+    expect(screen.getByRole("link", { name: "Open live ↗" })).toHaveAttribute("href", "/live");
+    expect(container.querySelector(".lp-mock")).toBeNull();
+  });
+
+  it("has a sound pill on the video that unmutes and mutes it in place", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      const pill = screen.getByRole("button", { name: "Tap for sound" });
+      expect(pill.closest(".lp-window-body")).not.toBeNull();
+      v.currentTime = 12;
+      fireEvent.click(pill);
+      expect(v.muted).toBe(false);
+      expect(v.currentTime).toBe(12); // in place, no restart
+      expect(play).toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Mute" }));
+      expect(v.muted).toBe(true);
+      expect(screen.getByRole("button", { name: "Tap for sound" })).toBeInTheDocument();
+    } finally {
+      play.mockRestore();
+    }
+  });
+
+  it("'Watch with sound' unmutes, restarts from 0 and shows the controls, with the length once known", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      Object.defineProperty(v, "duration", { value: 170, configurable: true });
+      fireEvent.loadedMetadata(v);
+      const btn = screen.getByRole("button", { name: /Watch with sound \(2:50\)/ });
+      v.currentTime = 42;
+      fireEvent.click(btn);
+      expect(v.muted).toBe(false);
+      expect(v.currentTime).toBe(0);
+      expect(v.hasAttribute("controls")).toBe(true);
+      expect(play).toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: /Watch with sound/ })).toBeNull();
+    } finally {
+      play.mockRestore();
+    }
+  });
+
+  it("pauses the loop when scrolled off screen and plays it when back", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    let cb: (e: { isIntersecting: boolean }[]) => void = () => undefined;
+    vi.stubGlobal("IntersectionObserver", vi.fn(function (this: unknown, fn: typeof cb) {
+      cb = fn;
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    }));
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    try {
+      render(<ProductWindow />);
+      await act(async () => undefined);
+      play.mockClear();
+      act(() => cb([{ isIntersecting: false }]));
+      expect(pause).toHaveBeenCalled();
+      act(() => cb([{ isIntersecting: true }]));
+      expect(play).toHaveBeenCalled();
+    } finally {
+      play.mockRestore();
+      pause.mockRestore();
+    }
+  });
+
+  it("under reduced motion shows the poster and the sound button only (no autoplay)", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    vi.stubGlobal("matchMedia", vi.fn((q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() })));
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    try {
+      const { container } = render(<ProductWindow />);
+      await act(async () => undefined);
+      const v = container.querySelector("video") as HTMLVideoElement;
+      expect(v.autoplay).toBe(false);
+      expect(v).toHaveAttribute("preload", "none");
+      expect(v).toHaveAttribute("poster", "/media/explainer-poster.jpg");
+      expect(play).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /Watch with sound/ })).toBeInTheDocument();
+    } finally {
+      play.mockRestore();
+    }
+  });
+
+  it("falls back to the mock when neither source can play", async () => {
+    vi.stubGlobal("fetch", videoHead());
+    const { container } = render(<ProductWindow m={live} />);
+    await act(async () => undefined);
+    fireEvent.error(container.querySelectorAll("video source")[1]);
+    expect(container.querySelector("video")).toBeNull();
+    expect(container.querySelector(".lp-mock")).not.toBeNull();
   });
 });
 
@@ -222,7 +276,7 @@ describe("proof", () => {
     expect(screen.getByText("2.51 s")).toBeInTheDocument();
     expect(screen.getByText("5.62 s")).toBeInTheDocument();
     expect(screen.getByText(`false alarms in ${FACTS.matchedSends} payments`)).toBeInTheDocument();
-    expect(screen.getByText("623")).toBeInTheDocument();
+    expect(screen.getByText("721")).toBeInTheDocument();
     expect(screen.getByText(/Read live from the incidents topic/)).toBeInTheDocument();
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).toContain(`https://hashscan.io/testnet/transaction/${live.attackTx}`);
@@ -255,7 +309,8 @@ describe("pricing", () => {
     expect(container.textContent).toMatch(/\$300\/mo on mainnet/);
     expect(container.textContent).toMatch(/\$1,500/);
     expect(container.querySelector("form")).toBeNull();
-    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")!.startsWith(DOCS_URL.replace("/tree/", "/blob/")) || p.querySelector(".lp-btn")!.getAttribute("href") === DOCS_URL).toBe(true);
+    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")!.startsWith(`${DOCS_URL}/`)).toBe(true);
+    for (const p of plans) expect(p.querySelector(".lp-btn")).not.toHaveAttribute("target");
     expect(plans.map((p) => p.querySelector(".lp-btn")!.getAttribute("href"))).toEqual([DOCS.quickstart, DOCS.setup, DOCS.contact]);
   });
 });
@@ -290,6 +345,15 @@ describe("footer", () => {
       ["Security", DOCS.security],
       ["GitHub", "https://github.com/0xvikram/levee"],
     ]);
+    // Parley layout: logo, description and small links on the left, the columns on the right, all before the art
+    const top = container.querySelector(".lp-footer-top")!;
+    expect(top.querySelector(".lp-footer-brand .lp-footer-logo")).toHaveAttribute("href", "/");
+    expect(top.querySelector(".lp-footer-brand p")!.textContent).toMatch(/\S/);
+    expect(within(top.querySelector(".lp-footer-social") as HTMLElement).getByRole("link", { name: "Levee on GitHub" })).toHaveAttribute("href", "https://github.com/0xvikram/levee");
+    expect(top.querySelector(".lp-footer-cols")).not.toBeNull();
+    const footer = container.querySelector("footer")!;
+    expect([...footer.children].map((c) => c.className)).toEqual(["lp-footer-inner", "lp-footer-art"]);
+    expect(container.querySelector(".lp-footer-art")!.textContent).toBe("");
     const img = container.querySelector(".lp-footer-art img")!;
     expect(img).toHaveAttribute("src", "/media/footer-engraving.jpg");
     fireEvent.error(img);
@@ -299,9 +363,24 @@ describe("footer", () => {
 });
 
 describe("docs links", () => {
-  it("are all built from DOCS_URL (one line to swap for Mintlify)", () => {
-    for (const v of Object.values(DOCS)) expect(v === DOCS_URL || v.startsWith(DOCS_URL.replace("/tree/", "/blob/"))).toBe(true);
-    expect(DOCS.quickstart).toMatch(/docs-site\/quickstart\.mdx$/);
-    expect(DOCS.api).toMatch(/docs-site\/api-reference\/overview\.mdx$/);
+  it("are all built from DOCS_URL and point at the in-site docs (/docs)", () => {
+    expect(DOCS_URL).toBe("/docs");
+    for (const v of Object.values(DOCS)) expect(v === DOCS_URL || v.startsWith(`${DOCS_URL}/`)).toBe(true);
+    expect(DOCS.quickstart).toBe("/docs/quickstart");
+    expect(DOCS.api).toBe("/docs/api-reference/overview");
+  });
+
+  it("open in-app (no new tab) and navigate without a page load", () => {
+    const { container } = render(<Landing />);
+    const docsAnchors = [...container.querySelectorAll("a")].filter((a) => a.getAttribute("href")?.startsWith("/docs"));
+    expect(docsAnchors.length).toBeGreaterThanOrEqual(10);
+    for (const a of docsAnchors) expect(a).not.toHaveAttribute("target");
+    const hero = container.querySelector(".lp-hero-copy") as HTMLElement;
+    const push = vi.spyOn(window.history, "pushState");
+    fireEvent.click(within(hero).getByRole("link", { name: "Read the docs" }));
+    expect(push).toHaveBeenCalledWith(null, "", "/docs");
+    expect(window.location.pathname).toBe("/docs");
+    push.mockRestore();
+    window.history.replaceState(null, "", "/");
   });
 });

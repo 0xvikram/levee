@@ -9,7 +9,8 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["vite/client", "node"]
+    "resolveJsonModule": true,
+    "types": ["vite/client", "node", "mdx"]
   },
   "include": ["src", "vite.config.ts"]
 }

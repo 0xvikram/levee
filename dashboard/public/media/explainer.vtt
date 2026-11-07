@@ -1,0 +1,148 @@
+WEBVTT
+
+00:00:00.550 --> 00:00:03.300
+Most stablecoin hacks don't break any code.
+
+00:00:03.330 --> 00:00:06.130
+They use the issuer's own keys.
+
+00:00:06.704 --> 00:00:10.764
+In March, Resolv lost about twenty-five million dollars this way.
+
+00:00:10.934 --> 00:00:13.856
+It took about three hours to stop.
+
+00:00:13.886 --> 00:00:17.794
+Levee is a circuit breaker for stablecoin issuers on Hedera.
+
+00:00:17.824 --> 00:00:21.224
+It has one rule: no receipt, no movement.
+
+00:00:22.584 --> 00:00:24.964
+Think of the issuer's treasury as a vault.
+
+00:00:24.994 --> 00:00:28.478
+Before any coins leave, Levee writes a receipt on Hedera.
+
+00:00:28.508 --> 00:00:30.714
+Only then do the coins go out.
+
+00:00:30.744 --> 00:00:34.144
+A watcher checks every move against its receipt.
+
+00:00:36.427 --> 00:00:40.578
+Now a thief steals the keys and grabs coins, with no receipt.
+
+00:00:40.608 --> 00:00:42.725
+The watcher spots it in seconds.
+
+00:00:42.755 --> 00:00:46.155
+The vault locks, and the coins come back.
+
+00:00:48.647 --> 00:00:52.642
+To open the vault again, two of three admins must turn their keys.
+
+00:00:52.672 --> 00:00:56.972
+Levee can close the vault, but it can never open it.
+
+00:00:58.196 --> 00:01:01.548
+Here's the real thing, running live on Hedera testnet.
+
+00:01:01.578 --> 00:01:04.322
+Across the top: the treasury, total supply,
+
+00:01:04.352 --> 00:01:07.182
+payments matched, and zero false alarms.
+
+00:01:07.352 --> 00:01:09.463
+Every payment walks four steps.
+
+00:01:09.493 --> 00:01:11.737
+Request, receipt, transfer, check.
+
+00:01:11.907 --> 00:01:15.796
+On the right, proof you can scan, and every move as it happens.
+
+00:01:15.826 --> 00:01:17.625
+This chip says the payment machine
+
+00:01:17.655 --> 00:01:20.755
+passed its health check, stored on Arkiv.
+
+00:01:21.060 --> 00:01:24.979
+Let's send five hundred tokens to Asha Pay, a distributor.
+
+00:01:25.009 --> 00:01:28.295
+Levee checks the request, and writes the receipt first.
+
+00:01:28.325 --> 00:01:32.629
+Then a separate issuer signer finds it and adds the second signature.
+
+00:01:32.659 --> 00:01:36.359
+The transfer lands, and the check turns green: matched.
+
+00:01:36.971 --> 00:01:39.378
+Every step is a real transaction.
+
+00:01:39.408 --> 00:01:41.908
+Here's that transfer on HashScan.
+
+00:01:42.384 --> 00:01:45.213
+Now the hack: someone with the treasury keys sends
+
+00:01:45.243 --> 00:01:48.491
+ten thousand tokens straight out, with no receipt.
+
+00:01:48.521 --> 00:01:51.718
+The clock runs from the moment the theft hit the chain.
+
+00:01:51.748 --> 00:01:53.881
+Levee caught it at seven seconds.
+
+00:01:53.911 --> 00:01:58.811
+The treasury froze, and the tokens were taken back at ten and a half.
+
+00:01:58.841 --> 00:02:00.946
+Resolv took about three hours.
+
+00:02:00.976 --> 00:02:04.976
+On this run, Levee took ten and a half seconds.
+
+00:02:05.209 --> 00:02:07.857
+To reopen, two of three admins sign.
+
+00:02:07.887 --> 00:02:10.687
+And the treasury is open again.
+
+00:02:10.726 --> 00:02:14.950
+One more: a stolen minting key prints five thousand fake tokens.
+
+00:02:14.980 --> 00:02:16.485
+No receipt again.
+
+00:02:16.515 --> 00:02:18.743
+Levee wipes them in about four seconds,
+
+00:02:18.773 --> 00:02:22.144
+and total supply is back where it was.
+
+00:02:22.174 --> 00:02:24.084
+Levee is built on Hedera.
+
+00:02:24.114 --> 00:02:27.625
+Stablecoin Studio, the Consensus Service for receipts,
+
+00:02:27.655 --> 00:02:29.133
+Scheduled Transactions,
+
+00:02:29.163 --> 00:02:32.805
+threshold keys, a verified contract and the Mirror Node,
+
+00:02:32.835 --> 00:02:35.061
+with health passes on Arkiv.
+
+00:02:35.091 --> 00:02:39.228
+It's open source, and live at levee-theta.vercel.app.
+
+00:02:41.178 --> 00:02:43.678
+Levee: no receipt, no movement.

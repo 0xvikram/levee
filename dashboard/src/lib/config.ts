@@ -81,16 +81,15 @@ export const MIRROR = (env.VITE_MIRROR_URL as string | undefined) ?? `https://${
 export const GITHUB = "https://github.com/0xvikram/levee";
 export const ARKIV_EXPLORER = "https://rabdi.explorer.arkiv.network";
 
-// ---------------------------------------------------------------- docs (Mintlify, docs-site/)
-// TODO(mintlify): once the Mintlify site is connected, set DOCS_URL to its address
-// (e.g. "https://levee.mintlify.app") and DOCS_ON_MINTLIFY to true. Every docs link on the
-// landing page (nav, hero, pricing, footer) is built from these two lines.
-export const DOCS_ON_MINTLIFY = false;
-export const DOCS_URL = "https://github.com/0xvikram/levee/tree/build/docs-site";
+// ---------------------------------------------------------------- docs (docs-site/, rendered at /docs)
+// The Mintlify sources in docs-site/ are compiled into this site and served at /docs (pages/Docs.tsx).
+// Every docs link on the landing page (nav, hero, pricing, footer) is built from these lines and opens
+// in-app (router Link), so no docs link leaves the site.
+export const DOCS_URL = "/docs";
 
-/** Link to one docs page by its path in docs-site/ without the extension, e.g. "quickstart". */
+/** Link to one docs page by its path in docs-site/ without the extension, e.g. "quickstart" -> "/docs/quickstart". */
 export function docsLink(page: string): string {
-  return DOCS_ON_MINTLIFY ? `${DOCS_URL}/${page}` : `${DOCS_URL.replace("/tree/", "/blob/")}/${page}.mdx`;
+  return page === "index" || page === "" ? DOCS_URL : `${DOCS_URL}/${page}`;
 }
 
 export const DOCS = {
