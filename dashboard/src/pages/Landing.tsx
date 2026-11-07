@@ -11,10 +11,9 @@ import { usePrefersReducedMotion, useRiseIn } from "../lib/hooks";
 const SCOPE = `${GITHUB}/blob/build/docs/SCOPE.md`;
 /** The product window plays the recorded demo when true; until the new video lands it shows a cobalt mock with the live numbers. */
 export const DEMO_VIDEO = false;
-/** Media lives only in the hero and the footer. The hero is the lighthouse loop (8 s, seamless); its sky,
- *  sampled from the poster (the most common dark pixel in the top third), is the hero ground #0F2554. */
+/** Media lives only in the footer (the hero is a plain cobalt ground, Nov 2026). The engraving's sky, sampled
+ *  from its top rows with PIL, is #1F3F88 = --cobalt-sky, the footer ground, so the art meets it with no seam. */
 const ART = {
-  hero: { webm: "/media/hero-lighthouse.webm", mp4: "/media/hero-lighthouse.mp4", poster: "/media/hero-lighthouse.jpg", sky: "#0F2554" },
   footer: "/media/footer-engraving.jpg",
 };
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
@@ -38,7 +37,6 @@ export function Landing() {
         Skip to content
       </a>
       <header className="lp-hero">
-        <HeroMedia />
         <div className="lp-nav">
           <Link to="/" className="lp-logo">
             <SiteLogo />
@@ -92,65 +90,6 @@ export function Landing() {
 
       <Footer />
     </div>
-  );
-}
-
-// ---------------------------------------------------------------- hero media
-
-/** True when the browser asks to save data (Chrome's Save-Data / Lite mode). */
-function saveData(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-}
-
-/**
- * The hero's lighthouse loop: muted, looping and inline, webm then mp4, with the poster under it. It plays only
- * while the hero is on screen and pauses when scrolled away. Reduced motion, Save-Data or a video that cannot
- * load: the poster still instead. Decorative (aria-hidden). Shown whole, never cropped, so the Veo mark in its
- * bottom-right corner stays visible.
- */
-export function HeroMedia() {
-  const reduced = usePrefersReducedMotion();
-  const vid = useRef<HTMLVideoElement>(null);
-  const [lite] = useState(saveData);
-  const [videoOk, setVideoOk] = useState(true);
-  const [posterOk, setPosterOk] = useState(true);
-  const still = reduced || lite || !videoOk;
-
-  useEffect(() => {
-    const v = vid.current;
-    if (!v || still) return;
-    v.muted = true; // React does not always write the attribute, which autoplay needs
-    const play = () => v.play?.()?.catch(() => undefined);
-    if (typeof IntersectionObserver === "undefined") {
-      play();
-      return;
-    }
-    const io = new IntersectionObserver(([e]) => (e.isIntersecting ? play() : v.pause?.()));
-    io.observe(v);
-    return () => io.disconnect();
-  }, [still]);
-
-  if (still) {
-    return posterOk ? <img className="lp-hero-media" src={ART.hero.poster} alt="" aria-hidden="true" decoding="async" onError={() => setPosterOk(false)} /> : null;
-  }
-  return (
-    <video
-      ref={vid}
-      className="lp-hero-media"
-      aria-hidden="true"
-      muted
-      autoPlay
-      loop
-      playsInline
-      preload="metadata"
-      poster={ART.hero.poster}
-      onError={(e) => e.target === e.currentTarget && setVideoOk(false)}
-    >
-      <source src={ART.hero.webm} type="video/webm" />
-      {/* only the last <source> failing means neither could play */}
-      <source src={ART.hero.mp4} type="video/mp4" onError={() => setVideoOk(false)} />
-    </video>
   );
 }
 
@@ -743,60 +682,75 @@ export function FaqSection() {
 
 // ---------------------------------------------------------------- 7. footer
 
-/** Parley-style footer: brand and link columns over the engraving's empty sky, the coastline at the bottom. */
+/**
+ * Parley-style footer: everything sits on the plain sky (--cobalt-sky) above the art, never over it. Logo, a
+ * one-line description and small links on the left, the link columns on the right, the legal row, and then the
+ * full-width engraving with its sky fading into the same colour and the coastline flush at the bottom.
+ */
 export function Footer() {
   const [imgOk, setImgOk] = useState(true);
   return (
     <footer className="lp-footer">
       <div className="lp-footer-inner">
-        <div className="lp-footer-brand">
-          <span className="lp-footer-word">Levee</span>
-          <p className="serif">
-            No receipt, no <span className="accent">movement</span>.
-          </p>
-        </div>
-        <div className="lp-footer-cols">
-          <div>
-            <h2 className="lp-footer-h">Product</h2>
-            <Link to="/live">Live demo</Link>
-            <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
+        <div className="lp-footer-top">
+          <div className="lp-footer-brand">
+            <Link to="/" className="lp-footer-logo">
+              <SiteLogo />
+            </Link>
+            <p>Hack recovery for stablecoins on Hedera. No receipt, no movement.</p>
+            <div className="lp-footer-social">
+              <a href={GITHUB} target="_blank" rel="noreferrer" aria-label="Levee on GitHub">
+                <GitHubMark />
+              </a>
+              <a href={DOCS.home} target="_blank" rel="noreferrer">
+                Docs
+              </a>
+              <Link to="/live">Live demo</Link>
+            </div>
           </div>
-          <div>
-            <h2 className="lp-footer-h">Developers</h2>
-            <a href={DOCS.home} target="_blank" rel="noreferrer">
-              Docs
-            </a>
-            <a href={DOCS.quickstart} target="_blank" rel="noreferrer">
-              Quickstart
-            </a>
-            <a href={DOCS.api} target="_blank" rel="noreferrer">
-              API reference
-            </a>
-            <a href={DOCS.security} target="_blank" rel="noreferrer">
-              Security
-            </a>
-            <a href={GITHUB} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-          </div>
-          <div>
-            <h2 className="lp-footer-h">Proof</h2>
-            <a href={hashscan.token(deploy.token.tokenId)} target="_blank" rel="noreferrer">
-              Token {deploy.token.tokenId}
-            </a>
-            <a href={hashscan.contract(deploy.controller)} target="_blank" rel="noreferrer">
-              Contract {deploy.controller}
-            </a>
-            <a href={hashscan.topic(deploy.topics.incidents)} target="_blank" rel="noreferrer">
-              Incidents topic {deploy.topics.incidents}
-            </a>
-            <a href={`${MIRROR}/api/v1/topics/${deploy.topics.incidents}/messages?order=desc&limit=5`} target="_blank" rel="noreferrer">
-              Mirror Node feed
-            </a>
-            <a href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
-              Arkiv explorer
-            </a>
+          <div className="lp-footer-cols">
+            <div>
+              <h2 className="lp-footer-h">Product</h2>
+              <Link to="/live">Live demo</Link>
+              <a href="#how">How it works</a>
+              <a href="#pricing">Pricing</a>
+            </div>
+            <div>
+              <h2 className="lp-footer-h">Developers</h2>
+              <a href={DOCS.home} target="_blank" rel="noreferrer">
+                Docs
+              </a>
+              <a href={DOCS.quickstart} target="_blank" rel="noreferrer">
+                Quickstart
+              </a>
+              <a href={DOCS.api} target="_blank" rel="noreferrer">
+                API reference
+              </a>
+              <a href={DOCS.security} target="_blank" rel="noreferrer">
+                Security
+              </a>
+              <a href={GITHUB} target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+            </div>
+            <div>
+              <h2 className="lp-footer-h">Proof</h2>
+              <a href={hashscan.token(deploy.token.tokenId)} target="_blank" rel="noreferrer">
+                Token {deploy.token.tokenId}
+              </a>
+              <a href={hashscan.contract(deploy.controller)} target="_blank" rel="noreferrer">
+                Contract {deploy.controller}
+              </a>
+              <a href={hashscan.topic(deploy.topics.incidents)} target="_blank" rel="noreferrer">
+                Incidents topic {deploy.topics.incidents}
+              </a>
+              <a href={`${MIRROR}/api/v1/topics/${deploy.topics.incidents}/messages?order=desc&limit=5`} target="_blank" rel="noreferrer">
+                Mirror Node feed
+              </a>
+              <a href={ARKIV_EXPLORER} target="_blank" rel="noreferrer">
+                Arkiv explorer
+              </a>
+            </div>
           </div>
         </div>
         <div className="lp-footer-base">
@@ -808,5 +762,16 @@ export function Footer() {
         {imgOk && <img src={ART.footer} alt="" loading="lazy" decoding="async" onError={() => setImgOk(false)} />}
       </div>
     </footer>
+  );
+}
+
+function GitHubMark() {
+  return (
+    <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"
+      />
+    </svg>
   );
 }
