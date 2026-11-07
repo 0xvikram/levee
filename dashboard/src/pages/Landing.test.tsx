@@ -279,7 +279,8 @@ describe("pricing", () => {
     expect(container.textContent).toMatch(/\$300\/mo on mainnet/);
     expect(container.textContent).toMatch(/\$1,500/);
     expect(container.querySelector("form")).toBeNull();
-    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")!.startsWith(DOCS_URL.replace("/tree/", "/blob/")) || p.querySelector(".lp-btn")!.getAttribute("href") === DOCS_URL).toBe(true);
+    for (const p of plans) expect(p.querySelector(".lp-btn")!.getAttribute("href")!.startsWith(`${DOCS_URL}/`)).toBe(true);
+    for (const p of plans) expect(p.querySelector(".lp-btn")).not.toHaveAttribute("target");
     expect(plans.map((p) => p.querySelector(".lp-btn")!.getAttribute("href"))).toEqual([DOCS.quickstart, DOCS.setup, DOCS.contact]);
   });
 });
@@ -332,9 +333,24 @@ describe("footer", () => {
 });
 
 describe("docs links", () => {
-  it("are all built from DOCS_URL (one line to swap for Mintlify)", () => {
-    for (const v of Object.values(DOCS)) expect(v === DOCS_URL || v.startsWith(DOCS_URL.replace("/tree/", "/blob/"))).toBe(true);
-    expect(DOCS.quickstart).toMatch(/docs-site\/quickstart\.mdx$/);
-    expect(DOCS.api).toMatch(/docs-site\/api-reference\/overview\.mdx$/);
+  it("are all built from DOCS_URL and point at the in-site docs (/docs)", () => {
+    expect(DOCS_URL).toBe("/docs");
+    for (const v of Object.values(DOCS)) expect(v === DOCS_URL || v.startsWith(`${DOCS_URL}/`)).toBe(true);
+    expect(DOCS.quickstart).toBe("/docs/quickstart");
+    expect(DOCS.api).toBe("/docs/api-reference/overview");
+  });
+
+  it("open in-app (no new tab) and navigate without a page load", () => {
+    const { container } = render(<Landing />);
+    const docsAnchors = [...container.querySelectorAll("a")].filter((a) => a.getAttribute("href")?.startsWith("/docs"));
+    expect(docsAnchors.length).toBeGreaterThanOrEqual(10);
+    for (const a of docsAnchors) expect(a).not.toHaveAttribute("target");
+    const hero = container.querySelector(".lp-hero-copy") as HTMLElement;
+    const push = vi.spyOn(window.history, "pushState");
+    fireEvent.click(within(hero).getByRole("link", { name: "Read the docs" }));
+    expect(push).toHaveBeenCalledWith(null, "", "/docs");
+    expect(window.location.pathname).toBe("/docs");
+    push.mockRestore();
+    window.history.replaceState(null, "", "/");
   });
 });

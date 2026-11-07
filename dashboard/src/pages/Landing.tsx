@@ -50,9 +50,9 @@ export function Landing() {
             <a href="#how">How it works</a>
             <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
-            <a href={DOCS.home} target="_blank" rel="noreferrer">
+            <Link to={DOCS.home}>
               Docs
-            </a>
+            </Link>
           </nav>
           <Link to="/live" className="lp-btn primary small lp-nav-cta">
             Watch it live
@@ -71,9 +71,9 @@ export function Landing() {
             <Link to="/live" className="lp-btn primary">
               Watch it live
             </Link>
-            <a className="lp-btn ghost" href={DOCS.home} target="_blank" rel="noreferrer">
+            <Link className="lp-btn ghost" to={DOCS.home}>
               Read the docs
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -680,9 +680,9 @@ export function PricingSection() {
                   <li key={f}>{f}</li>
                 ))}
               </ul>
-              <a className={`lp-btn ${p.primary ? "primary" : "ghost"}`} href={p.href} target="_blank" rel="noreferrer">
+              <Link className={`lp-btn ${p.primary ? "primary" : "ghost"}`} to={p.href}>
                 {p.cta}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
@@ -774,9 +774,9 @@ export function Footer() {
               <a href={GITHUB} target="_blank" rel="noreferrer" aria-label="Levee on GitHub">
                 <GitHubMark />
               </a>
-              <a href={DOCS.home} target="_blank" rel="noreferrer">
+              <Link to={DOCS.home}>
                 Docs
-              </a>
+              </Link>
               <Link to="/live">Live demo</Link>
             </div>
           </div>
@@ -789,18 +789,18 @@ export function Footer() {
             </div>
             <div>
               <h2 className="lp-footer-h">Developers</h2>
-              <a href={DOCS.home} target="_blank" rel="noreferrer">
+              <Link to={DOCS.home}>
                 Docs
-              </a>
-              <a href={DOCS.quickstart} target="_blank" rel="noreferrer">
+              </Link>
+              <Link to={DOCS.quickstart}>
                 Quickstart
-              </a>
-              <a href={DOCS.api} target="_blank" rel="noreferrer">
+              </Link>
+              <Link to={DOCS.api}>
                 API reference
-              </a>
-              <a href={DOCS.security} target="_blank" rel="noreferrer">
+              </Link>
+              <Link to={DOCS.security}>
                 Security
-              </a>
+              </Link>
               <a href={GITHUB} target="_blank" rel="noreferrer">
                 GitHub
               </a>

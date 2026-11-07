@@ -243,3 +243,82 @@ describe("/live cobalt theme contrast", () => {
     for (const c of found) expect(allowed, `unexpected colour rgb(${c})`).toContain(c);
   });
 });
+
+/** /docs (pages/docs.css): cobalt main column, cobalt-deep sidebar and cards, cobalt-ink top bar, code blocks
+ *  and search panel. Fills are cream at 6-10%, yellow at 8% (warning callout), cobalt-ink at 35% (table head). */
+const DC = { cobalt: "#1A3892", deep: "#142C82", ink: "#0E1F5E", cream: "#F3EBD6", yellow: "#F2E34C" };
+const DC_FILL = (a: number, bg: string) => over(DC.cream, a, bg);
+const DC_DIM = (bg: string) => over(DC.cream, 0.74, bg);
+const DC_FAINT = (bg: string) => over(DC.cream, 0.64, bg);
+const DC_WARN = over(DC.yellow, 0.08, DC.cobalt);
+const DC_THEAD = over(DC.ink, 0.35, DC.cobalt);
+const DC_PAIRS: [string, string, string][] = [
+  ["cream body text on cobalt (article)", DC.cream, DC.cobalt],
+  ["cream-dim description / TOC links on cobalt", DC_DIM(DC.cobalt), DC.cobalt],
+  ["cream-faint overline on cobalt", DC_FAINT(DC.cobalt), DC.cobalt],
+  ["cream-dim sidebar links on cobalt-deep", DC_DIM(DC.deep), DC.deep],
+  ["cream-dim sidebar labels on cobalt-deep", DC_DIM(DC.deep), DC.deep],
+  ["cream sidebar link on its 6% hover fill", DC.cream, DC_FILL(0.06, DC.deep)],
+  ["cream active sidebar link on its 10% fill", DC.cream, DC_FILL(0.1, DC.deep)],
+  ["cream top bar links on cobalt-ink", DC.cream, DC.ink],
+  ["cream top bar link on its 10% hover fill", DC.cream, DC_FILL(0.1, DC.ink)],
+  ["cream search text on its 10% field over cobalt-ink", DC.cream, DC_FILL(0.1, DC.ink)],
+  ["cream-dim search placeholder on its 10% field over cobalt-ink", DC_DIM(DC_FILL(0.1, DC.ink)), DC_FILL(0.1, DC.ink)],
+  ["cream-dim search snippet on the cobalt-ink panel", DC_DIM(DC.ink), DC.ink],
+  ["cream-dim snippet on the selected 10% hit", DC_DIM(DC_FILL(0.1, DC.ink)), DC_FILL(0.1, DC.ink)],
+  ["cream code on cobalt-ink code block", DC.cream, DC.ink],
+  ["cream-dim code-bar label / copy on cobalt-ink", DC_DIM(DC.ink), DC.ink],
+  ["cream copy button on its 10% hover fill", DC.cream, DC_FILL(0.1, DC.ink)],
+  ["cream inline code on its 10% fill over cobalt", DC.cream, DC_FILL(0.1, DC.cobalt)],
+  ["cream inline code on its 10% fill inside a cobalt-deep card", DC.cream, DC_FILL(0.1, DC.deep)],
+  ["cream note callout on its 8% fill", DC.cream, DC_FILL(0.08, DC.cobalt)],
+  ["cream warning callout text on its 8% yellow fill", DC.cream, DC_WARN],
+  ["yellow warning label on its 8% yellow fill", DC.yellow, DC_WARN],
+  ["yellow link hover on cobalt", DC.yellow, DC.cobalt],
+  ["cream card title on cobalt-deep", DC.cream, DC.deep],
+  ["cream-dim card body / field type on cobalt-deep", DC_DIM(DC.deep), DC.deep],
+  ["cream-dim field type on cobalt", DC_DIM(DC.cobalt), DC.cobalt],
+  ["cobalt-ink required badge on yellow", DC.ink, DC.yellow],
+  ["cream table head on cobalt-ink 35%", DC.cream, DC_THEAD],
+  ["cream accordion summary on its 6% hover over cobalt-deep", DC.cream, DC_FILL(0.06, DC.deep)],
+  ["cream changelog label on its 10% pill", DC.cream, DC_FILL(0.1, DC.cobalt)],
+  ["cream step number on cobalt-ink", DC.cream, DC.ink],
+  ["cream / cream-dim mermaid text on cobalt boxes", DC_DIM(DC.cobalt), DC.cobalt],
+  ["cream mermaid edge label on cobalt-ink", DC.cream, DC.ink],
+  ["cobalt-ink mermaid note on yellow", DC.ink, DC.yellow],
+  ["cobalt-ink skip link on yellow", DC.ink, DC.yellow],
+];
+const DC_MARKS: [string, string, string][] = [
+  ["yellow focus ring on cobalt", DC.yellow, DC.cobalt],
+  ["yellow focus ring on cobalt-ink", DC.yellow, DC.ink],
+  ["yellow focus ring on cobalt-deep", DC.yellow, DC.deep],
+  ["yellow active-page bar on cobalt-deep", DC.yellow, DC.deep],
+  ["cream mermaid lines on cobalt-ink", DC.cream, DC.ink],
+];
+
+describe("/docs theme contrast", () => {
+  it.each(DC_PAIRS)("%s ≥ 4.5:1", (_name, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5);
+  });
+  it.each(DC_MARKS)("%s ≥ 3:1", (_name, fg, bg) => {
+    expect(ratio(fg, bg)).toBeGreaterThanOrEqual(3);
+  });
+  it("docs.css and the mermaid theme use no gold and only the cobalt/cream/yellow palette", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const allowed = new Set(["26,56,146", "20,44,130", "14,31,94", "31,63,136", "243,235,214", "242,227,76", "0,0,0"]);
+    const hex = (h: string) => {
+      const x = h.length === 4 ? h.slice(1).split("").map((c) => c + c).join("") : h.slice(1);
+      return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)).join(",");
+    };
+    for (const [f, min] of [["pages/docs.css", 10], ["docs/Mermaid.tsx", 10]] as const) {
+      const src = fs.readFileSync(path.resolve(__dirname, "../..", f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").toLowerCase();
+      expect(src).not.toContain("#7a5a00");
+      expect(src).not.toContain("var(--gold)");
+      const found = [...src.matchAll(/#[0-9a-f]{6}\b|#[0-9a-f]{3}\b/g)].map((m) => hex(m[0]));
+      found.push(...[...src.matchAll(/rgba?\((\d+),\s*(\d+),\s*(\d+)/g)].map((m) => `${m[1]},${m[2]},${m[3]}`));
+      expect(found.length, f).toBeGreaterThan(min);
+      for (const c of found) expect(allowed, `${f}: unexpected colour rgb(${c})`).toContain(c);
+    }
+  });
+});

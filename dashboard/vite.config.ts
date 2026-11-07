@@ -1,6 +1,9 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import mdx from "@mdx-js/rollup";
+import remarkGfm from "remark-gfm";
+import type { Plugin } from "vite";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -25,6 +28,32 @@ function publicDeploy() {
   }
 }
 
+/** docs-site/*.mdx start with YAML frontmatter (title, description). The docs UI reads it from the raw
+ *  source (src/docs/content.ts), so it is stripped here before MDX compiles the page body. */
+function stripFrontmatter(): Plugin {
+  return {
+    name: "levee-mdx-frontmatter",
+    enforce: "pre",
+    transform(code, id) {
+      if (!id.endsWith(".mdx")) return null;
+      return { code: code.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, ""), map: null };
+    },
+  };
+}
+
+/** @mdx-js/rollup ignores the query, so `page.mdx?raw` (the search index in src/docs/content.ts) would be compiled too. */
+function mdxPages(): Plugin {
+  const inner = mdx({ remarkPlugins: [remarkGfm] }) as Plugin & { transform: (this: unknown, code: string, id: string) => unknown };
+  return {
+    ...inner,
+    enforce: "pre",
+    transform(code, id) {
+      if (id.includes("?")) return null;
+      return inner.transform.call(this, code, id) as ReturnType<Extract<Plugin["transform"], (...a: never[]) => unknown>>;
+    },
+  };
+}
+
 const proxy = {
   "/api/gate": { target: "http://127.0.0.1:8710", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/gate/, "") },
   "/api/watcher": { target: "http://127.0.0.1:8711", changeOrigin: true, rewrite: (p: string) => p.replace(/^\/api\/watcher/, "") },
@@ -34,9 +63,9 @@ const proxy = {
 };
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [stripFrontmatter(), mdxPages(), react({ include: /\.(mdx|jsx|js|tsx|ts)$/ })],
   define: { __LEVEE_DEPLOY__: JSON.stringify(publicDeploy()) },
-  server: { port: 5173, proxy },
+  server: { port: 5173, proxy, fs: { allow: [".."] } },
   preview: { port: 4173, proxy },
   test: {
     environment: "jsdom",
