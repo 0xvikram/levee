@@ -29,5 +29,6 @@ jobs:
         working-directory: dashboard
         run: |
           npm ci
+          node scripts/sync-docs.mjs
           npx vitest run
           npm run build
