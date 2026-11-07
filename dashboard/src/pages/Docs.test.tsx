@@ -37,7 +37,7 @@ describe("docs content", () => {
     expect([...listed].sort()).toEqual([...ALL_MDX_SLUGS].sort());
     expect(TABS.map((t) => t.tab)).toEqual(["Documentation", "API reference", "Security", "Product"]);
     expect(PAGES[0].slug).toBe("index");
-    expect(PAGES).toHaveLength(31);
+    expect(PAGES).toHaveLength(32);
   });
 
   it("every page has a title and a description from its frontmatter", () => {
