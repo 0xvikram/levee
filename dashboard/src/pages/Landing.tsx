@@ -22,7 +22,7 @@ const ART = {
   footer: "/media/footer-engraving.jpg",
 };
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
-const ROOT_TESTS = 351 + 272; // root suite + dashboard suite, as run on 7 Nov 2026
+const ROOT_TESTS = 351 + 279; // root suite + dashboard suite, as run on 7 Nov 2026
 
 const sec = (s: number) => `${s.toFixed(2)} s`;
 const about = (s: number) => `~${Math.max(1, Math.round(s))} s`;

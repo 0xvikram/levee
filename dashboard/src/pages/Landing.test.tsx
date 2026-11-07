@@ -246,7 +246,7 @@ describe("proof", () => {
     expect(screen.getByText("2.51 s")).toBeInTheDocument();
     expect(screen.getByText("5.62 s")).toBeInTheDocument();
     expect(screen.getByText(`false alarms in ${FACTS.matchedSends} payments`)).toBeInTheDocument();
-    expect(screen.getByText("623")).toBeInTheDocument();
+    expect(screen.getByText("630")).toBeInTheDocument();
     expect(screen.getByText(/Read live from the incidents topic/)).toBeInTheDocument();
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).toContain(`https://hashscan.io/testnet/transaction/${live.attackTx}`);
