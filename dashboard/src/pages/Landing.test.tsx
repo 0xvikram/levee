@@ -59,7 +59,9 @@ describe("Landing structure", () => {
     const { container } = render(<Landing />);
     const main = container.querySelector("main")!;
     expect(main.querySelector("#problem .lp-card .lp-chart.lp-patch")).not.toBeNull();
-    expect(main.querySelector("#problem .lp-pill")!.textContent).toBe("01 · The problem");
+    expect(main.querySelector("#problem .lp-pill")!.textContent).toBe("02 · The problem");
+    expect(main.querySelector("#proof .lp-pill")!.textContent).toBe("01 · Proof");
+    expect(main.querySelector("#how .lp-ledger-panel.lp-patch")).not.toBeNull();
     expect(main.querySelectorAll("#proof .lp-stats li.lp-patch")).toHaveLength(5);
     expect(main.querySelectorAll("#fit .lp-card .lp-patch.lp-checks")).toHaveLength(2);
     expect(main.querySelectorAll("#faq .lp-card details > p.lp-patch")).toHaveLength(5);
@@ -70,7 +72,7 @@ describe("Landing structure", () => {
   it("puts the sections in the agreed order, each with a pill eyebrow", () => {
     const { container } = render(<Landing />);
     const ids = [...container.querySelectorAll("main > section")].map((s) => s.id);
-    expect(ids).toEqual(["problem", "how", "proof", "fit", "pricing", "faq"]);
+    expect(ids).toEqual(["proof", "problem", "how", "fit", "pricing", "faq"]);
     for (const s of container.querySelectorAll("main > section")) expect(s.querySelector(".lp-pill")).not.toBeNull();
     // the window and the Hedera strip come right after the hero, before main
     const order = [...container.querySelector(".lp")!.children].map((c) => c.className || c.tagName.toLowerCase());
@@ -248,25 +250,38 @@ describe("problem chart", () => {
 });
 
 describe("how it works", () => {
-  it("shows three cards with the live detection and containment times", () => {
-    const { container } = render(<HowSection m={live} />);
-    const cards = container.querySelectorAll(".lp-step");
-    expect(cards).toHaveLength(3);
-    expect(cards[0].textContent).toMatch(/Every payment gets a receipt on Hedera/);
-    expect(cards[1].textContent).toMatch(/No receipt = theft, caught in ~3 s/);
-    expect(cards[2].textContent).toMatch(/Frozen and taken back in ~6 s · 2 of 3 to unlock/);
-  });
-  it("uses no imagery: colour and type, each card a pill, a cream patch with a cobalt glyph, and a sentence", () => {
+  it("shows the receipt ledger with five scenarios, each a replay with its source", () => {
     const { container } = render(<HowSection m={live} />);
     expect(container.querySelector("img, video, canvas, .dither")).toBeNull();
-    const cards = [...container.querySelectorAll(".lp-step")];
-    expect(cards.map((c) => c.querySelector(".lp-pill")!.textContent)).toEqual(["A Receipt", "B Watch", "C Contain"]);
-    for (const c of cards) {
-      expect(c.classList.contains("lp-card")).toBe(true);
-      expect(c.querySelector(".lp-patch svg.lp-glyph")).not.toBeNull();
-    }
-    expect(cards[1].querySelector(".lp-step-fig")!.textContent).toBe("~3 s");
-    expect(cards[2].querySelector(".lp-step-fig")!.textContent).toBe("~6 s");
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((t) => t.textContent)).toEqual(["Honest payment", "Stolen keys", "Fake mint", "Forged receipt, too big", "Forged receipt, known partner"]);
+    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
+    expect(container.querySelector(".lp-ledger-src")!.textContent).toMatch(/^Replay · Recorded on Hedera testnet/);
+  });
+  it("stolen keys: no receipt, the live detection and wipe times, and HashScan links to the real run", () => {
+    const { container } = render(<HowSection m={live} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Stolen keys" }));
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.textContent).toContain("No receipt");
+    expect(panel.textContent).toContain("2.51 s");
+    expect(panel.textContent).toContain("5.62 s");
+    const hrefs = [...container.querySelectorAll(".lp-ledger-src a")].map((a) => a.getAttribute("href"));
+    expect(hrefs).toContain(`https://hashscan.io/testnet/transaction/${live.attackTx}`);
+    expect(hrefs).toContain(`https://hashscan.io/testnet/transaction/${live.wipeTx}`);
+  });
+  it("is honest about the forged-receipt cases: rule tests, not a testnet run, and the partner case is allowed but capped", () => {
+    render(<HowSection m={live} />);
+    fireEvent.click(screen.getByRole("tab", { name: "Forged receipt, known partner" }));
+    const panel = screen.getByRole("tabpanel");
+    expect(panel.textContent).toContain("not a testnet run");
+    expect(panel.textContent).toMatch(/Allowed/);
+    expect(panel.textContent).toMatch(/one day's cap/);
+  });
+  it("answers 'why not check before signing' in three rows, naming no competitor", () => {
+    const { container } = render(<HowSection m={live} />);
+    const rows = container.querySelectorAll('.lp-versus-table [role="row"]');
+    expect(rows).toHaveLength(4);
+    expect(rows[1].textContent).toMatch(/A stolen key signs a payment.*valid.*frozen and wiped/);
   });
 });
 
@@ -276,7 +291,7 @@ describe("proof", () => {
     expect(screen.getByText("2.51 s")).toBeInTheDocument();
     expect(screen.getByText("5.62 s")).toBeInTheDocument();
     expect(screen.getByText(`false alarms in ${FACTS.matchedSends} payments`)).toBeInTheDocument();
-    expect(screen.getByText("721")).toBeInTheDocument();
+    expect(screen.getByText("724")).toBeInTheDocument();
     expect(screen.getByText(/Read live from the incidents topic/)).toBeInTheDocument();
     const hrefs = [...container.querySelectorAll("a")].map((a) => a.getAttribute("href"));
     expect(hrefs).toContain(`https://hashscan.io/testnet/transaction/${live.attackTx}`);

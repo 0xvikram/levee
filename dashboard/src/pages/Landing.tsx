@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./landing.css";
 import { Link } from "../components/router";
 import { SiteLogo } from "../components/SiteLogo";
-import { ChevronMark } from "../components/logos";
+import { ReceiptLedger, VERSUS } from "../components/ReceiptLedger";
 import { ARKIV_EXPLORER, DOCS, GITHUB, MIRROR, deploy, hashscan } from "../lib/config";
 import { FACTS, INDUSTRY, TICKS, logPos } from "../lib/numbers";
 import { FALLBACK_SHOWCASE, useShowcase, type Showcase } from "../lib/incident";
@@ -25,10 +25,9 @@ const ART = {
   footer: "/media/footer-engraving.jpg",
 };
 /** Root suite (`npx vitest run` in the repo root, 7 Nov 2026). Shown with the CI link. */
-const ROOT_TESTS = 351 + 370; // root suite + dashboard suite, as run on 7 Nov 2026
+const ROOT_TESTS = 351 + 373; // root suite + dashboard suite, as run on 7 Nov 2026
 
 const sec = (s: number) => `${s.toFixed(2)} s`;
-const about = (s: number) => `~${Math.max(1, Math.round(s))} s`;
 
 export function Landing() {
   useRiseIn();
@@ -89,9 +88,9 @@ export function Landing() {
       <HederaStrip />
 
       <main id="main">
+        <ProofSection m={m} />
         <ProblemSection m={m} />
         <HowSection m={m} />
-        <ProofSection m={m} />
         <FitSection />
         <PricingSection />
         <FaqSection />
@@ -405,7 +404,7 @@ function ProblemSection({ m }: { m: Showcase }) {
       <div className="lp-inner">
         <div className="lp-card" data-rise>
           <CardHead
-            pill="01 · The problem"
+            pill="02 · The problem"
             id="problem-h"
             title={
               <>
@@ -476,97 +475,41 @@ export function CompareChart({ leveeS, leveeTx, live = false }: { leveeS: number
 
 // ---------------------------------------------------------------- 2. how it works
 
-/** Three wave lines, the water the watcher reads (from the chevron mark). */
-function Waves() {
-  return (
-    <svg className="lp-glyph" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <g fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <path d="M4.5 10 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
-        <path d="M4.5 17 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
-        <path d="M4.5 24 q2.875 -2.6 5.75 0 t5.75 0 t5.75 0 t5.75 0" />
-      </g>
-    </svg>
-  );
-}
-
-/** A closed lock: the treasury frozen. */
-function Lock() {
-  return (
-    <svg className="lp-glyph" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
-      <path d="M10 14 V10 a6 6 0 0 1 12 0 V14" fill="none" stroke="currentColor" strokeWidth="3" />
-      <rect x="6" y="14" width="20" height="14" rx="2.5" fill="currentColor" />
-      <rect x="14.75" y="18.5" width="2.5" height="5" rx="1.25" className="lp-glyph-cut" />
-    </svg>
-  );
-}
-
 export function HowSection({ m }: { m: Showcase }) {
-  const steps = [
-    {
-      letter: "A",
-      tag: "Receipt",
-      cap: "before signing",
-      glyph: <ChevronMark className="lp-glyph" />,
-      figure: "1 receipt",
-      figCap: "per payment, on a Hedera topic",
-      title: "Every payment gets a receipt on Hedera",
-      text: "Your payout service asks Levee first. Levee writes a receipt to a Hedera topic, then co-signs the payment.",
-    },
-    {
-      letter: "B",
-      tag: "Watch",
-      cap: "mirror node",
-      glyph: <Waves />,
-      figure: about(m.detectionS),
-      figCap: "theft to detected",
-      title: `No receipt = theft, caught in ${about(m.detectionS)}`,
-      text: "The watcher reads every movement from the Mirror Node. Anything that leaves without a receipt is a theft, whoever signed it.",
-    },
-    {
-      letter: "C",
-      tag: "Contain",
-      cap: "2 of 3 to reopen",
-      glyph: <Lock />,
-      figure: about(m.wipedS),
-      figCap: "frozen and taken back",
-      title: `Frozen and taken back in ${about(m.wipedS)} · 2 of 3 to unlock`,
-      text: "A close-only contract freezes the treasury and wipes the thief. Only 2 of 3 admins, signing together, can reopen.",
-    },
-  ];
   return (
     <section className="lp-section" id="how" aria-labelledby="how-h">
       <div className="lp-inner">
-        <div className="lp-sec-head" data-rise>
+        <div className="lp-card" data-rise>
           <CardHead
-            pill="02 · How it works"
+            pill="03 · How it works"
             id="how-h"
             title={
               <>
                 One rule: no receipt, no <span className="accent">movement</span>.
               </>
             }
-            caption="three parts"
+            caption="pick a scenario"
           />
+          <p className="lp-lede serif">Every payment needs a receipt on Hedera before it moves. The watcher matches what moved against the receipts, and anything without one is undone.</p>
+          <ReceiptLedger m={m} />
         </div>
-        <ol className="lp-steps">
-          {steps.map((s) => (
-            <li key={s.letter} className="lp-card lp-step" data-rise>
-              <div className="lp-card-head">
-                <span className="lp-pill">
-                  <b>{s.letter}</b> {s.tag}
-                </span>
-                <span className="lp-cap">{s.cap}</span>
+        <div className="lp-card lp-versus" data-rise>
+          <CardHead as="h3" pill="Why after, not only before" title="Most guards check before signing. A stolen key signs just fine." />
+          <div className="lp-patch lp-versus-table" role="table" aria-label="Checks before signing compared with Levee">
+            <div role="row" className="lp-versus-head">
+              <span role="columnheader">If…</span>
+              <span role="columnheader">Checks before signing</span>
+              <span role="columnheader">Levee</span>
+            </div>
+            {VERSUS.map((r) => (
+              <div role="row" key={r.case}>
+                <span role="cell">{r.case}</span>
+                <span role="cell" className="lp-muted-ink">{r.before}</span>
+                <span role="cell" className="lp-strong">{r.levee}</span>
               </div>
-              <figure className="lp-patch lp-step-panel" aria-hidden="true">
-                {s.glyph}
-                <b className="lp-step-fig mono">{s.figure}</b>
-                <figcaption>{s.figCap}</figcaption>
-              </figure>
-              <h3>{s.title}</h3>
-              <p className="lp-muted">{s.text}</p>
-            </li>
-          ))}
-        </ol>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -587,7 +530,7 @@ export function ProofSection({ m }: { m: Showcase }) {
       <div className="lp-inner">
         <div className="lp-card" data-rise>
           <CardHead
-            pill="03 · Proof"
+            pill="01 · Proof"
             id="proof-h"
             title={
               <>
