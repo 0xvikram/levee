@@ -109,7 +109,7 @@ export function useRiseIn(): void {
     root.classList.add("js-motion");
     const io = new IntersectionObserver(
       (entries) => entries.forEach((e) => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))),
-      { threshold: 0.18, rootMargin: "0px 0px -6% 0px" },
+      { threshold: 0.06, rootMargin: "0px 0px -4% 0px" },
     );
     els.forEach((e) => io.observe(e));
     return () => io.disconnect();
