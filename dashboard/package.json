@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "dev": "node scripts/sync-docs.mjs && vite",
+    "build": "node scripts/sync-docs.mjs && tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "node scripts/sync-docs.mjs && vitest run"
   },
   "dependencies": {
     "mermaid": "^12.3.0",

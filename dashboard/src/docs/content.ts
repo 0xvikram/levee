@@ -3,14 +3,14 @@
 // description. This module is only imported by the lazily loaded /docs route, so none of it (nor the
 // raw page text used for search) reaches the bundle for / or /live.
 import type { ComponentType } from "react";
-import docsConfig from "../../../docs-site/docs.json";
+import docsConfig from "../../docs-site/docs.json";
 import type { MDXComponents } from "mdx/types";
 
 export type MdxPage = ComponentType<{ components?: MDXComponents }>;
 
-const ROOT = "../../../docs-site/";
-const loaders = import.meta.glob<{ default: MdxPage }>("../../../docs-site/**/*.mdx");
-const raws = import.meta.glob<string>("../../../docs-site/**/*.mdx", { query: "?raw", import: "default", eager: true });
+const ROOT = "../../docs-site/";
+const loaders = import.meta.glob<{ default: MdxPage }>("../../docs-site/**/*.mdx");
+const raws = import.meta.glob<string>("../../docs-site/**/*.mdx", { query: "?raw", import: "default", eager: true });
 
 const slugOf = (file: string) => file.slice(ROOT.length).replace(/\.mdx$/, "");
 
