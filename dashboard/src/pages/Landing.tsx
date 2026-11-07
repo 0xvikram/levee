@@ -43,25 +43,24 @@ export function Landing() {
       <a className="lp-skip" href="#main">
         Skip to content
       </a>
+      <div className="lp-nav">
+        <Link to="/" className="lp-logo">
+          <SiteLogo />
+        </Link>
+        <nav aria-label="Main">
+          <a href="#how">How it works</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
+          <Link to={DOCS.home}>
+            Docs
+          </Link>
+        </nav>
+        <Link to="/live" className="lp-btn primary small lp-nav-cta">
+          Watch it live
+        </Link>
+      </div>
       <header className="lp-hero">
         <img className="lp-hero-art" src={ART.hero} alt="" aria-hidden="true" decoding="async" />
-        <div className="lp-nav">
-          <Link to="/" className="lp-logo">
-            <SiteLogo />
-          </Link>
-          <nav aria-label="Main">
-            <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
-            <a href="#faq">FAQ</a>
-            <Link to={DOCS.home}>
-              Docs
-            </Link>
-          </nav>
-          <Link to="/live" className="lp-btn primary small lp-nav-cta">
-            Watch it live
-          </Link>
-        </div>
-
         <div className="lp-hero-copy">
           <span className="lp-chip">
             <i aria-hidden="true" /> Live on Hedera {deploy.network}
